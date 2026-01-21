@@ -1,0 +1,7 @@
+numpy
+open3d
+wandb
+scikit-optimize
+opencv-python
+matplotlib
+openpyxl
