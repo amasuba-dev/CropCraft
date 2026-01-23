@@ -4,7 +4,7 @@ Albert J. Zhai, Xinlei Wang, Kaiyuan Li, Zhao Jiang, Junxiong Zhou, Sheng Wang, 
 
 3DV 2026 (Oral)
 
-[Paper](https://) │ [Project Page](https://)
+[Paper](https://arxiv.org/abs/2411.09693) │ [Project Page](https://ajzhai.github.io/CropCraft/)
 
 
 **TL;DR: Create 3D digital twins of crop fields from images**<br/>
@@ -49,9 +49,9 @@ Our code expects scene data (multi-view images + camera parameters) in Nerfstudi
 
 We provide datasets for soybean and maize fields collected near UIUC. These can be downloaded from the links below. The soybean data is captured using Polycam on an iPad Pro. The maize data is captured from a UAV using a high-resolution camera, so it is much larger in file size. See Section 4 of our paper for more info about the data.
 
-**[Soybean data (MB): this Box link]()**
+**[Download soybean data (0.9 GB)](https://uofi.box.com/shared/static/mtgt440bolnq9hqvn6xis4crbuxikcux.zip)**
 
-**[Maize data (GB): this Box link]()**
+**[Download maize data (71 GB)](https://uofi.app.box.com/shared/static/drv88sd6w32eig4ju0c2xbapbnfsop41.zip)**
 
 Create a directory at `./data` and unzip the data files there. Both files contain the same GT `field_measurements`, so you only need one copy of that.
 
