@@ -29,6 +29,15 @@ conda install -c "nvidia/label/cuda-11.8.0" cuda-toolkit
 pip install ninja git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch
 ```
 
+> [!NOTE]
+> This step requires a working NVIDIA driver (check with `nvidia-smi`). The `cuda-toolkit` conda package only installs the compiler (`nvcc`) and headers, not the driver itself — on Ubuntu, install it with `sudo apt install nvidia-driver-<version>` (see `ubuntu-drivers devices` for the recommended version) and reboot before continuing.
+>
+> If `pip install tiny-cuda-nn` fails with `error: #error -- unsupported GNU version! gcc versions later than 11 are not supported!`, your system's default GCC is too new for CUDA 11.8's `nvcc` (this affects Ubuntu 22.04+ and 24.04, which ship GCC ≥ 12). Fix it by installing GCC 11 alongside your default compiler and pointing `nvcc` at it for this one build:
+> ```bash
+> sudo apt install gcc-11 g++-11
+> NVCC_PREPEND_FLAGS='-ccbin /usr/bin/g++-11' pip install ninja git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch
+> ```
+
 Install Nerfstudio:
 ```bash
 cd nerfstudio
