@@ -34,7 +34,7 @@ USBFS_MEMORY_MIN_MB = 64   # two Kinect v2 depth transfer pools need ~16MB each
 try:
     from pylibfreenect2 import (
         Freenect2, SyncMultiFrameListener, FrameType,
-        Registration, Frame, CpuPacketPipeline,
+        Registration, Frame, OpenGLPacketPipeline,
     )
     KINECT_AVAILABLE = True
 except ImportError:
@@ -57,6 +57,20 @@ CAM_A_SERIAL = "003071363947"   # update from `Protonect --help` if different
 CAM_B_SERIAL = "006158144547"
 
 DEPTH_WIDTH, DEPTH_HEIGHT = 512, 424
+
+# Kinect v2's color auto-exposure isn't controllable via libfreenect2 (no
+# gain/exposure API), and the greenhouse has natural light only. Measured
+# RGB comes out consistently underexposed (~26/255 mean). A fixed gamma
+# curve applied identically to every frame recovers shadow visibility
+# without introducing shot-to-shot exposure drift across a plant's 12
+# views, which an adaptive per-image stretch would (bad for NeRF training,
+# which assumes consistent appearance across views of the same scene).
+RGB_GAMMA = 2.6
+_GAMMA_LUT = (np.linspace(0, 1, 256) ** (1.0 / RGB_GAMMA) * 255).astype(np.uint8)
+
+
+def gamma_correct(rgb: np.ndarray) -> np.ndarray:
+    return cv2.LUT(rgb, _GAMMA_LUT)
 
 
 # ---------------------------------------------------------------------------
@@ -186,7 +200,7 @@ class KinectDevice:
                 f"devices {serials}. Update CAM_A_SERIAL/CAM_B_SERIAL in this script."
             )
 
-        pipeline = CpuPacketPipeline()
+        pipeline = OpenGLPacketPipeline()
         self.device = self.fn.openDevice(self.serial.encode(), pipeline=pipeline)
         self.listener = SyncMultiFrameListener(FrameType.Color | FrameType.Depth)
         self.device.setColorFrameListener(self.listener)
@@ -251,8 +265,8 @@ def capture_single_shot(label: str, serial: str):
     """Open one camera, grab exactly one frame, close it again."""
     cam = KinectDevice(label, serial)
     print(f"  [{label}] opening...")
-    cam.open(warmup_frames=SHOT_WARMUP_FRAMES)
     try:
+        cam.open(warmup_frames=SHOT_WARMUP_FRAMES)
         return cam.capture()
     finally:
         cam.close()
@@ -284,6 +298,8 @@ def capture_plant(plant_id: str):
 
         rgb_a, depth_a = capture_single_shot("camA", CAM_A_SERIAL)
         rgb_b, depth_b = capture_single_shot("camB", CAM_B_SERIAL)
+        rgb_a = gamma_correct(rgb_a)
+        rgb_b = gamma_correct(rgb_b)
 
         a_rgb_path = images_dir / f"camA_{angle:03d}.png"
         a_dep_path = depth_dir / f"camA_{angle:03d}.png"
