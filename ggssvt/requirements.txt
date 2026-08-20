@@ -1,0 +1,18 @@
+# GG-SSVT dependencies.
+#
+# Deliberately minimal and separate from the repository root requirements.txt,
+# which pins the Nerfstudio stack for the original CropCraft pipeline. Nothing
+# here needs Open3D, OpenCV or Nerfstudio.
+#
+# The geometry half (data/, geometry/) runs on numpy and pillow alone -- no
+# PyTorch, no GPU. Install torch only to train or evaluate the model.
+
+numpy>=1.24
+pillow>=10.0
+
+# Model, training and evaluation. Match the CUDA build to your driver; see
+# https://pytorch.org/get-started/locally/
+torch>=2.0
+
+# Tests
+pytest>=7.0

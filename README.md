@@ -90,6 +90,21 @@ python evaluate.py --scene_name 20230801_S1
 ```
 The visualization and evaluation scripts can be executed in any order.
 
+## GG-SSVT
+
+This repository also contains [`ggssvt/`](ggssvt/), a Geometry-Grounded
+Self-Supervised Vision Transformer for label-efficient volumetric reconstruction
+and biomass estimation from the dual-Kinect single-plant captures in
+[`dataset/`](dataset/). It is independent of the Nerfstudio pipeline above and
+needs only NumPy, Pillow and PyTorch.
+
+```bash
+python -m ggssvt.cli inspect
+```
+
+See [`ggssvt/README.md`](ggssvt/README.md) for the pipeline, the evaluation
+protocol, and the known limitations of the capture set.
+
 ## Citation
 If you find this paper and repository useful, please consider citing:
 ```bibtex
