@@ -287,9 +287,9 @@ cut short, what completed is what the write-up needs.
 | `baseline_cnn` | reference | every comparison below is against this |
 | `h2_no_geometry` | **H2** | the geometry-grounding ablation; γ frozen at zero, capacity identical |
 | `h1_dinov2` | **H1** | ViT backbone against the CNN stem, inside the trained model |
-| `h3_bands_6_freq6` | **H3** | encoding trimmed to roughly the grid Nyquist |
-| `h3_bands_4_freq4` | **H3** | encoding below Nyquist — expected to hurt |
-| `h3_bands_16_freq10` | **H3** | encoding far above Nyquist — expected to add nothing |
+| `h3_bands_8_freq7` | **H3** | encoding matched to the grid Nyquist, 41.7 cyc/m |
+| `h3_bands_6_freq6` | **H3** | half the Nyquist, 20.8 cyc/m — expected to hurt |
+| `h3_bands_16_freq10` | **H3** | 8× the Nyquist, 333 cyc/m — expected to add nothing |
 | `sam3d_cnn`, `sam3d_dinov2` | factorial | tests whether the probe's interaction survives training |
 | `h1_dinov3` | H1 | if access has been granted |
 

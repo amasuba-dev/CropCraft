@@ -92,21 +92,25 @@ def _core_runs() -> list[Run]:
         # H3: the encoding reaches 83 cycles/m; the 12 mm grid tops out at 42.
         # If the top octaves carry nothing, cutting them should cost nothing --
         # which is the parameter-efficiency claim stated as an experiment.
+        # The band ladder is set by where each config's top frequency lands
+        # relative to the 41.7 cycles/m the 12 mm grid can represent. 2^7 over the
+        # 1.536 m extent is 41.7 exactly, so that run is the Nyquist match and the
+        # baseline's 2^8 sits one octave above it.
+        Run(
+            name="h3_bands_8_freq7",
+            question="H3: encoding matched to the grid Nyquist (41.7 cyc/m)",
+            fourier_bands=8,
+            fourier_max_freq=7.0,
+        ),
         Run(
             name="h3_bands_6_freq6",
-            question="H3: encoding trimmed to roughly the grid Nyquist",
+            question="H3: half the grid Nyquist (20.8 cyc/m); expected to hurt",
             fourier_bands=6,
             fourier_max_freq=6.0,
         ),
         Run(
-            name="h3_bands_4_freq4",
-            question="H3: encoding well below the grid Nyquist; expected to hurt",
-            fourier_bands=4,
-            fourier_max_freq=4.0,
-        ),
-        Run(
             name="h3_bands_16_freq10",
-            question="H3: encoding well above the grid Nyquist; expected to add nothing",
+            question="H3: eight times the grid Nyquist (333 cyc/m); expected to add nothing",
             fourier_bands=16,
             fourier_max_freq=10.0,
         ),

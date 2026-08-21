@@ -69,17 +69,29 @@ structural difference that the rest of this project keeps running into.
 
 ## H3b — The encoding is over-provisioned for the grid ✅ **established**
 
-| quantity | value |
-|---|---|
-| Fourier encoding top frequency (10 bands, 2⁸) | **83.3 cycles/m** |
-| Voxel grid Nyquist (12 mm) | **41.7 cycles/m** |
-| Encoding dimensions | 63 |
+Over the working extent (128 voxels × 12 mm = 1.536 m):
 
-**The encoding reaches twice as high as the grid can represent.** Everything
-above 41.7 cycles/m is spent describing detail the occupancy field cannot carry.
-That is the parameter-efficiency claim, stated as a measured quantity rather than
-an aspiration — and it predicts the encoding can be cut without loss, which
-H3e tests.
+| config | top frequency | encoding dims | model params |
+|---|---|---|---|
+| 16 bands @ 2¹⁰ | 333.3 cycles/m | 99 | 19,340,578 |
+| **10 bands @ 2⁸ (current)** | **83.3 cycles/m** | **63** | **19,326,754** |
+| 8 bands @ 2⁷ | **41.7 — the grid Nyquist exactly** | 51 | 19,322,146 |
+| 6 bands @ 2⁶ | 20.8 cycles/m | 39 | 19,317,538 |
+| voxel grid Nyquist (12 mm) | 41.7 cycles/m | — | — |
+
+**The current encoding reaches one full octave above what the grid can
+represent.** Everything above 41.7 cycles/m is spent describing detail the
+occupancy field cannot carry, and 2⁷ is the exact match.
+
+**But state the efficiency claim honestly.** Trimming 10 bands to 6 removes 24
+encoding dimensions and **9,216 parameters out of 19.3 million — 0.05%**. As a
+parameter count that is nothing, because the encoding feeds an MLP whose width
+dominates the budget. The defensible version of H3's "parameter efficiency" is
+therefore not *fewer weights* but *representational allocation*: whether the
+capacity spent on unrepresentable octaves buys anything. H3e measures that, and a
+null result there is itself the finding — it would say the encoding's reach is
+not what limits this model, which is worth knowing precisely because the proposal
+assumed otherwise.
 
 ## H3c — Mango saturates the grid Nyquist ✅ **established**
 
@@ -119,23 +131,30 @@ gives every view plenty of evidence; a small tuft on a large pot gives very litt
 per view and needs many of them. **Bandwidth does not predict view requirement**,
 and that non-obviousness is what makes the pair worth reporting together.
 
-## H3e — Trimming the encoding to the grid Nyquist costs nothing ⏳ **needs training**
+## H3e — Where the encoding's reach should sit ⏳ **needs training**
 
-The prediction from H3b: cutting the encoding from 10 bands at 2⁸ to 6 bands at
-2⁶ should leave reconstruction quality unchanged while removing parameters,
-because the removed octaves describe frequencies the grid cannot represent.
-Cutting further, to 4 bands at 2⁴, should hurt — it falls below the grid Nyquist.
+The prediction from H3b. Three runs bracket the grid Nyquist against
+`baseline_cnn`'s 2⁸:
 
-Three runs in the campaign, `h3_bands_*`, against `baseline_cnn`:
+| run | top frequency | vs. Nyquist | prediction |
+|---|---|---|---|
+| `h3_bands_8_freq7` | 41.7 cycles/m | matched | no change from baseline |
+| `h3_bands_6_freq6` | 20.8 cycles/m | half | should hurt |
+| `h3_bands_16_freq10` | 333.3 cycles/m | 8× | should add nothing |
 
 ```bash
 python -m ggssvt.campaign --plan core --device cuda
 ```
 
-Report occupancy AP, best-threshold IoU, biomass RMSE and **parameter count** for
-each, with the paired bootstrap against baseline. A flat result from 10→6 bands
-with fewer parameters *is* the parameter-efficiency claim; a drop at 4 bands
-confirms the mechanism rather than a coincidence.
+Report occupancy AP, best-threshold IoU and biomass RMSE for each, with the
+paired bootstrap against baseline. The shape of the curve is the result: flat
+from 2¹⁰ down to 2⁷ and dropping at 2⁶ confirms the grid Nyquist is the right
+place to set the encoding, and that the mechanism is band-limiting rather than
+capacity. A curve that is flat *everywhere*, 2⁶ included, says the encoding's
+reach is not a binding constraint on this model at all — also a result, and one
+that redirects the efficiency argument away from the encoding.
+
+Do not report this as a parameter saving. It is 0.05% of the weights.
 
 ## H3f — The Frequency Principle governs what converges ⏳ **needs training**
 
@@ -166,9 +185,10 @@ It also earns its place in the argument rather than sitting beside it:
 - **H3c explains a limit.** Mango is resolution-limited, not method-limited. That
   bounds what any method on this data can achieve, which the results chapter
   needs.
-- **H3b/H3e give a concrete efficiency result** — the kind of claim that survives
-  a small sample, because it is about representational capacity rather than a
-  difference in means at n=28.
+- **H3b/H3e are about representational capacity, not means.** That is the kind
+  of claim that survives n=28, where a difference in group averages does not.
+  The measured parameter saving is negligible, so the claim must be made about
+  where the encoding's reach should sit, not about weight count.
 - **H3f would explain the thin-structure failure** that the mesh arm ran into and
   that Paper 1 argues about.
 
