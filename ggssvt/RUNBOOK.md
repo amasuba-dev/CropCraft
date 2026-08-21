@@ -145,6 +145,17 @@ python -m ggssvt.cli preprocess
 python -m ggssvt.cli preprocess --segmenter sam3d --cache-dir work_dirs/ggssvt/cache_sam3d --sam-device cuda
 ```
 
+Then confirm the caches are sane before building on them:
+
+```bash
+python -m ggssvt.cli inspect && python -m ggssvt.cli baselines
+```
+
+`inspect` audits the raw dataset and reports the missing calibration; `baselines`
+prints the leave-one-out table the whole day is measured against. If `baselines`
+does not roughly reproduce geometric features at RMSE 0.397 / R² 0.526, the
+preprocessing differed from the reference run and everything after it will too.
+
 Expect 28/30 specimens through the quality gate on the geometric cache and 26/30
 on SAM3D — SAM3D additionally drops E015 and E019. About 4 s/specimen for the
 geometric pass and 5 s/specimen for SAM3D on the GPU, so under five minutes for
@@ -190,6 +201,52 @@ small/base/large improvement is far more persuasive than any one comparison —
 it is evidence the backbone is doing something rather than that one run got
 lucky. ViT-L/14 is 300M frozen parameters; it did not fit comfortably in 8 GB and
 fits easily in 16.
+
+### 3c. Mesh arm and reconstruction gallery (~5 min, CPU)
+
+```bash
+python -m ggssvt.cli mesh --export work_dirs/ggssvt/meshes
+```
+
+Marching cubes on the carved occupancy, then biomass from mesh descriptors —
+scored under the same leave-one-out protocol as every other method, so the table
+is directly comparable. It is currently the **best** method (RMSE 0.359,
+R² 0.613, against 0.397 / 0.526 for the voxel features), though the paired
+interval spans zero. `--export` also writes OBJ files for MeshLab.
+
+Needs `scikit-image` and `scipy`, both in `requirements.txt`. Nothing else in
+the pipeline depends on them.
+
+```bash
+python -m ggssvt.cli gallery
+```
+
+Contact sheets, PLY point clouds and a self-contained interactive HTML viewer of
+every reconstruction under both segmenters. Worth five minutes before committing
+to a day of training: it is how the "E001–E010 are mostly pot" problem became
+visible in the first place, and it will show immediately if a preprocessing run
+on this machine went wrong in a way the quality gate did not catch.
+
+---
+
+## What today's biomass numbers can and cannot say
+
+Read this before interpreting anything the afternoon produces.
+
+The Eucalyptus specimens are two batches with almost no overlap in mass —
+E001–E010 average 0.538 kg, E011–E020 average 1.844 kg. **Batch membership alone
+explains R² = 0.887**, which is more than any method achieves. Within either
+batch, no method clears R² = 0.2.
+
+So the comparison is measuring how well each method separates *size classes*, not
+how well it estimates mass among comparable plants. That is still a real
+comparison and worth running — a method that separates the classes better is
+extracting more from the reconstruction — but the headline claim it supports is
+"reconstructed geometry separates plant size classes", not "estimates biomass".
+
+Nothing today fixes this; only a capture batch spanning a continuous mass range
+within one species will. Note it in the log so the framing is decided now rather
+than at examination.
 
 ---
 
@@ -265,6 +322,17 @@ of the repository. Install upstream instead:
 pip install nerfstudio
 ```
 
+**Export the poses first — `ns-train` has nothing to read without them.** This
+runs in the `ggssvt` environment, not `cropcraft`, and writes `transforms.json`
+into each specimen directory:
+
+```bash
+conda activate ggssvt && python -m ggssvt.cli nerfstudio && conda activate cropcraft
+```
+
+Skip it and `ns-train` fails on a missing `transforms.json`, which reads like a
+Nerfstudio problem rather than a missing step.
+
 Then, on one good specimen and one bad one:
 
 ```bash
@@ -312,6 +380,52 @@ eucalyptus stems are exactly what falls off the bottom of that ranking.
 
 `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` helps with fragmentation
 across the 28 folds of a LOOCV sweep.
+
+---
+
+## End of day — collect the results
+
+```bash
+python -m ggssvt.cli report --folds work_dirs/ggssvt/reports/folds_geo_cnn.json
+```
+
+Writes `report.md`, `comparison.csv`, `metrics.json` and a predicted-versus-true
+scatter to `work_dirs/ggssvt/reports/`. Pass `--folds` to fold a GG-SSVT
+leave-one-out run into the comparison table alongside the baselines; without it
+you get the baselines only.
+
+```bash
+python -m ggssvt.cli visualise --plants M003 E001 E011
+```
+
+Rig overlays (the world axis projected into every view) and mask overlays. Run
+these if any registration looks suspect — if the red axis is not on the plant
+stem in all twelve frames, every number for that specimen is meaningless.
+
+---
+
+## Every command
+
+| Command | Needs | Roughly |
+|---|---|---|
+| `inspect` | nothing | seconds — dataset audit, no computation |
+| `access` | network | seconds — HuggingFace account and model access |
+| `preprocess` | dataset | 2–3 min per segmenter |
+| `baselines` | cache | seconds — LOOCV baseline table |
+| `mesh` | cache, scikit-image | ~1 min including the comparison |
+| `gallery` | cache | ~2 min — contact sheets, PLY, HTML viewer |
+| `visualise` | dataset | seconds per specimen |
+| `dino-probe` | cache, network | 5–15 min depending on variant |
+| `factorial` | both caches | ~10 min frozen; hours with `--train` |
+| `pretrain` | cache, **GPU** | ~25 min at 120 epochs |
+| `loocv` | cache, checkpoint, **GPU** | ~40 min at 60 fine-tune epochs |
+| `experiment` | cache, **GPU** | one pretrain + one LOOCV per backbone |
+| `nerfstudio` | dataset | seconds — writes `transforms.json` |
+| `report` | cache | seconds |
+
+`experiment` is the single-factor backbone comparison; `factorial` supersedes it
+by crossing backbone with segmenter. Use `experiment` only when you want
+backbones alone on one cache.
 
 ---
 
