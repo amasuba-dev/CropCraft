@@ -47,6 +47,15 @@ def _add_training(parser: argparse.ArgumentParser) -> None:
             "folds, so the default is a multi-day run on one GPU"
         ),
     )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=TRAIN.batch_size,
+        help=(
+            "specimens per step, each carrying 12 views. 1 fits 8 GB; 2 or 4 "
+            "roughly halves or quarters epoch time on a 16 GB card"
+        ),
+    )
 
 
 def _training_config(args: argparse.Namespace):
@@ -57,6 +66,7 @@ def _training_config(args: argparse.Namespace):
         TRAIN,
         num_workers=getattr(args, "workers", TRAIN.num_workers),
         finetune_epochs=getattr(args, "finetune_epochs", TRAIN.finetune_epochs),
+        batch_size=getattr(args, "batch_size", TRAIN.batch_size),
     )
 
 
