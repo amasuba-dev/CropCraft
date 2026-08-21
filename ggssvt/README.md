@@ -16,6 +16,14 @@ The four components named in the dissertation scaffold:
 | Biomass head | [`models/head.py`](models/head.py) | Volume integration with a modulated density prior |
 | SAM3D segmentation | [`geometry/sam3d.py`](geometry/sam3d.py) | Promptable masks made 3D-consistent across views |
 
+## Where the research stands
+
+- **[RESEARCH_STATUS.md](RESEARCH_STATUS.md)** — every research question and
+  hypothesis from the proposal, what answers it, what is pending, and what to do
+  about each. Includes the recommended scope change.
+- **[FINDINGS.md](FINDINGS.md)** — every experiment run, the deductions, the bugs
+  found, and what can be reported today.
+
 ## Setup and today's experiments
 
 See **[RUNBOOK.md](RUNBOOK.md)** for the environment setup, the ordered list of
