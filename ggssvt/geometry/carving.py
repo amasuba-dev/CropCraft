@@ -29,8 +29,6 @@ from ..config import (
     CARVE_DEPTH_MARGIN_M,
     CARVE_DEPTH_MARGIN_SLOPE,
     CARVE_MASK_DILATION,
-    CARVE_MAX_VOTES,
-    CARVE_MIN_INFORMATIVE_VIEWS,
     Intrinsics,
     KINECT_V2,
     POT_HEIGHT_M,
@@ -126,8 +124,8 @@ def carve(
     voxel_size_m: float = VOXEL_SIZE_M,
     depth_margin_m: float = CARVE_DEPTH_MARGIN_M,
     depth_margin_slope: float = CARVE_DEPTH_MARGIN_SLOPE,
-    max_carve_votes: int = CARVE_MAX_VOTES,
-    min_informative_views: int = CARVE_MIN_INFORMATIVE_VIEWS,
+    max_carve_votes: int | None = None,
+    min_informative_views: int | None = None,
     mask_dilation: int = CARVE_MASK_DILATION,
     chunk: int = 1 << 20,
 ) -> OccupancyVolume:
@@ -153,7 +151,9 @@ def carve(
         depth_margin_slope: quadratic term, ``margin = base + slope * z^2``.
             Kinect v2 range noise grows with the square of distance.
         max_carve_votes: how many views may rule a voxel out before it goes.
-        min_informative_views: views that must have an opinion at all.
+            Defaults to a quarter of the view count.
+        min_informative_views: views that must have an opinion at all. Defaults
+            to half the view count.
         mask_dilation: pixels to widen each subject mask by before carving.
         chunk: voxels processed per batch, to bound peak memory.
 
@@ -167,6 +167,18 @@ def carve(
     informative = np.zeros(n_voxels, dtype=np.int16)
 
     positions = [p for p in segmentations if p in rig.poses]
+
+    # Both thresholds scale with the number of views. The tuned values (6 and 3)
+    # were chosen against the full 12-view sweep, and holding them fixed makes a
+    # four-view carve return an empty volume rather than a poor one: no voxel can
+    # possibly have six informative views when only four exist. Deriving them
+    # keeps a view-count ablation measuring the reconstruction rather than a
+    # constant left over from a different protocol.
+    n_views = max(1, len(positions))
+    if min_informative_views is None:
+        min_informative_views = max(2, round(n_views / 2))
+    if max_carve_votes is None:
+        max_carve_votes = max(1, round(n_views / 4))
     masks = {
         position_id: dilate(segmentations[position_id].mask, mask_dilation)
         for position_id in positions

@@ -220,3 +220,52 @@ def test_psnr_is_infinite_for_identical_images_and_finite_otherwise():
 
     noisy = np.clip(image + 0.1, 0, 1)
     assert 15.0 < psnr(noisy, image) < 40.0
+
+
+def test_carve_thresholds_scale_with_the_view_count():
+    """A four-view carve must return a poor volume, not an empty one.
+
+    The tuned thresholds (6 informative views, 3 carve votes) were chosen against
+    the full 12-view sweep. Held fixed, they make any carve below six views
+    return nothing at all -- no voxel can have six informative views when only
+    four exist -- so a view-count ablation would measure the leftover constant
+    rather than the reconstruction.
+    """
+    from ggssvt.config import KINECT_V2
+    from ggssvt.geometry.carving import carve
+    from ggssvt.geometry.rig import RigSolution, nominal_view_pose
+    from ggssvt.geometry.segment import ViewSegmentation
+
+    def stub(position_id, pose):
+        # A subject filling the frame at a constant range: every voxel near the
+        # origin is supported and nothing is carved.
+        depth = np.full((KINECT_V2.height, KINECT_V2.width), 1.4, dtype=np.float32)
+        mask = np.ones_like(depth, dtype=bool)
+        return ViewSegmentation(
+            position_id=position_id, mask=mask, depth_m=depth,
+            points_world=np.zeros((0, 3), dtype=np.float32), colours=None,
+        )
+
+    for n_views in (3, 4, 6, 12):
+        step = 360 // n_views
+        ids = [f"camA_{a:03d}" for a in range(0, 360, step)]
+        poses = {p: nominal_view_pose(a, position_id=p)
+                 for p, a in zip(ids, range(0, 360, step))}
+        rig = RigSolution(plant_id="stub", poses=poses, warnings=[])
+        segs = {p: stub(p, poses[p]) for p in ids}
+
+        volume = carve(rig, segs, plant_id="stub")
+        assert volume.occupancy.any(), (
+            f"{n_views} views produced an empty volume; the thresholds did not scale"
+        )
+
+
+def test_carve_thresholds_can_still_be_overridden():
+    """The scaling is a default, not a policy."""
+    import inspect
+
+    from ggssvt.geometry.carving import carve
+
+    signature = inspect.signature(carve)
+    assert signature.parameters["min_informative_views"].default is None
+    assert signature.parameters["max_carve_votes"].default is None

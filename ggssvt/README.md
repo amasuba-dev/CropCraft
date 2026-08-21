@@ -487,6 +487,81 @@ needs specimens whose masses overlap across morphologies — the cheapest fix is
 a capture batch spanning a continuous mass range within one species, rather than
 more specimens of the two clusters already held.
 
+## How many views do you actually need?
+
+```bash
+python -m ggssvt.cli preprocess --views 4 --cache-dir work_dirs/ggssvt/cache_v4
+```
+
+Only divisors of 12 give a uniform subset, so 2, 3, 4 and 6 are accepted and
+anything else is refused rather than approximated — an uneven subset clusters the
+views on one side and biases the hull in a direction unrelated to the plant.
+
+### Reconstruction quality, and it is monotone
+
+| views | usable specimens | multi-view agreement | mean above-ground hull |
+|---|---|---|---|
+| 3 | 17/30 | 0.372 | 133.9 L |
+| 4 | 18/30 | 0.447 | 159.3 L |
+| 6 | 26/30 | 0.550 | 250.3 L |
+| **12** | **28/30** | **0.635** | **19.3 L** |
+
+Usable count and multi-view agreement both improve monotonically with view count,
+which justifies the 12-view protocol on its own. The volume column is the blunter
+finding: **below twelve views the carve is uselessly loose.** A hull of 130–250 L
+above the pot rim, for plants weighing at most 2.35 kg, is not a reconstruction —
+four silhouettes simply do not constrain a branching plant. Four views at 90° is
+the classic visual-hull minimum for a convex object, and a plant is the opposite
+of convex.
+
+*Caveat on that column:* the carve thresholds scale with view count (see below),
+so the volumes are not a pure view-count effect. The usable-count and agreement
+columns do not depend on that scaling and are clean.
+
+### The biomass comparison across view counts is not informative
+
+Only 15 specimens pass the quality gate under *every* view count, and on that
+subset almost every R² is negative — worse than predicting the mean. Twelve views
+against four is ΔRMSE −0.000 kg, 95% CI [−0.106, +0.105]. The apparent ordering
+is noise and should not be read; the reconstruction metrics above are the result.
+
+### A bug this ablation exposed
+
+`CARVE_MIN_INFORMATIVE_VIEWS = 6` and `CARVE_MAX_VOTES = 3` were tuned against
+the 12-view sweep. Held fixed, a four-view carve returns an **empty** volume
+rather than a poor one — no voxel can have six informative views when only four
+exist — so the first run of this ablation reported 0/30 usable at 3 and 4 views,
+which looks like a finding and is a leftover constant. Both thresholds now derive
+from the view count (half and a quarter respectively) unless passed explicitly,
+with a regression test that carves at 3, 4, 6 and 12 views and asserts none comes
+back empty.
+
+## Can the CropCraft pipeline be reused?
+
+Not directly, and it is worth being precise about why, because the repository
+sitting alongside this one looks like it should apply.
+
+| CropCraft assumes | This dataset is |
+|---|---|
+| Crop plants in **field rows** (sequential RANSAC row fitting in `align_and_render.py`) | Single potted plants on a floor, no rows |
+| **Maize or soybean** procedural morphology (`morphology/maize_model.py`, `soybean_model.py`) | Mango and Eucalyptus |
+| Ground truth as **LAI and leaf-angle distribution** from field surveys (`evaluate.py`) | Fresh mass on a scale, per plant |
+| NeRF from SfM poses over a field traverse | 12 registered RGB-D views on a circle |
+
+Applying it would mean writing a mango and a eucalyptus procedural morphology
+model — which is the paper's central contribution, not a configuration change.
+
+**But its core idea is the principled fix for the failure documented above.** The
+canopy-area hypothesis failed because a visual hull's surface is *envelope* area,
+not leaf area: twelve views at 12 mm voxels cannot resolve individual leaves.
+Inverse procedural modelling sidesteps that entirely — it fits a biologically
+plausible parametric model whose leaves are explicit, so leaf area becomes a
+*model parameter* rather than something the sensor has to see. That is exactly
+the quantity a leafy canopy's mass scales with.
+
+That is a research direction rather than a code path, and a substantial one. It
+is also the most promising route past the ceiling this dataset currently hits.
+
 ## Known limitations
 
 - **Registration is estimated, not measured.** See above.

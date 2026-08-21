@@ -31,7 +31,7 @@ from ..config import (
 from ..geometry.carving import carve, largest_connected_component, surface_coverage
 from ..geometry.rig import estimate_rig
 from ..geometry.segment import multiview_agreement, segment_specimen
-from .dataset import Specimen, load_dataset, load_specimen
+from .dataset import Specimen, load_dataset, load_specimen, select_views
 
 CACHE_VERSION = 2
 
@@ -96,6 +96,7 @@ def preprocess_specimen(
     seed: int = 0,
     segmenter: str = "geometric",
     sam_segmenter=None,
+    n_views: int | None = None,
 ) -> SpecimenQuality:
     """Run the geometry pipeline for one specimen and write its cache entry.
 
@@ -109,6 +110,9 @@ def preprocess_specimen(
             reused across specimens so the weights load once.
     """
     cache_dir.mkdir(parents=True, exist_ok=True)
+
+    if n_views is not None:
+        specimen = select_views(specimen, n_views)
 
     rig = estimate_rig(specimen, seed=seed)
 
@@ -220,6 +224,7 @@ def preprocess_dataset(
     segmenter: str = "geometric",
     sam_model: str = "base",
     sam_device: str = "cpu",
+    n_views: int | None = None,
 ) -> list[SpecimenQuality]:
     """Preprocess every specimen and write a quality report beside the cache."""
     specimens = (
@@ -243,6 +248,7 @@ def preprocess_dataset(
             seed=seed,
             segmenter=segmenter,
             sam_segmenter=sam_segmenter,
+            n_views=n_views,
         )
         report.append(quality)
         if verbose:

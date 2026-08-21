@@ -202,6 +202,7 @@ def cmd_preprocess(args: argparse.Namespace) -> int:
         segmenter=args.segmenter,
         sam_model=args.sam_model,
         sam_device=args.sam_device,
+        n_views=args.views,
     )
     usable = sum(1 for q in report if q.is_usable())
     print(f"\n{usable}/{len(report)} specimens passed the quality gate.")
@@ -681,6 +682,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--sam-model", default="base", help="SAM checkpoint: base | large | huge"
     )
     preprocess.add_argument("--sam-device", default="cpu")
+    preprocess.add_argument(
+        "--views", type=int, default=None,
+        help=(
+            "use an evenly spaced subset of the 12 views (must divide 12: "
+            "2, 3, 4, 6). Needs its own --cache-dir"
+        ),
+    )
     preprocess.set_defaults(func=cmd_preprocess)
 
     baselines = sub.add_parser("baselines", help="LOOCV baselines from the cache")

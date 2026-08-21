@@ -8,6 +8,7 @@ from .dataset import (
     load_dataset,
     load_ground_truth,
     load_specimen,
+    select_views,
 )
 from .io import backproject, excess_green, load_depth, load_rgb, project
 from .naming import Position, PositionIdError, parse_position, resolve_positions
@@ -26,6 +27,7 @@ __all__ = [
     "load_ground_truth",
     "load_rgb",
     "load_specimen",
+    "select_views",
     "parse_position",
     "project",
     "resolve_positions",

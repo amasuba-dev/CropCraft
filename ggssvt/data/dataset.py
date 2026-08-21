@@ -219,6 +219,47 @@ def load_specimen(
     )
 
 
+def select_views(specimen: "Specimen", n_views: int) -> "Specimen":
+    """Keep an evenly spaced subset of a specimen's views.
+
+    The rig captures 12 azimuths at 30 degree steps, so only divisors of 12 give
+    a genuinely uniform subset. Anything else would cluster views on one side and
+    the resulting hull would be biased in a direction that has nothing to do with
+    the plant, so this refuses rather than approximating.
+
+    Four views at 90 degrees is the classic minimum for a visual hull, and is the
+    protocol the predecessor project on this rig used.
+
+    Args:
+        specimen: the full 12-view specimen.
+        n_views: how many to keep. Must divide 12.
+
+    Returns:
+        A new :class:`Specimen` carrying only the selected views.
+    """
+    if n_views >= specimen.n_views:
+        return specimen
+    if specimen.n_views % n_views != 0:
+        raise ValueError(
+            f"{n_views} does not divide the {specimen.n_views} captured views, so "
+            "the subset would not be evenly spaced in azimuth. Use a divisor: "
+            f"{sorted(d for d in range(2, specimen.n_views) if specimen.n_views % d == 0)}"
+        )
+
+    stride = specimen.n_views // n_views
+    ordered = sorted(specimen.views, key=lambda v: v.azimuth_deg)
+    kept = ordered[::stride][:n_views]
+
+    return Specimen(
+        plant_id=specimen.plant_id,
+        root=specimen.root,
+        views=kept,
+        ground_truth=specimen.ground_truth,
+        warnings=list(specimen.warnings)
+        + [f"using {n_views} of {specimen.n_views} views, every {stride * 30} degrees"],
+    )
+
+
 def load_dataset(
     *,
     plants_dir: Path = PLANTS_DIR,
@@ -294,4 +335,5 @@ __all__ = [
     "load_dataset",
     "load_ground_truth",
     "load_specimen",
+    "select_views",
 ]
