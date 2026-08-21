@@ -91,35 +91,44 @@ def normalise_world(points: torch.Tensor, extent_m: float = VOLUME_EXTENT_M) -> 
 def patch_centroids(
     points_world: torch.Tensor,
     valid: torch.Tensor,
-    patch_size: int,
+    grid_size: tuple[int, int],
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Reduce a per-pixel world-point map to one 3D anchor per patch.
+    """Reduce a per-pixel world-point map to one 3D anchor per token.
 
-    The anchor is the mean of the patch's valid back-projected points. Patches
+    The anchor is the mean of the token's valid back-projected points. Tokens
     with no valid depth -- background, or a hole in the Kinect return -- get a
     zero anchor and are reported as invalid, so the caller can fall back to a
-    learned token rather than pretending the patch sits at the world origin.
+    learned token rather than pretending the token sits at the world origin.
+
+    Takes a target *grid size* rather than a patch size so the anchors align with
+    whatever token grid the appearance backbone produces. DINOv2 uses 14-pixel
+    patches and DINOv3 uses 16, and each resizes its input; deriving the grid
+    from a fixed patch size would silently misalign anchors with tokens for at
+    least one of them.
 
     Args:
         points_world: ``(B, V, 3, H, W)`` world coordinates per pixel.
         valid: ``(B, V, 1, H, W)`` mask of pixels with usable depth.
-        patch_size: side of the square patch.
+        grid_size: ``(grid_h, grid_w)`` token grid to pool onto.
 
     Returns:
         ``(centroids, patch_valid)`` of shape ``(B, V, P, 3)`` and ``(B, V, P)``
-        where ``P`` is the number of patches per view.
+        where ``P = grid_h * grid_w``.
     """
     batch, views, _, height, width = points_world.shape
     flat_points = points_world.reshape(batch * views, 3, height, width)
     flat_valid = valid.reshape(batch * views, 1, height, width).to(flat_points.dtype)
 
-    summed = F.avg_pool2d(flat_points * flat_valid, patch_size) * (patch_size ** 2)
-    counts = F.avg_pool2d(flat_valid, patch_size) * (patch_size ** 2)
+    # Adaptive pooling returns means over each cell; the cell sizes cancel in the
+    # ratio, so the result is the mean over valid pixels regardless of whether
+    # the grid divides the image evenly.
+    summed = F.adaptive_avg_pool2d(flat_points * flat_valid, grid_size)
+    counts = F.adaptive_avg_pool2d(flat_valid, grid_size)
 
-    centroids = summed / counts.clamp(min=1.0)
+    centroids = summed / counts.clamp(min=1e-6)
     patch_valid = counts.squeeze(1) > 0
 
-    n_patches = centroids.shape[-1] * centroids.shape[-2]
+    n_patches = grid_size[0] * grid_size[1]
     centroids = centroids.reshape(batch, views, 3, n_patches).permute(0, 1, 3, 2)
     patch_valid = patch_valid.reshape(batch, views, n_patches)
 

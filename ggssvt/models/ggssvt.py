@@ -80,6 +80,8 @@ class GGSSVT(nn.Module):
             dropout=config.dropout,
             tokens_per_view=tokens_per_view,
             backbone=config.backbone,
+            backbone_variant=config.backbone_variant,
+            freeze_backbone=config.freeze_backbone,
         )
         self.fusion = CrossViewFusion(
             embed_dim=config.embed_dim,
@@ -231,7 +233,11 @@ class GGSSVT(nn.Module):
         everything already trained, so thirty labels cannot undo what the
         self-supervised stage learned.
         """
-        backbone = list(self.encoder.parameters()) + list(self.fusion.parameters())
+        backbone = [
+            p
+            for p in list(self.encoder.parameters()) + list(self.fusion.parameters())
+            if p.requires_grad
+        ]
         decoder = list(self.decoder.parameters())
         head = list(self.head.parameters())
 

@@ -178,3 +178,45 @@ def test_f_score_can_stay_high_while_volume_is_wrong():
     assert metrics.recall == pytest.approx(1.0)
     assert metrics.f_score == pytest.approx(1.0)
     assert metrics.voxel_iou < 0.6
+
+
+def test_hd95_ignores_a_single_outlier_that_hausdorff_reports():
+    """Why HD95 and not raw Hausdorff on a carved hull."""
+    from ggssvt.eval.metrics import hausdorff
+
+    rng = np.random.default_rng(0)
+    truth = rng.uniform(0, 0.2, size=(500, 3))
+    predicted = np.vstack([truth, np.array([[9.0, 9.0, 9.0]])])   # one stray speck
+
+    result = hausdorff(predicted, truth)
+    assert result["hausdorff"] > 5.0        # the speck sets the worst case
+    assert result["hd95"] < 0.1             # the percentile shrugs it off
+
+
+def test_hd95_recall_detects_a_missing_branch():
+    """The direction that measures missing canopy."""
+    from ggssvt.eval.metrics import hausdorff
+
+    body = np.random.default_rng(1).uniform(0, 0.1, size=(400, 3))
+    branch = np.column_stack(
+        [np.full(60, 0.05), np.full(60, 0.05), np.linspace(0.3, 0.8, 60)]
+    )
+    truth = np.vstack([body, branch])
+
+    complete = hausdorff(truth, truth)
+    missing = hausdorff(body, truth)        # reconstruction dropped the branch
+
+    assert complete["hd95_recall"] == pytest.approx(0.0, abs=1e-9)
+    assert missing["hd95_recall"] > 0.3
+    # Precision is unaffected: everything predicted is still correct.
+    assert missing["hd95_precision"] == pytest.approx(0.0, abs=1e-9)
+
+
+def test_psnr_is_infinite_for_identical_images_and_finite_otherwise():
+    from ggssvt.eval.metrics import psnr
+
+    image = np.random.default_rng(0).random((16, 16, 3))
+    assert psnr(image, image) == float("inf")
+
+    noisy = np.clip(image + 0.1, 0, 1)
+    assert 15.0 < psnr(noisy, image) < 40.0

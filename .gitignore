@@ -1,4 +1,9 @@
 data/
+# ...but not Nerfstudio's own source package. The bare `data/` rule above
+# matches at any depth, which silently excluded nerfstudio/nerfstudio/data/
+# (dataparsers, datasets, pixel samplers) from the vendored copy, leaving it
+# unimportable.
+!nerfstudio/nerfstudio/data/
 preds/
 wandb/
 work_dirs/

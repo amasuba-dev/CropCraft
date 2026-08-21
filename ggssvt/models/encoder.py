@@ -1,12 +1,19 @@
 """Per-view token encoder with geometry-driven token selection.
 
-Two design points matter here.
+Box 3 of the system diagram. Three design points matter here.
 
-**RGB-D patches, not RGB patches.** The stem consumes colour, metric depth and a
-validity channel together. Depth is what makes a token's 3D anchor computable at
-all, and the validity channel stops the network reading the Kinect's zero-return
-holes as "surface at range zero" -- those holes are common on the thin stems and
-dark pots in this capture set.
+**A swappable appearance backbone.** The stem is one of the interchangeable
+backbones in :mod:`ggssvt.models.backbones` -- a trainable RGB-D CNN (no DINO),
+DINOv2, or DINOv3. Everything downstream is identical across the three, so the
+difference between their results is attributable to the backbone alone.
+
+**RGB-D patches, not RGB patches.** Every condition sees colour, metric depth and
+a validity channel. Depth is what makes a token's 3D anchor computable at all,
+and the validity channel stops the network reading the Kinect's zero-return holes
+as "surface at range zero" -- those holes are common on the thin stems and dark
+pots in this capture set. The frozen DINO backbones cannot ingest depth through
+their RGB trunk, so they take it through a parallel stem instead; see
+:class:`~ggssvt.models.backbones._DinoBackbone`.
 
 **Subject-driven token pruning.** The plant occupies about four percent of each
 512x424 frame; the rest is greenhouse floor and background. Keeping every patch
@@ -16,8 +23,7 @@ spend almost all of the attention budget on concrete. Because the views are
 registered, the subject mask is already known, so the encoder keeps the ``K``
 patches per view with the most subject coverage and discards the rest. This is
 not a heuristic bolted on for speed -- it is only available *because* the model
-is geometry-grounded, and it is what brings the cross-view attention in
-:mod:`ggssvt.models.attention` within reach of a single consumer GPU.
+is geometry-grounded.
 """
 
 from __future__ import annotations
@@ -27,78 +33,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from ..config import MODEL
+from .backbones import Backbone, build_backbone
 from .embedding import GeometryGroundedEmbedding, patch_centroids
-
-
-class PatchStem(nn.Module):
-    """Convolutional patch embedding over RGB, depth and validity.
-
-    Shape:
-        - Input: ``(N, 5, H, W)``
-        - Output: ``(N, C, H // patch, W // patch)``
-    """
-
-    def __init__(self, embed_dim: int = MODEL.embed_dim, patch_size: int = MODEL.patch_size):
-        super().__init__()
-        self.patch_size = patch_size
-        self.project = nn.Conv2d(5, embed_dim, kernel_size=patch_size, stride=patch_size)
-        self.norm = nn.GroupNorm(1, embed_dim)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.norm(self.project(x))
-
-
-class Dinov2Stem(nn.Module):
-    """DINOv2 patch tokens as the appearance backbone.
-
-    Loaded from ``torch.hub``, so it needs network access the first time. The
-    depth and validity channels cannot pass through a frozen RGB backbone, so
-    they are embedded separately and summed onto the DINOv2 tokens -- the
-    appearance prior stays intact while the geometry still reaches the encoder.
-    """
-
-    def __init__(
-        self,
-        embed_dim: int = MODEL.embed_dim,
-        name: str = MODEL.dinov2_name,
-        freeze: bool = MODEL.freeze_backbone,
-    ):
-        super().__init__()
-        self.backbone = torch.hub.load("facebookresearch/dinov2", name)
-        self.patch_size = self.backbone.patch_size
-        backbone_dim = self.backbone.embed_dim
-
-        if freeze:
-            for parameter in self.backbone.parameters():
-                parameter.requires_grad_(False)
-            self.backbone.eval()
-
-        self.frozen = freeze
-        self.project = nn.Linear(backbone_dim, embed_dim)
-        self.depth_stem = nn.Conv2d(
-            2, embed_dim, kernel_size=self.patch_size, stride=self.patch_size
-        )
-
-    def train(self, mode: bool = True):  # noqa: D102 - keeps a frozen backbone in eval
-        super().train(mode)
-        if self.frozen:
-            self.backbone.eval()
-        return self
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        rgb, depth = x[:, :3], x[:, 3:]
-
-        context = torch.no_grad() if self.frozen else torch.enable_grad()
-        with context:
-            features = self.backbone.forward_features(rgb)["x_norm_patchtokens"]
-
-        tokens = self.project(features)
-
-        grid_h = x.shape[-2] // self.patch_size
-        grid_w = x.shape[-1] // self.patch_size
-        tokens = tokens.transpose(1, 2).reshape(x.shape[0], -1, grid_h, grid_w)
-
-        return tokens + self.depth_stem(depth)
 
 
 def _select_top_patches(
@@ -129,11 +65,12 @@ class ViewEncoder(nn.Module):
 
     Args:
         embed_dim: token width.
-        patch_size: patch side in pixels.
+        patch_size: patch side in pixels, for the ``cnn`` backbone only.
         depth: transformer layers applied within each view, before fusion.
         tokens_per_view: how many subject patches to keep per view.
-        backbone: ``"cnn"`` for the trainable RGB-D stem, ``"dinov2"`` for the
-            frozen foundation-model backbone.
+        backbone: ``"cnn"``, ``"dinov2"`` or ``"dinov3"``.
+        backbone_variant: DINO size, ``"small"`` / ``"base"`` / ``"large"``.
+        freeze_backbone: keep DINO weights fixed.
     """
 
     def __init__(
@@ -146,19 +83,21 @@ class ViewEncoder(nn.Module):
         dropout: float = MODEL.dropout,
         tokens_per_view: int = 64,
         backbone: str = MODEL.backbone,
+        backbone_variant: str = MODEL.backbone_variant,
+        freeze_backbone: bool = MODEL.freeze_backbone,
     ):
         super().__init__()
         self.tokens_per_view = tokens_per_view
         self.backbone_kind = backbone
 
-        if backbone == "cnn":
-            self.stem = PatchStem(embed_dim=embed_dim, patch_size=patch_size)
-            self.patch_size = patch_size
-        elif backbone == "dinov2":
-            self.stem = Dinov2Stem(embed_dim=embed_dim)
-            self.patch_size = self.stem.patch_size
-        else:
-            raise ValueError(f"unknown backbone {backbone!r}; expected 'cnn' or 'dinov2'")
+        self.stem: Backbone = build_backbone(
+            backbone,
+            embed_dim=embed_dim,
+            patch_size=patch_size,
+            variant=backbone_variant,
+            freeze=freeze_backbone,
+        )
+        self.patch_size = self.stem.patch_size
 
         layer = nn.TransformerEncoderLayer(
             d_model=embed_dim,
@@ -193,33 +132,31 @@ class ViewEncoder(nn.Module):
             ``(B, V, K, 3)`` and ``(B, V, K)``.
         """
         batch, views = rgb.shape[:2]
+        height, width = rgb.shape[-2:]
         subject = subject.to(rgb.dtype)
         valid = (depth > 0).to(rgb.dtype)
 
-        stacked = torch.cat([rgb, depth, valid], dim=2)
-        flat = stacked.reshape(batch * views, 5, *stacked.shape[-2:])
+        flat_rgb = rgb.reshape(batch * views, 3, height, width)
+        flat_depth = depth.reshape(batch * views, 1, height, width)
+        flat_valid = valid.reshape(batch * views, 1, height, width)
 
-        features = self.stem(flat)
+        features = self.stem(flat_rgb, flat_depth, flat_valid)
         grid_h, grid_w = features.shape[-2:]
         n_patches = grid_h * grid_w
 
         tokens = features.reshape(batch, views, -1, n_patches).permute(0, 1, 3, 2)
 
-        # Anchor each patch on its *subject* pixels only. Averaging over every
+        # Anchor each token on its *subject* pixels only. Averaging over every
         # valid pixel instead lets a patch that straddles the plant edge take
         # its 3D position partly from the greenhouse wall metres behind, which
         # drags the anchor off the specimen and corrupts the distance bias that
         # the whole architecture rests on.
         centroids, patch_valid = patch_centroids(
-            points_world, (depth > 0) & (subject > 0), self.patch_size
+            points_world, (depth > 0) & (subject > 0), (grid_h, grid_w)
         )
-        coverage = (
-            F.avg_pool2d(
-                (subject * valid).reshape(batch * views, 1, *subject.shape[-2:]),
-                self.patch_size,
-            )
-            .reshape(batch, views, n_patches)
-        )
+        coverage = F.adaptive_avg_pool2d(
+            (subject * valid).reshape(batch * views, 1, height, width), (grid_h, grid_w)
+        ).reshape(batch, views, n_patches)
 
         index, kept_coverage = _select_top_patches(coverage, self.tokens_per_view)
         tokens = _gather_tokens(tokens, index)
@@ -236,4 +173,4 @@ class ViewEncoder(nn.Module):
         return tokens, anchors, anchor_valid
 
 
-__all__ = ["Dinov2Stem", "PatchStem", "ViewEncoder"]
+__all__ = ["ViewEncoder"]

@@ -1,18 +1,37 @@
-# GG-SSVT dependencies.
+# GG-SSVT runtime dependencies.
 #
-# Deliberately minimal and separate from the repository root requirements.txt,
-# which pins the Nerfstudio stack for the original CropCraft pipeline. Nothing
-# here needs Open3D, OpenCV or Nerfstudio.
+# Deliberately minimal, and deliberately SEPARATE from the repository root
+# requirements.txt. The root file pins the Nerfstudio stack (torch 2.0.1+cu118,
+# tiny-cuda-nn, Python 3.8); GG-SSVT needs modern torch and transformers >= 4.56
+# for the DINOv3 and SAM model classes, which will not install on Python 3.8.
+# Trying to satisfy both in one environment fails. Use two -- see RUNBOOK.md.
 #
-# The geometry half (data/, geometry/) runs on numpy and pillow alone -- no
-# PyTorch, no GPU. Install torch only to train or evaluate the model.
+# Install torch FIRST, from the CUDA index, then this file:
+#
+#   pip install torch==2.5.1 torchvision==0.20.1 \
+#       --index-url https://download.pytorch.org/whl/cu121
+#   pip install -r ggssvt/requirements.txt
+#
+# cu121 wheels cover the RTX 4060 (Ada, sm_89). cu118 also works but is slower
+# on Ada; do not use a CPU-only wheel or every GPU command silently falls back.
 
-numpy>=1.24
+# --- core: the geometry half needs only these two -------------------------
+numpy>=1.24,<3
 pillow>=10.0
 
-# Model, training and evaluation. Match the CUDA build to your driver; see
-# https://pytorch.org/get-started/locally/
-torch>=2.0
+# --- model, training, evaluation ------------------------------------------
+# Not pinned to a CUDA build here on purpose: pip cannot select one from PyPI.
+# Install it from the index URL above before this file.
+torch>=2.4,<3
+torchvision>=0.19,<1
 
-# Tests
+# --- DINOv2 / DINOv3 / SAM backbones --------------------------------------
+# 4.56 is the floor for the DINOv3 model class. Optional: the `cnn` (no-DINO)
+# condition and the whole geometry pipeline run without these.
+transformers>=4.56
+huggingface_hub>=0.26
+safetensors>=0.4
+
+# --- development ----------------------------------------------------------
 pytest>=7.0
+ruff>=0.6

@@ -145,8 +145,8 @@ class ModelConfig:
     num_heads: int = 6
     mlp_ratio: float = 4.0
     dropout: float = 0.0
-    backbone: str = "cnn"          # "cnn" | "dinov2"
-    dinov2_name: str = "dinov2_vits14"
+    backbone: str = "cnn"           # "cnn" (no DINO) | "dinov2" | "dinov3"
+    backbone_variant: str = "small" # DINO size: small | base | large
     freeze_backbone: bool = True
 
     # Fourier back-projected positional encoding

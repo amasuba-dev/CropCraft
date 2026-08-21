@@ -30,6 +30,36 @@ def _add_common(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_training(parser: argparse.ArgumentParser) -> None:
+    """Flags that decide whether a run finishes today or next week."""
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=TRAIN.num_workers,
+        help="dataloader workers; 4 keeps a GPU fed, 0 starves it",
+    )
+    parser.add_argument(
+        "--finetune-epochs",
+        type=int,
+        default=TRAIN.finetune_epochs,
+        help=(
+            "epochs per leave-one-out fold. This multiplies by the number of "
+            "folds, so the default is a multi-day run on one GPU"
+        ),
+    )
+
+
+def _training_config(args: argparse.Namespace):
+    """Build a TrainConfig from the common training flags."""
+    import dataclasses
+
+    return dataclasses.replace(
+        TRAIN,
+        num_workers=getattr(args, "workers", TRAIN.num_workers),
+        finetune_epochs=getattr(args, "finetune_epochs", TRAIN.finetune_epochs),
+    )
+
+
 def cmd_inspect(args: argparse.Namespace) -> int:
     """Audit the raw dataset without running any geometry."""
     from .data import dataset_summary, load_dataset
@@ -74,8 +104,22 @@ def cmd_inspect(args: argparse.Namespace) -> int:
 def cmd_preprocess(args: argparse.Namespace) -> int:
     from .data.preprocess import preprocess_dataset
 
+    if args.segmenter == "sam3d" and args.cache_dir == WORK_DIR / "cache":
+        print(
+            "Refusing to overwrite the geometric cache with SAM3D output. "
+            "Pass --cache-dir work_dirs/ggssvt/cache_sam3d so both conditions "
+            "can be compared.",
+            file=sys.stderr,
+        )
+        return 2
+
     report = preprocess_dataset(
-        cache_dir=args.cache_dir, plant_ids=args.plants, seed=args.seed
+        cache_dir=args.cache_dir,
+        plant_ids=args.plants,
+        seed=args.seed,
+        segmenter=args.segmenter,
+        sam_model=args.sam_model,
+        sam_device=args.sam_device,
     )
     usable = sum(1 for q in report if q.is_usable())
     print(f"\n{usable}/{len(report)} specimens passed the quality gate.")
@@ -124,6 +168,7 @@ def cmd_pretrain(args: argparse.Namespace) -> int:
         dataset,
         stage="pretrain",
         epochs=args.epochs,
+        config=_training_config(args),
         device=device,
     )
 
@@ -170,6 +215,7 @@ def cmd_loocv(args: argparse.Namespace) -> int:
     results = loocv(
         plant_ids,
         cache_dir=args.cache_dir,
+        train_config=_training_config(args),
         tokens_per_view=args.tokens_per_view,
         geometry_grounded=not args.no_geometry,
         strict=args.strict,
@@ -237,6 +283,176 @@ def cmd_visualise(args: argparse.Namespace) -> int:
     return 0
 
 
+def _write_comparison(report, out: Path) -> None:
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(report.to_json(), encoding="utf-8")
+    print(f"\nSaved comparison to {out}")
+
+
+def cmd_dino_probe(args: argparse.Namespace) -> int:
+    """Frozen-feature DINO vs no-DINO comparison. CPU, minutes."""
+    from .data.preprocess import usable_plant_ids
+    from .eval.experiment import probe_experiment
+
+    plant_ids = args.plants or usable_plant_ids(args.cache_dir)
+    print(f"Frozen-feature probe over {len(plant_ids)} specimens, leave-one-out\n")
+
+    report = probe_experiment(
+        plant_ids,
+        backbones=tuple(args.backbones),
+        variant=args.variant,
+        cache_dir=args.cache_dir,
+        n_components=args.components,
+        alpha=args.alpha,
+    )
+    print()
+    print(report.to_table())
+    _write_comparison(report, args.out)
+    return 0
+
+
+def cmd_experiment(args: argparse.Namespace) -> int:
+    """Full GG-SSVT backbone comparison. Needs a GPU."""
+    from .data.preprocess import usable_plant_ids
+    from .eval.experiment import backbone_experiment
+    from .training.trainer import resolve_device
+
+    plant_ids = args.plants or usable_plant_ids(args.cache_dir)
+    device = resolve_device(args.device)
+
+    if device.type != "cuda":
+        print(
+            "WARNING: no CUDA device. This trains one model per backbone and will "
+            "take many hours on a CPU. Use `dino-probe` for a CPU-scale answer.",
+            file=sys.stderr,
+        )
+
+    report = backbone_experiment(
+        plant_ids,
+        backbones=tuple(args.backbones),
+        variant=args.variant,
+        cache_dir=args.cache_dir,
+        train_config=_training_config(args),
+        epochs=args.epochs,
+        tokens_per_view=args.tokens_per_view,
+        out_dir=args.out_dir,
+        device=device,
+    )
+    print()
+    print(report.to_table())
+    _write_comparison(report, args.out_dir / "backbone_comparison.json")
+    return 0
+
+
+def cmd_factorial(args: argparse.Namespace) -> int:
+    """SAM3D on/off crossed with the appearance backbone."""
+    from .eval.factorial import probe_factorial, train_factorial
+
+    if args.train:
+        from .training.trainer import resolve_device
+
+        device = resolve_device(args.device)
+        if device.type != "cuda":
+            print(
+                "WARNING: no CUDA device. --train runs one pretrain plus one "
+                "leave-one-out sweep per cell and will take many hours on a CPU. "
+                "Drop --train for the CPU-scale probe.",
+                file=sys.stderr,
+            )
+        report = train_factorial(
+            segmenters=tuple(args.segmenters),
+            backbones=tuple(args.backbones),
+            variant=args.variant,
+            train_config=_training_config(args),
+            epochs=args.epochs,
+            tokens_per_view=args.tokens_per_view,
+            device=device,
+        )
+    else:
+        report = probe_factorial(
+            segmenters=tuple(args.segmenters),
+            backbones=tuple(args.backbones),
+            variant=args.variant,
+            n_components=args.components,
+            alpha=args.alpha,
+        )
+    print()
+    print(report.to_table())
+
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(report.to_json(), encoding="utf-8")
+    print(f"\nSaved factorial to {args.out}")
+    return 0
+
+
+def cmd_gallery(args: argparse.Namespace) -> int:
+    """Render every reconstruction: contact sheets, PLY clouds, interactive page."""
+    import json
+
+    from .data.preprocess import usable_plant_ids
+    from .eval.factorial import CACHE_DIRS
+    from .eval.gallery_html import build_html
+    from .eval.render import build_gallery
+
+    caches = {
+        name: path
+        for name, path in CACHE_DIRS.items()
+        if (path / "quality.json").exists()
+    }
+    if not caches:
+        print("No preprocessed cache found. Run `preprocess` first.", file=sys.stderr)
+        return 2
+
+    plant_ids = args.plants or sorted(
+        {pid for path in caches.values() for pid in usable_plant_ids(path)}
+    )
+    print(f"Rendering {len(plant_ids)} specimens across {len(caches)} segmenter(s)")
+
+    manifest = build_gallery(
+        plant_ids,
+        cache_dirs=caches,
+        out_dir=args.out_dir,
+        write_ply=not args.no_ply,
+        write_sheets=not args.no_sheets,
+        columns=args.columns,
+    )
+    (args.out_dir / "manifest.json").write_text(
+        json.dumps(manifest), encoding="utf-8"
+    )
+
+    page = build_html(manifest, args.out_dir / "reconstructions.html")
+    print(f"  wrote {page}")
+    if not args.no_ply:
+        print(f"  wrote {len(manifest['files'])} files under {args.out_dir}")
+    return 0
+
+
+def cmd_nerfstudio(args: argparse.Namespace) -> int:
+    """Export estimated rig poses as Nerfstudio transforms.json."""
+    from .eval.nerfstudio_export import export_dataset, training_commands
+
+    results = export_dataset(
+        args.plants,
+        in_place=not args.out_dir,
+        out_root=args.out_dir or (WORK_DIR / "nerfstudio"),
+        include_depth=not args.no_depth,
+        write_rig_positions=not args.no_rig_positions,
+    )
+    if not results:
+        print("No specimens exported.", file=sys.stderr)
+        return 2
+
+    first = sorted(results)[0]
+    print(f"\nExported {len(results)} specimens.")
+    print(
+        "\nPoses are estimated from depth, not measured by ChArUco calibration.\n"
+        "Train with a camera optimiser so the radiance field can refine them:\n"
+    )
+    for line in training_commands(first):
+        print("  " + line)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="ggssvt",
@@ -253,6 +469,16 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common(preprocess)
     preprocess.add_argument("--plants", nargs="*", help="specific plant ids")
     preprocess.add_argument("--seed", type=int, default=0)
+    preprocess.add_argument(
+        "--segmenter",
+        default="geometric",
+        choices=["geometric", "sam3d"],
+        help="subject segmentation; sam3d needs its own --cache-dir",
+    )
+    preprocess.add_argument(
+        "--sam-model", default="base", help="SAM checkpoint: base | large | huge"
+    )
+    preprocess.add_argument("--sam-device", default="cpu")
     preprocess.set_defaults(func=cmd_preprocess)
 
     baselines = sub.add_parser("baselines", help="LOOCV baselines from the cache")
@@ -274,6 +500,7 @@ def build_parser() -> argparse.ArgumentParser:
     pretrain.add_argument(
         "--out", type=Path, default=WORK_DIR / "checkpoints" / "pretrain.pt"
     )
+    _add_training(pretrain)
     pretrain.set_defaults(func=cmd_pretrain)
 
     evaluate = sub.add_parser("loocv", help="stage 2 and leave-one-out evaluation")
@@ -291,6 +518,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="re-run pretraining inside each fold for an inductive result",
     )
     evaluate.add_argument("--out", type=Path, default=WORK_DIR / "reports" / "folds.json")
+    _add_training(evaluate)
     evaluate.set_defaults(func=cmd_loocv)
 
     report = sub.add_parser("report", help="write result tables and figures")
@@ -309,6 +537,111 @@ def build_parser() -> argparse.ArgumentParser:
         "--out-dir", type=Path, default=WORK_DIR / "reports" / "overlays"
     )
     visualise.set_defaults(func=cmd_visualise)
+
+    probe = sub.add_parser(
+        "dino-probe",
+        help="frozen-feature DINO vs no-DINO comparison (CPU, minutes)",
+    )
+    _add_common(probe)
+    probe.add_argument("--plants", nargs="*")
+    probe.add_argument(
+        "--backbones",
+        nargs="+",
+        default=["dinov2", "dinov3"],
+        choices=["dinov2", "dinov3"],
+        help="DINO backbones to probe; the no-DINO control always runs",
+    )
+    probe.add_argument("--variant", default="base", choices=["small", "base", "large"])
+    probe.add_argument("--components", type=int, default=8, help="PCA components")
+    probe.add_argument("--alpha", type=float, default=1.0, help="ridge strength")
+    probe.add_argument(
+        "--out", type=Path, default=WORK_DIR / "reports" / "dino_probe.json"
+    )
+    probe.set_defaults(func=cmd_dino_probe)
+
+    experiment = sub.add_parser(
+        "experiment", help="full GG-SSVT backbone comparison (needs a GPU)"
+    )
+    _add_common(experiment)
+    experiment.add_argument("--plants", nargs="*")
+    experiment.add_argument(
+        "--backbones",
+        nargs="+",
+        default=["cnn", "dinov2", "dinov3"],
+        choices=["cnn", "dinov2", "dinov3"],
+    )
+    experiment.add_argument(
+        "--variant", default="base", choices=["small", "base", "large"]
+    )
+    experiment.add_argument("--epochs", type=int, default=TRAIN.pretrain_epochs)
+    experiment.add_argument("--device", default=TRAIN.device)
+    experiment.add_argument("--tokens-per-view", type=int, default=64)
+    experiment.add_argument("--out-dir", type=Path, default=WORK_DIR / "experiments")
+    _add_training(experiment)
+    experiment.set_defaults(func=cmd_experiment)
+
+    factorial = sub.add_parser(
+        "factorial",
+        help="full SAM3D x DINO factorial via the frozen-feature probe (CPU)",
+    )
+    factorial.add_argument(
+        "--segmenters", nargs="+", default=["geometric", "sam3d"],
+        choices=["geometric", "sam3d"],
+    )
+    factorial.add_argument(
+        "--backbones", nargs="+", default=["cnn", "dinov2", "dinov3"],
+        choices=["cnn", "dinov2", "dinov3"],
+    )
+    factorial.add_argument(
+        "--variant", default="base", choices=["small", "base", "large"]
+    )
+    factorial.add_argument("--components", type=int, default=8)
+    factorial.add_argument("--alpha", type=float, default=1.0)
+    factorial.add_argument(
+        "--train",
+        action="store_true",
+        help="train GG-SSVT per cell instead of probing frozen features (GPU)",
+    )
+    factorial.add_argument("--epochs", type=int, default=TRAIN.pretrain_epochs)
+    factorial.add_argument("--device", default=TRAIN.device)
+    factorial.add_argument("--tokens-per-view", type=int, default=64)
+    factorial.add_argument(
+        "--out", type=Path, default=WORK_DIR / "reports" / "factorial.json"
+    )
+    _add_training(factorial)
+    factorial.set_defaults(func=cmd_factorial)
+
+    gallery = sub.add_parser(
+        "gallery", help="render every reconstruction for viewing"
+    )
+    gallery.add_argument("--plants", nargs="*")
+    gallery.add_argument(
+        "--out-dir", type=Path, default=WORK_DIR / "reports" / "gallery"
+    )
+    gallery.add_argument("--columns", type=int, default=4)
+    gallery.add_argument("--no-ply", action="store_true", help="skip PLY export")
+    gallery.add_argument(
+        "--no-sheets", action="store_true", help="skip the PNG contact sheets"
+    )
+    gallery.set_defaults(func=cmd_gallery)
+
+    nerf = sub.add_parser(
+        "nerfstudio", help="export estimated poses as Nerfstudio transforms.json"
+    )
+    nerf.add_argument("--plants", nargs="*")
+    nerf.add_argument(
+        "--out-dir",
+        type=Path,
+        default=None,
+        help="write here instead of into each specimen directory",
+    )
+    nerf.add_argument("--no-depth", action="store_true", help="omit depth_file_path")
+    nerf.add_argument(
+        "--no-rig-positions",
+        action="store_true",
+        help="skip the rig_positions.json / intrinsics files make_transforms.py uses",
+    )
+    nerf.set_defaults(func=cmd_nerfstudio)
 
     return parser
 

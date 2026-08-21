@@ -10,6 +10,12 @@ torch = pytest.importorskip("torch")
 
 from ggssvt.config import MODEL
 from ggssvt.models.attention import CrossViewGeometricAttention
+from ggssvt.models.backbones import (
+    BackboneError,
+    CnnBackbone,
+    backbone_is_available,
+    build_backbone,
+)
 from ggssvt.models.embedding import FourierFeatures, normalise_world, patch_centroids
 from ggssvt.models.ggssvt import GGSSVT
 from ggssvt.models.head import BiomassHead
@@ -70,7 +76,7 @@ def test_patch_centroids_average_only_the_valid_pixels():
     valid = torch.zeros(1, 1, 1, 4, 4, dtype=torch.bool)
     valid[..., 0, 0] = True
 
-    centroids, patch_valid = patch_centroids(points, valid, patch_size=4)
+    centroids, patch_valid = patch_centroids(points, valid, (1, 1))
 
     assert patch_valid.all()
     assert torch.allclose(centroids[0, 0, 0], torch.full((3,), 5.0))
@@ -80,7 +86,7 @@ def test_patch_with_no_valid_pixels_is_flagged_invalid():
     points = torch.zeros(1, 1, 3, 4, 4)
     valid = torch.zeros(1, 1, 1, 4, 4, dtype=torch.bool)
 
-    _, patch_valid = patch_centroids(points, valid, patch_size=4)
+    _, patch_valid = patch_centroids(points, valid, (1, 1))
     assert not patch_valid.any()
 
 
@@ -216,3 +222,50 @@ def test_parameter_groups_cover_the_stages():
     assert len(model.parameter_groups("finetune")) == 3
     with pytest.raises(ValueError):
         model.parameter_groups("nonsense")
+
+
+def test_backbone_registry_rejects_unknown_kinds():
+    with pytest.raises(BackboneError):
+        build_backbone("resnet50")
+
+
+def test_cnn_backbone_is_the_no_dino_control_and_sees_depth():
+    """The control condition must still receive depth and validity."""
+    backbone = build_backbone("cnn", embed_dim=32, patch_size=8)
+    assert isinstance(backbone, CnnBackbone)
+    assert backbone.grid_size(64, 32) == (8, 4)
+
+    rgb = torch.rand(2, 3, 64, 32)
+    depth = torch.rand(2, 1, 64, 32)
+    valid = torch.ones(2, 1, 64, 32)
+
+    out = backbone(rgb, depth, valid)
+    assert out.shape == (2, 32, 8, 4)
+
+    # Changing depth alone must change the output, or the control is RGB-only.
+    other = backbone(rgb, depth + 1.0, valid)
+    assert not torch.allclose(out, other)
+
+
+def test_cnn_control_is_fully_trainable():
+    backbone = build_backbone("cnn", embed_dim=16, patch_size=8)
+    assert backbone.n_frozen_parameters == 0
+
+
+def test_dinov3_reports_its_access_requirement_rather_than_failing_obscurely():
+    available, reason = backbone_is_available("dinov3")
+    if not available:
+        assert "gated" in reason.lower() or "unavailable" in reason.lower()
+        assert "huggingface" in reason.lower()
+
+
+def test_patch_centroids_align_with_an_arbitrary_token_grid():
+    """DINOv2 uses 14-pixel patches and DINOv3 uses 16; anchors must follow."""
+    points = torch.rand(1, 1, 3, 28, 28)
+    valid = torch.ones(1, 1, 1, 28, 28, dtype=torch.bool)
+
+    for grid in ((2, 2), (7, 7), (4, 14)):
+        centroids, patch_valid = patch_centroids(points, valid, grid)
+        assert centroids.shape == (1, 1, grid[0] * grid[1], 3)
+        assert patch_valid.shape == (1, 1, grid[0] * grid[1])
+        assert patch_valid.all()

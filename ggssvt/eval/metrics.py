@@ -181,6 +181,89 @@ def reconstruction_metrics(
     )
 
 
+def hausdorff(
+    predicted_points: np.ndarray,
+    truth_points: np.ndarray,
+    *,
+    percentile: float = 95.0,
+) -> dict[str, float]:
+    """Symmetric Hausdorff distance, and its percentile-robust variant.
+
+    The raw Hausdorff distance is the largest nearest-neighbour distance in
+    either direction -- a pure worst case. On a carved hull that makes it a
+    measure of the single worst speck: one stray voxel that survived carving sets
+    the whole number, so it says more about the connected-component cleanup than
+    about the reconstruction.
+
+    ``HD95`` takes the 95th percentile instead, which is why medical volumetric
+    segmentation reports it in preference to the raw value. It keeps the
+    worst-case character -- unlike Chamfer distance, which is a mean and so is
+    dominated by the bulk of the object -- while ignoring a handful of outliers.
+
+    For a branching plant the *backward* direction is the informative one:
+    ``hd95_recall`` is how far the most-missed five percent of the reference lies
+    from anything the method reconstructed. That is a direct measurement of
+    missing canopy, which a mean-based metric hides.
+
+    Returns:
+        ``hausdorff`` (symmetric max), ``hd95`` (symmetric percentile),
+        ``hd95_precision`` (predicted to truth) and ``hd95_recall``
+        (truth to predicted), all in metres.
+    """
+    predicted_points = np.asarray(predicted_points, dtype=np.float64).reshape(-1, 3)
+    truth_points = np.asarray(truth_points, dtype=np.float64).reshape(-1, 3)
+
+    if predicted_points.size == 0 or truth_points.size == 0:
+        nan = float("nan")
+        return {
+            "hausdorff": nan,
+            "hd95": nan,
+            "hd95_precision": nan,
+            "hd95_recall": nan,
+        }
+
+    forward = _nearest_distances(predicted_points, truth_points)
+    backward = _nearest_distances(truth_points, predicted_points)
+
+    return {
+        "hausdorff": float(max(forward.max(), backward.max())),
+        "hd95": float(
+            max(
+                np.percentile(forward, percentile),
+                np.percentile(backward, percentile),
+            )
+        ),
+        "hd95_precision": float(np.percentile(forward, percentile)),
+        "hd95_recall": float(np.percentile(backward, percentile)),
+    }
+
+
+def psnr(rendered: np.ndarray, reference: np.ndarray, *, data_range: float = 1.0) -> float:
+    """Peak signal-to-noise ratio between two images, in decibels.
+
+    Only meaningful on continuous-valued images -- a rendered RGB view against
+    the captured one. Do not apply it to binary masks or occupancy grids: on
+    two-valued data PSNR is a monotone function of the error count and carries
+    strictly less information than IoU, while looking like a different result.
+
+    Its place here is the radiance-field arm, where held-out-view PSNR is the
+    conventional number. Treat it as an appearance metric, not a geometry one:
+    a splatfacto model can post a high PSNR while carrying floaters that wreck
+    the volume.
+    """
+    rendered = np.asarray(rendered, dtype=np.float64)
+    reference = np.asarray(reference, dtype=np.float64)
+    if rendered.shape != reference.shape:
+        raise ValueError(
+            f"rendered {rendered.shape} and reference {reference.shape} must match"
+        )
+
+    mse = float(np.mean((rendered - reference) ** 2))
+    if mse <= 0:
+        return float("inf")
+    return float(10.0 * np.log10(data_range ** 2 / mse))
+
+
 def average_precision(probabilities: np.ndarray, labels: np.ndarray) -> float:
     """Threshold-free ranking quality of an occupancy field.
 
@@ -241,6 +324,75 @@ def best_threshold_iou(
     return best_iou, best_at
 
 
+def paired_bootstrap_difference(
+    predictions_a: np.ndarray,
+    predictions_b: np.ndarray,
+    target_kg: np.ndarray,
+    metric: str = "rmse_kg",
+    *,
+    n_resamples: int = 5000,
+    confidence: float = 0.95,
+    seed: int = 0,
+) -> dict[str, float]:
+    """Is method A actually better than method B, or is it sampling noise?
+
+    Resamples specimens (not predictions) and recomputes both methods on the
+    same resample, so the comparison is paired -- the two methods rise and fall
+    together on an easy or hard draw, and only their *difference* is measured.
+
+    At n=28 an unpaired comparison of two point estimates says almost nothing:
+    the confidence intervals of two methods can overlap heavily while one is
+    reliably better on every single specimen. This reports the interval on the
+    difference, which is the quantity the claim depends on.
+
+    Returns:
+        ``difference`` (A minus B; negative favours A on error metrics), its
+        confidence interval, and ``p_direction`` -- the fraction of resamples
+        where the sign flips, a two-sided significance proxy.
+    """
+    a = np.asarray(predictions_a, dtype=np.float64).ravel()
+    b = np.asarray(predictions_b, dtype=np.float64).ravel()
+    target = np.asarray(target_kg, dtype=np.float64).ravel()
+
+    observed = (
+        regression_metrics(a, target).as_dict()[metric]
+        - regression_metrics(b, target).as_dict()[metric]
+    )
+
+    rng = np.random.default_rng(seed)
+    differences = []
+    for _ in range(n_resamples):
+        index = rng.integers(0, a.size, a.size)
+        if np.unique(target[index]).size < 2:
+            continue
+        try:
+            differences.append(
+                regression_metrics(a[index], target[index]).as_dict()[metric]
+                - regression_metrics(b[index], target[index]).as_dict()[metric]
+            )
+        except (ValueError, ZeroDivisionError):
+            continue
+
+    if not differences:
+        return {
+            "difference": observed,
+            "low": float("nan"),
+            "high": float("nan"),
+            "p_direction": float("nan"),
+        }
+
+    values = np.array(differences)
+    tail = (1.0 - confidence) / 2.0
+    sign_flips = float((values >= 0).mean() if observed < 0 else (values <= 0).mean())
+
+    return {
+        "difference": float(observed),
+        "low": float(np.quantile(values, tail)),
+        "high": float(np.quantile(values, 1.0 - tail)),
+        "p_direction": 2.0 * min(sign_flips, 1.0 - sign_flips),
+    }
+
+
 def bootstrap_interval(
     predicted_kg: np.ndarray,
     target_kg: np.ndarray,
@@ -284,6 +436,9 @@ __all__ = [
     "average_precision",
     "best_threshold_iou",
     "bootstrap_interval",
+    "hausdorff",
+    "psnr",
+    "paired_bootstrap_difference",
     "reconstruction_metrics",
     "regression_metrics",
     "voxel_iou",

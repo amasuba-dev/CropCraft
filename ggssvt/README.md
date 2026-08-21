@@ -8,11 +8,25 @@ The four components named in the dissertation scaffold:
 
 | Component | Module | What it does |
 |---|---|---|
+| DINO backbone (box 3) | [`models/backbones.py`](models/backbones.py) | Swappable stem: none, DINOv2, or DINOv3 |
 | Fourier back-projected token embeddings | [`models/embedding.py`](models/embedding.py) | Positions tokens by their world coordinate, not their image index |
 | Cross-view geometric attention | [`models/attention.py`](models/attention.py) | Biases attention logits by `-gamma * ||x_i - x_j||^2`, gamma learned per head |
 | Implicit occupancy decoder | [`models/decoder.py`](models/decoder.py) | World coordinate + fused context to occupancy, evaluated in chunks |
 | Space-carving self-supervision | [`geometry/carving.py`](geometry/carving.py) | Depth and silhouettes to the occupancy targets, no manual labels |
 | Biomass head | [`models/head.py`](models/head.py) | Volume integration with a modulated density prior |
+| SAM3D segmentation | [`geometry/sam3d.py`](geometry/sam3d.py) | Promptable masks made 3D-consistent across views |
+
+## Setup and today's experiments
+
+See **[RUNBOOK.md](RUNBOOK.md)** for the environment setup, the ordered list of
+experiments with time budgets, and the VRAM fallbacks. Two things from it are
+worth repeating here:
+
+- **Two conda environments are required.** Nerfstudio pins torch 2.0.1+cu118 and
+  Python 3.8; GG-SSVT needs `transformers >= 4.56`, which will not install there.
+  [`environment.yml`](environment.yml) builds the GG-SSVT one.
+- **`--finetune-epochs` defaults to 200**, which in a 28-fold leave-one-out sweep
+  is about 29 GPU-hours per condition. Override it.
 
 ## Quick start
 
@@ -121,6 +135,222 @@ transductive rather than inductive. `--strict` re-runs pretraining inside each
 fold for the inductive number; the gap between the two is worth reporting rather
 than hiding.
 
+## DINO backbone comparison
+
+Box 3 of the system diagram is a DINO vision transformer. It is swappable, so
+its contribution can be measured rather than assumed:
+
+| condition | backbone | trained |
+|---|---|---|
+| no DINO (control) | RGB-D patch stem | from scratch |
+| DINOv2 | `facebook/dinov2-{small,base,large}` | frozen |
+| DINOv3 | `facebook/dinov3-vit{s,b,l}16-pretrain-lvd1689m` | frozen |
+
+Everything downstream of the stem is identical across conditions, so the
+difference is attributable to the backbone alone. The control is not a strawman:
+it is the only condition whose trunk ingests depth directly, and the frozen DINO
+stems take depth through a parallel embedding so every condition sees the same
+information.
+
+### DINOv3 needs an access request
+
+DINOv3 weights are **gated** on HuggingFace — Meta approves access manually, per
+account. Every command degrades gracefully and tells you what to do:
+
+1. Open <https://huggingface.co/facebook/dinov3-vits16-pretrain-lvd1689m>
+2. Accept the licence and request access.
+3. `hf auth login`, or set `HF_TOKEN`.
+
+DINOv2 is open and needs none of this.
+
+### Two experiments
+
+```bash
+python -m ggssvt.cli dino-probe --variant base
+```
+
+A linear probe on frozen features, leave-one-out. Runs on a CPU in about five
+minutes and measures how much biomass information the pretrained representation
+holds on its own. Use it to decide whether the GPU run is worth it.
+
+```bash
+python -m ggssvt.cli experiment --backbones cnn dinov2 dinov3 --variant base
+```
+
+The full comparison: GG-SSVT pretrained and cross-validated once per backbone.
+Needs a GPU. Pretraining is re-run per condition — sharing a checkpoint across
+backbones would be meaningless, since the stems produce different features.
+
+### Probe results, 28 specimens
+
+| condition | RMSE | MAE | MARE | R² | dims |
+|---|---|---|---|---|---|
+| no DINO (geometry only) | 0.358 kg | 0.269 | 27.4% | 0.616 | 7 |
+| DINOv2-small | 0.335 kg | 0.260 | 25.8% | 0.663 | 768 |
+| **DINOv2-base** | **0.295 kg** | **0.230** | **22.9%** | **0.738** | 1536 |
+| DINOv2-base + geometry | 0.296 kg | 0.232 | 23.3% | 0.738 | 1543 |
+| DINOv3 | *gated — not run* | | | | |
+
+Paired bootstrap, DINOv2-base against the control: **ΔRMSE −0.062 kg, 95% CI
+[−0.160, +0.036], p≈0.22 — not significant at n=28.**
+
+Three things follow, and the third is the one that matters most:
+
+- DINO helps in the point estimate, and the gain grows with backbone size
+  (small → base). The direction is consistent across every reduction setting
+  tried (PCA-4, PCA-8, un-truncated ridge), so it is not an artefact of the
+  probe's hyperparameters.
+- **Adding geometry on top of DINO changes nothing** (0.295 → 0.296). The pooled
+  DINO descriptor already contains whatever the hand-built geometric features
+  encode, which is mostly size.
+- **Twenty-eight specimens cannot establish the effect.** The confidence interval
+  on the difference spans zero. Reporting "DINOv2 improves R² from 0.62 to 0.74"
+  without that interval would be overclaiming. More specimens, not a bigger
+  backbone, is what would settle it.
+
+## SAM3D
+
+**Naming, first.** In the predecessor project's
+`neural_geometry/sam3d/sam3d_pipeline.py`, "SAM3D" means *SAM plus 3D
+back-projection*: promptable 2D masks per view, lifted to 3D, made consistent
+across views. That is what [`geometry/sam3d.py`](geometry/sam3d.py) implements.
+It is **not** Meta's SAM 3D Objects, which is a single-image mesh generator. If
+you meant the mesh generator, that is a different component and a different
+experiment — say so and it can be added, but note its weights are gated too.
+
+Availability, checked 21 August 2026:
+
+| model | status |
+|---|---|
+| `facebook/sam-vit-base` / `-large` / `-huge` | **open** — used by default |
+| `facebook/sam2-hiera-*` | open |
+| `facebook/sam3` | **gated**, manual approval |
+| `facebook/sam-3d-objects` | **gated**, manual approval |
+
+### What it does, and why it is a refinement rather than a replacement
+
+The default cylinder segmentation keeps everything physically inside a cylinder
+about the plant axis. That is robust, but anything *inside* that cylinder counts
+as subject — a rig pole or bench edge directly behind the plant is kept. SAM3D
+cuts those away on appearance.
+
+SAM needs a prompt, and because the views are already registered, the projected
+plant axis and the bounding box of the geometric mask are free. So SAM3D refines
+the geometric mask rather than replacing it — which is why it needs no manual
+clicks, and equally why it cannot recover a plant the geometric stage missed.
+
+Three rules keep SAM honest, and the third is what makes the result *3D* rather
+than twelve independent 2D segmentations:
+
+1. **3D gating** — the SAM mask is intersected with the working cylinder, so a
+   mask leaking onto the far wall is trimmed by geometry.
+2. **Coverage guard** — a mask covering implausibly much or little of its prompt
+   box is rejected and that view falls back to geometry.
+3. **Multi-view agreement** — a mask whose back-projected points do not land
+   where the other views' points already are is reverted.
+
+### Running it
+
+SAM3D changes the subject mask, which changes the carved occupancy, the
+self-supervision targets and the geometric features. So it is a *preprocessing*
+choice with its own cache, not a flag at training time:
+
+```bash
+python -m ggssvt.cli preprocess --segmenter sam3d --cache-dir work_dirs/ggssvt/cache_sam3d
+```
+
+Roughly 80 s per specimen on a CPU with SAM ViT-B, most of it SAM's image
+encoder; far faster on a GPU with `--sam-device cuda`.
+
+## The full factorial
+
+SAM3D and DINO act at different stages — one changes what counts as the subject,
+the other changes how pixels become tokens — so they can interact. One-factor-
+at-a-time ablations cannot see that; the factorial can.
+
+```bash
+python -m ggssvt.cli factorial
+```
+
+| | no DINO | DINOv2 | DINOv3 |
+|---|---|---|---|
+| **no SAM3D** | control | DINO only | DINO only |
+| **SAM3D** | SAM3D only | both | both |
+
+Conditions are compared on the **specimens that pass the quality gate under
+every segmenter**, not on whichever subset each pipeline happens to leave
+standing — otherwise the conditions would be scored on different plants.
+
+Effects are reported as paired bootstraps against the same control: the main
+effect of each factor, each factor *given* the other, and the interaction
+`(both − DINO) − (SAM3D − neither)`. A negative interaction means the two are
+synergistic; positive means partly redundant.
+
+At n=28 every one of these intervals is wider than the effect it measures. The
+harness prints the intervals rather than the point estimates alone, because with
+four conditions and a small sample, one arrangement looking good by luck is
+likely, not unlikely.
+
+### Factorial results, 26 specimens, frozen-feature probe
+
+|  | no DINO | DINOv2-base |
+|---|---|---|
+| **no SAM3D** | 0.306 kg / R² 0.712 | 0.302 kg / R² 0.720 |
+| **SAM3D** | 0.317 kg / R² 0.690 | **0.295 kg / R² 0.732** |
+
+Paired effects on RMSE (negative = the addition helps):
+
+| effect | ΔRMSE | 95% CI | resolved? |
+|---|---|---|---|
+| DINO alone | −0.004 kg | [−0.065, +0.065] | no |
+| SAM3D alone | **+0.011 kg** | [−0.010, +0.034] | no |
+| both together | −0.011 kg | [−0.069, +0.056] | no |
+| DINO *given* SAM3D | −0.022 kg | [−0.091, +0.055] | no |
+| SAM3D *given* DINO | −0.007 kg | [−0.017, +0.003] | no |
+| **interaction** | **−0.018 kg** | [−0.037, **+0.000**] | borderline |
+
+**The one result the factorial found that no one-factor ablation could.**
+SAM3D on its own makes things slightly *worse* (+0.011 kg), but SAM3D given DINO
+makes them *better* (−0.007 kg). The sign flips. Correspondingly, DINO helps five
+times more when SAM3D is present (−0.022) than when it is not (−0.004), and the
+interaction term is negative with an interval whose upper bound sits exactly on
+zero.
+
+The mechanism is plausible: SAM3D removes about 15% of the subject pixels,
+tightening the mask. For hand-built geometric descriptors that is lost volume,
+so they get worse. For a DINO descriptor pooled over subject patches it is less
+background contamination, so it gets better. Run the two factors separately and
+you would conclude "SAM3D doesn't help" and drop it.
+
+**Two caveats that must travel with these numbers.**
+
+*Nothing here is statistically resolved.* Every interval spans zero, the
+interaction only just excludes it. This is a hypothesis the factorial generated,
+not a finding it established.
+
+*The 26-specimen set is not a random subset of the 28.* Conditions are compared
+on the specimens usable under **both** segmenters, and SAM3D fails the quality
+gate on E015 and E019, which the geometric pipeline passes. Dropping those two
+moved the no-DINO/no-SAM3D control from 0.358 kg (n=28) to 0.306 kg (n=26) — a
+larger shift than any effect in the table. The comparison between cells is fair
+because all four see the same plants; the comparison against the earlier
+28-specimen numbers is not.
+
+### SAM3D's effect on the reconstruction itself
+
+| metric | geometric | SAM3D | change |
+|---|---|---|---|
+| multi-view agreement | 0.625 | 0.637 | **+1.9%** |
+| surface coverage | 0.788 | 0.741 | −6.0% |
+| connected fraction | 0.870 | 0.842 | −3.2% |
+| above-ground volume | 11.0 L | 10.4 L | −5.4% |
+| usable specimens | 28/30 | 26/30 | −2 |
+
+SAM accepted 96% of views (minimum 67% on the worst specimen) and removed 15.3%
+of subject pixels on average. The masks are tighter and more view-consistent,
+which is what it was added to do — but tighter masks also cost coverage and
+push two marginal specimens below the quality gate.
+
 ## Ablations
 
 ```bash
@@ -135,6 +365,59 @@ identical, so the difference is attributable to geometry grounding alone.
 After training, `model.fusion.distance_scales()` returns the learned per-head
 `gamma`. That is the direct evidence for whether the distance bias is used at
 all, and it belongs in the ablation section.
+
+## Nerfstudio
+
+```bash
+python -m ggssvt.cli nerfstudio
+```
+
+Writes `transforms.json` into every specimen directory, plus the
+`rig_positions.json` and per-camera intrinsics that
+[`rig_calibration/make_transforms.py`](../rig_calibration/make_transforms.py)
+expects. That script was written against `calibrate_extrinsics.py` output that
+was never captured — the estimated rig supplies the same poses, so both paths now
+work.
+
+```bash
+ns-train splatfacto --data dataset/plants/M001 --pipeline.model.camera-optimizer.mode SO3xR3
+```
+
+```bash
+ns-train depth-nerfacto --data dataset/plants/M001 --pipeline.model.camera-optimizer.mode SO3xR3
+```
+
+```bash
+ns-viewer --load-config outputs/M001/splatfacto/<timestamp>/config.yml
+```
+
+**Always enable the camera optimiser.** The exported poses are estimated, not
+measured, and the azimuth refinement saturates its ±8° search bound on most
+specimens. Letting the radiance field refine them from image evidence is an
+independent estimate — and comparing the optimised poses against the exported
+ones is a direct, quantitative check on the registration this whole pipeline
+rests on.
+
+### Three things that will bite
+
+**Coordinate convention.** Nerfstudio's `transform_matrix` is camera-to-world in
+OpenGL/Blender convention (+y up, −z forward); the rig poses are OpenCV (+y down,
++z forward). The exporter applies the flip and
+[`tests/test_nerfstudio_export.py`](../tests/test_nerfstudio_export.py) pins it.
+Get it wrong and the scene trains upside down and back to front, which looks like
+a failed reconstruction rather than a failed export.
+
+**Twelve views is thin.** Radiance fields normally want 50–200. The depth maps
+help — prefer `depth-nerfacto`, or splatfacto with depth — but expect floaters
+between the sparse viewpoints, especially above ~1.15 m where the frames truncate.
+
+**The vendored copy in `nerfstudio/` does not import.** `.gitignore` line 1 is
+`data/`, which matches at any depth and silently excluded
+`nerfstudio/nerfstudio/data/` — the dataparsers, datasets and pixel samplers — so
+it was never committed and is absent on disk. The ignore rule now carries a
+negation for that path, but the files still need restoring: install upstream
+Nerfstudio (`pip install nerfstudio`) or re-clone it into that directory. Either
+way it needs CUDA and `tiny-cuda-nn`, per the root README.
 
 ## Known limitations
 
@@ -166,11 +449,12 @@ ggssvt/
     io.py              PNG loading, back-projection, projection
     dataset.py         specimen index joined to ground_truth.csv
     preprocess.py      geometry cache and the quality report
-  geometry/            NumPy only, no PyTorch
+  geometry/            NumPy only, no PyTorch (sam3d.py also needs torch)
     plane.py           RANSAC plane fitting
     rig.py             calibration-free extrinsics
     refine.py          residual azimuth and offset correction
     segment.py         subject segmentation in the world frame
+    sam3d.py           SAM-refined, 3D-consistent subject masks
     carving.py         space carving to occupancy
   models/              PyTorch
     embedding.py       Fourier back-projected positional encoding
@@ -183,9 +467,17 @@ ggssvt/
     dataset.py         torch dataset and query sampling
     losses.py          occupancy, biomass, volume consistency
     trainer.py         two-stage schedule and LOOCV
+  models/
+    backbones.py       interchangeable stems: none / DINOv2 / DINOv3
   eval/
-    metrics.py         RMSE/MAE/MARE/R2, IoU, Chamfer, F-score
+    metrics.py         RMSE/MAE/MARE/R2, IoU, Chamfer, F-score, paired bootstrap
     baselines.py       allometric, geometric-feature, direct-2D, mean
+    dino_probe.py      frozen-feature linear probe
+    experiment.py      backbone comparison harness
+    factorial.py       SAM3D x DINO factorial and interaction
+    render.py          volume renders, contact sheets, PLY export
+    gallery_html.py    interactive reconstruction gallery
+    nerfstudio_export.py  transforms.json from the estimated rig
     report.py          tables and figures
     visualise.py       rig and mask overlays
 ```
