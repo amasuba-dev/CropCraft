@@ -1,9 +1,12 @@
-data/
-# ...but not Nerfstudio's own source package. The bare `data/` rule above
-# matches at any depth, which silently excluded nerfstudio/nerfstudio/data/
-# (dataparsers, datasets, pixel samplers) from the vendored copy, leaving it
-# unimportable.
-!nerfstudio/nerfstudio/data/
+# The downloaded soybean/maize scenes, at the repository root only.
+#
+# Anchored with a leading slash on purpose. A bare `data/` matches at EVERY
+# depth, which silently excluded two source packages that happen to be named
+# `data`: ggssvt/data/ (the loaders) and nerfstudio/nerfstudio/data/ (the
+# dataparsers). Both were absent from fresh clones and failed at import with
+# "No module named ...data", which looks like a broken install rather than a
+# missing commit. Keep the slash.
+/data/
 preds/
 wandb/
 work_dirs/
