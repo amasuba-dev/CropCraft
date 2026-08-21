@@ -57,8 +57,16 @@ Expected: `2.5.1+cu121 True NVIDIA GeForce RTX 4080`.
 python -m pytest tests/ -q
 ```
 
-96 tests. Any failure here means something about the port is wrong; fix it before
-spending GPU hours.
+**Expect `89 passed, 7 skipped` at this point — that is correct.** Seven tests in
+`test_pipeline.py` are integration tests gated on the preprocessed cache, and
+`work_dirs/` is gitignored because it holds about 120 MB of derived data that
+regenerates in four minutes. They skip until step 1 below has run, then all
+**96** pass. Re-run the suite after preprocessing to collect them.
+
+What matters is the failure count, not the pass count. Any *failure* means
+something about the environment is wrong; fix it before spending GPU hours. A
+much lower pass count than 89 usually means a missing module rather than a real
+failure — check `git ls-files ggssvt/data/` returns five files.
 
 ---
 
@@ -84,14 +92,27 @@ Everything works without them; the DINOv3 cells simply report as skipped.
 
 ## Morning — cheap, and it unblocks the afternoon
 
-### 1. Re-run SAM3D preprocessing on the GPU (~3 min, was ~40 min on CPU)
+### 1. Build both caches (~4 min geometric, ~3 min SAM3D on GPU)
+
+`work_dirs/` is not in the repository, so on a fresh machine there is no cache at
+all and everything downstream — baselines, probes, factorial, training — has
+nothing to read. Build the geometric one first:
+
+```bash
+python -m ggssvt.cli preprocess
+```
 
 ```bash
 python -m ggssvt.cli preprocess --segmenter sam3d --cache-dir work_dirs/ggssvt/cache_sam3d --sam-device cuda
 ```
 
-The geometric cache does not need rebuilding unless you changed the geometry
-code.
+Expect 28/30 specimens to pass the quality gate on the geometric cache and 26/30
+on SAM3D. Then re-run the tests and the seven skipped integration tests should
+join in:
+
+```bash
+python -m pytest tests/ -q
+```
 
 ### 2. Time one epoch before committing to anything (~2 min)
 
