@@ -21,6 +21,8 @@ The four components named in the dissertation scaffold:
 - **[RESEARCH_STATUS.md](RESEARCH_STATUS.md)** — every research question and
   hypothesis from the proposal, what answers it, what is pending, and what to do
   about each. Includes the recommended scope change.
+- **[HYPOTHESIS_3.md](HYPOTHESIS_3.md)** — the frequency hypothesis, restructured
+  into six measurable sub-claims; four are already established.
 - **[FINDINGS.md](FINDINGS.md)** — every experiment run, the deductions, the bugs
   found, and what can be reported today.
 

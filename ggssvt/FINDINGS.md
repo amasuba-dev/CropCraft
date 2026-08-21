@@ -240,9 +240,12 @@ classes" is supported. "Estimates biomass" is not, and an examiner who checks
 the batch structure will find this in minutes. Saying it first is far stronger
 than being asked.
 
-**Drop H3 (frequency grounding).** It was never implemented and at n=28 could not
-be resolved anyway. Dropping it removes one of the four hypotheses Stander
-flagged as PhD-sized scope, at no cost.
+**Keep H3, restated** — see [HYPOTHESIS_3.md](HYPOTHESIS_3.md). An earlier draft
+recommended dropping it on the grounds frequency grounding was never implemented;
+that was wrong. The Fourier positional encoding is exactly what the proposal's
+wording names, and once measured H3 has four of six sub-claims already
+established, including a counter-intuitive one with a published precedent to cite
+against.
 
 **Split H1 and H4.** Each bundles separable claims; only some have evidence.
 

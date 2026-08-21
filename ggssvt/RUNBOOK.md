@@ -250,6 +250,73 @@ than at examination.
 
 ---
 
+## Multi-day: the training campaign
+
+With more than a day on the machine, do not drive the training by hand. One
+command queues the whole programme, writes a JSON result per run, and **skips
+whatever already finished** — so a campaign that dies at 3am is restarted with
+the same command and picks up where it stopped.
+
+```bash
+python -m ggssvt.campaign --plan smoke --device cuda
+```
+
+**Always run `smoke` first.** Two two-epoch runs, a few minutes, and it proves
+the loop, the checkpointing, the resume logic and the result writing before you
+commit a night to them.
+
+```bash
+python -m ggssvt.campaign --plan core --device cuda --workers 8 --batch-size 2
+```
+
+```bash
+python -m ggssvt.campaign --plan full --device cuda --workers 8 --batch-size 2
+```
+
+`--list` prints a plan without running it; `--only NAME [NAME...]` runs a subset;
+`--force` re-runs something already marked done.
+
+### What the plans contain, and which question each run closes
+
+Runs are ordered so the hypothesis-answering ones come first — if the campaign is
+cut short, what completed is what the write-up needs.
+
+| run | closes | why |
+|---|---|---|
+| `baseline_cnn` | reference | every comparison below is against this |
+| `h2_no_geometry` | **H2** | the geometry-grounding ablation; γ frozen at zero, capacity identical |
+| `h1_dinov2` | **H1** | ViT backbone against the CNN stem, inside the trained model |
+| `h3_bands_6_freq6` | **H3** | encoding trimmed to roughly the grid Nyquist |
+| `h3_bands_4_freq4` | **H3** | encoding below Nyquist — expected to hurt |
+| `h3_bands_16_freq10` | **H3** | encoding far above Nyquist — expected to add nothing |
+| `sam3d_cnn`, `sam3d_dinov2` | factorial | tests whether the probe's interaction survives training |
+| `h1_dinov3` | H1 | if access has been granted |
+
+`core` is six runs — roughly **8–10 hours** at 120 pretrain and 60 fine-tune
+epochs. `full` is nine, roughly 13–15 hours. Time one epoch first (step 2) and
+scale.
+
+### What to report back from each run
+
+The campaign writes `summary.txt` and a per-run JSON carrying everything below.
+For the research status document you need, per run:
+
+- **RMSE, MAE, MARE, R²** with the bootstrap interval on RMSE
+- **occupancy AP and best-threshold IoU** — reconstruction quality, threshold-free
+- **parameter count**, total and trainable — H3's efficiency claim needs it
+- **the paired bootstrap against `baseline_cnn`**, not the two point estimates
+
+And three things that are not in the JSON and must be recorded by hand:
+
+1. **`model.fusion.distance_scales()` after training.** Per-head, per-block γ. If
+   it collapses toward zero the distance bias is not being used, and that is a
+   finding about H2 regardless of which way the RMSE goes.
+2. **Seconds per epoch and total GPU hours** per condition.
+3. **Any run that failed or was skipped**, and why. A gated backbone leaving a
+   hole in the factorial is a result about availability, not a gap to hide.
+
+---
+
 ## Afternoon — the GPU work
 
 Budget roughly **three hours** for this block on this card. Do not try to run the full 2×3
@@ -466,6 +533,8 @@ stem in all twelve frames, every number for that specimen is meaningless.
 | `nerfstudio` | dataset | seconds — writes `transforms.json` |
 | `dashboard` | cache, mesh cache | ~1 min — the walkthrough page |
 | `posefree` | cloned repos, **GPU** | minutes per specimen per method |
+| `mesh` | cache, scikit-image | ~1 min including the comparison |
+| `ggssvt.campaign` | cache, **GPU** | 8–15 h depending on plan |
 | `report` | cache | seconds |
 
 `experiment` is the single-factor backbone comparison; `factorial` supersedes it

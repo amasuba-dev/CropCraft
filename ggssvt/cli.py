@@ -49,6 +49,22 @@ def _add_training(parser: argparse.ArgumentParser) -> None:
         ),
     )
     parser.add_argument(
+        "--fourier-bands",
+        type=int,
+        default=MODEL.fourier_bands,
+        help=(
+            "frequency bands in the positional encoding. The H3 parameter-"
+            "efficiency knob: the encoding currently reaches 83 cycles/m while "
+            "the 12 mm grid tops out at 42, so it is over-provisioned"
+        ),
+    )
+    parser.add_argument(
+        "--fourier-max-freq",
+        type=float,
+        default=MODEL.fourier_max_freq,
+        help="top exponent of the frequency ladder (2^k). Pairs with --fourier-bands",
+    )
+    parser.add_argument(
         "--batch-size",
         type=int,
         default=TRAIN.batch_size,
@@ -56,6 +72,17 @@ def _add_training(parser: argparse.ArgumentParser) -> None:
             "specimens per step, each carrying 12 views. 1 fits 8 GB; 2 or 4 "
             "roughly halves or quarters epoch time on a 16 GB card"
         ),
+    )
+
+
+def _model_config(args: argparse.Namespace):
+    """Build a ModelConfig from the architecture flags."""
+    import dataclasses
+
+    return dataclasses.replace(
+        MODEL,
+        fourier_bands=getattr(args, "fourier_bands", MODEL.fourier_bands),
+        fourier_max_freq=getattr(args, "fourier_max_freq", MODEL.fourier_max_freq),
     )
 
 
@@ -237,6 +264,7 @@ def cmd_pretrain(args: argparse.Namespace) -> int:
     dataset = SpecimenDataset(plant_ids, cache_dir=args.cache_dir, mode="occupancy")
 
     model = GGSSVT(
+        config=_model_config(args),
         tokens_per_view=args.tokens_per_view,
         geometry_grounded=not args.no_geometry,
     )
@@ -298,6 +326,7 @@ def cmd_loocv(args: argparse.Namespace) -> int:
     results = loocv(
         plant_ids,
         cache_dir=args.cache_dir,
+        model_config=_model_config(args),
         train_config=_training_config(args),
         tokens_per_view=args.tokens_per_view,
         geometry_grounded=not args.no_geometry,

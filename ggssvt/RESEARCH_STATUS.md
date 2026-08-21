@@ -28,7 +28,7 @@ stated once here and applies throughout.
 | **RQ3** — reconstruction → biomass, label-efficiently | **Substantially answered** | Answer is qualified, not clean |
 | **H1** — ViT beats CNN; label efficiency | Partial | DINOv2 probe done, not significant at n=28 |
 | **H2** — geometry grounding → viewpoint consistency | Partial | Ablation implemented, not run |
-| **H3** — frequency + geometry grounding | **Recommend dropping** | Frequency grounding was never implemented |
+| **H3** — frequency + geometry grounding | **Best evidenced of the four** | 4 of 6 sub-claims established; see [HYPOTHESIS_3.md](HYPOTHESIS_3.md) |
 | **H4** — robustness to occlusion, noise, sparse sampling | Partial | Sparse-sampling clause answered; occlusion/noise not |
 
 ---
@@ -232,22 +232,35 @@ and report multi-view agreement plus occupancy AP for each.
 
 ## H3 — Frequency and geometry grounding together improve parameter efficiency
 
-**Status: recommend dropping.**
+**Status: keep. Four of six sub-claims established. Full treatment in
+[HYPOTHESIS_3.md](HYPOTHESIS_3.md).**
 
-**Frequency grounding was never implemented.** There is no wavelet or spectral
-decomposition anywhere in the pipeline. The reading log's "Geom (Frequency)"
-axis contains exactly one paper — WaveFormer — which is a citation, not a
-research axis.
+**An earlier draft of this document recommended dropping H3, on the grounds that
+frequency grounding was never implemented. That was wrong.** The proposal's own
+wording — "especially as relates to positional encodings for 3D spectral
+features" — names the Fourier positional encoding, which *is* implemented and
+used by both the token embedding and the occupancy decoder. What was never built
+is a separate wavelet branch, which is not what the hypothesis requires.
 
-Implementing it properly means adding a DWT branch, and at n=28 a parameter-
-efficiency claim could not be resolved anyway: the DINOv2 backbone-size
-comparison, which is a far larger effect, already fails to reach significance.
+Established on collected data:
 
-**Recommendation:** drop H3, and drop reference [27] (WaveFormer) with it unless
-it is cited for context. Doing so removes one hypothesis from the four Stander
-flagged as PhD-sized scope, at no cost to the contribution.
+- **Plant spectra are structure-specific.** High-frequency energy doubles from
+  the smooth potted specimens (0.128) to branching ones (0.254–0.273).
+- **The encoding is over-provisioned**: it reaches 83.3 cycles/m while the 12 mm
+  voxel grid tops out at 41.7. Half the ladder describes detail the grid cannot
+  carry — the parameter-efficiency claim as a measured quantity.
+- **Mango saturates the grid Nyquist** at 41.7 ± 0.0 cycles/m for all ten
+  specimens. Resolution, not method, is their binding constraint.
+- **Angular sampling requirement is structure-specific and independent of
+  bandwidth.** Mango has the highest bandwidth yet all ten are usable at three
+  views; E001–E010 has the lowest yet only one in ten is. Bresolin et al.'s
+  phenotype-specific acquisition-frequency finding, reproduced in another
+  modality — and the direction is the opposite of what the spectra predict.
 
----
+Pending, one GPU run each: trimming the encoding to the grid Nyquist should cost
+nothing (`h3_bands_*` in the campaign), and the Frequency Principle predicts
+high-frequency bands converge last, which `eval/frequency.band_error` measures
+per epoch.
 
 ## H4 — Robustness to occlusion, noise, and sparse sampling
 
@@ -282,7 +295,7 @@ the evidence supports him.
 |---|---|
 | H1 | **Split.** Keep the representation claim; drop "segmentation accuracy" (unmeasurable here) |
 | H2 | **Keep.** Closest to being cleanly answerable, needs one GPU run |
-| H3 | **Drop.** Frequency grounding was never implemented |
+| H3 | **Keep, restated.** See HYPOTHESIS_3.md — 4 of 6 sub-claims already established |
 | H4 | **Narrow to sparse sampling**, which is answered |
 
 That leaves a defensible set of two-and-a-half hypotheses matched to evidence
