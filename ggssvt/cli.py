@@ -608,6 +608,19 @@ def cmd_mesh(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_dashboard(args: argparse.Namespace) -> int:
+    """Build the self-contained research walkthrough page."""
+    from .eval.dashboard_data import build_payload
+    from .eval.dashboard_html import build_dashboard
+
+    payload = build_payload()
+    out = build_dashboard(payload.to_json(), out_path=args.out)
+    size = out.stat().st_size / 1e6
+    print(f"Wrote {out} ({size:.2f} MB, {len(payload.specimens)} specimens)")
+    print("Open it directly in a browser -- it needs no server.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="ggssvt",
@@ -802,6 +815,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--out", type=Path, default=WORK_DIR / "reports" / "mesh.json"
     )
     mesh.set_defaults(func=cmd_mesh)
+
+    dashboard = sub.add_parser(
+        "dashboard", help="build the research walkthrough page"
+    )
+    dashboard.add_argument(
+        "--out", type=Path, default=WORK_DIR / "reports" / "dashboard.html"
+    )
+    dashboard.set_defaults(func=cmd_dashboard)
 
     nerf = sub.add_parser(
         "nerfstudio", help="export estimated poses as Nerfstudio transforms.json"
