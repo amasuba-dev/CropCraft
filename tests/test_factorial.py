@@ -216,7 +216,7 @@ def test_access_check_reports_a_missing_repo_distinctly():
 
 
 def test_dinov3_help_names_the_variant_that_was_refused():
-    """Sending someone to accept the wrong repo's licence does not unblock them."""
+    """Point people at the size they asked for, not a different one."""
     from ggssvt.models.backbones import DINOV3_REPOS, dinov3_access_help
 
     for variant in ("small", "base", "large"):
@@ -224,3 +224,14 @@ def test_dinov3_help_names_the_variant_that_was_refused():
         assert DINOV3_REPOS[variant] in help_text
         for other in set(DINOV3_REPOS) - {variant}:
             assert DINOV3_REPOS[other] not in help_text
+
+
+def test_dinov3_help_covers_the_two_ways_approval_looks_granted_but_is_not():
+    """Both traps that make an approved account still read as gated."""
+    from ggssvt.models.backbones import dinov3_access_help
+
+    help_text = dinov3_access_help("base")
+    # PENDING on the settings page is not ACCEPTED.
+    assert "PENDING" in help_text and "gated-repos" in help_text
+    # The machine can be logged in as a different account than the approved one.
+    assert "whoami" in help_text
