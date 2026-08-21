@@ -8,7 +8,6 @@ import pytest
 skimage = pytest.importorskip("skimage")
 
 from ggssvt.geometry.mesh import (
-    Mesh,
     mesh_from_occupancy,
     mesh_metrics,
 )
