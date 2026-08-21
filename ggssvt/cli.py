@@ -535,6 +535,79 @@ def cmd_nerfstudio(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_mesh(args: argparse.Namespace) -> int:
+    """Extract meshes and score biomass from them against every other method."""
+    from .data.preprocess import load_cached, usable_plant_ids
+    from .eval.baselines import load_features
+    from .eval.mesh_baseline import evaluate_with_mesh
+    from .eval.metrics import paired_bootstrap_difference
+    from .geometry.mesh import mesh_from_occupancy
+
+    plant_ids = args.plants or usable_plant_ids(args.cache_dir)
+    print(f"Meshing {len(plant_ids)} specimens from {args.cache_dir}")
+
+    results, table = evaluate_with_mesh(
+        plant_ids, cache_dir=args.cache_dir, alpha=args.alpha
+    )
+    targets = np.array([f.target_kg for f in load_features(plant_ids, args.cache_dir)])
+
+    header = f"\n{'method':28s} {'RMSE':>7s} {'MAE':>7s} {'MARE%':>7s} {'R2':>7s}"
+    print(header)
+    print("-" * (len(header) - 1))
+    for name, (metrics, _) in sorted(results.items(), key=lambda kv: kv[1][0].rmse_kg):
+        print(
+            f"{name:28s} {metrics.rmse_kg:7.3f} {metrics.mae_kg:7.3f} "
+            f"{metrics.mare * 100:7.1f} {metrics.r2:7.3f}"
+        )
+
+    reference = "geometric features"
+    if reference in results:
+        print(f"\nPaired bootstrap against '{reference}':")
+        for name in ("mesh geometry", "canopy area allometric"):
+            if name not in results:
+                continue
+            d = paired_bootstrap_difference(
+                results[name][1], results[reference][1], targets
+            )
+            verdict = (
+                "significant" if d["high"] < 0 or d["low"] > 0 else "not resolved"
+            )
+            print(
+                f"  {name:26s} dRMSE {d['difference']:+.3f} kg  "
+                f"95% CI [{d['low']:+.3f}, {d['high']:+.3f}]  {verdict}"
+            )
+
+    if args.export:
+        args.export.mkdir(parents=True, exist_ok=True)
+        for plant_id in plant_ids:
+            cached = load_cached(plant_id, args.cache_dir)
+            mesh = mesh_from_occupancy(
+                cached.occupancy,
+                voxel_size_m=cached.voxel_size_m,
+                smoothing=args.smoothing,
+            )
+            (args.export / f"{plant_id}.obj").write_text(mesh.to_obj(), encoding="utf-8")
+        print(f"\nWrote {len(plant_ids)} OBJ meshes to {args.export}")
+
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(
+        json.dumps(
+            {
+                "n_specimens": len(plant_ids),
+                "mesh_metrics": table,
+                "results": {
+                    name: {**m.as_dict(), "predictions": p.tolist()}
+                    for name, (m, p) in results.items()
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    print(f"Saved to {args.out}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="ggssvt",
@@ -711,6 +784,24 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-sheets", action="store_true", help="skip the PNG contact sheets"
     )
     gallery.set_defaults(func=cmd_gallery)
+
+    mesh = sub.add_parser(
+        "mesh", help="extract meshes and score biomass from them"
+    )
+    _add_common(mesh)
+    mesh.add_argument("--plants", nargs="*")
+    mesh.add_argument("--alpha", type=float, default=1.0, help="ridge strength")
+    mesh.add_argument(
+        "--smoothing", type=int, default=0,
+        help="Laplacian smoothing passes on exported meshes (changes area/volume)",
+    )
+    mesh.add_argument(
+        "--export", type=Path, default=None, help="also write OBJ meshes here"
+    )
+    mesh.add_argument(
+        "--out", type=Path, default=WORK_DIR / "reports" / "mesh.json"
+    )
+    mesh.set_defaults(func=cmd_mesh)
 
     nerf = sub.add_parser(
         "nerfstudio", help="export estimated poses as Nerfstudio transforms.json"

@@ -35,3 +35,8 @@ safetensors>=0.4
 # --- development ----------------------------------------------------------
 pytest>=7.0
 ruff>=0.6
+
+# Mesh arm (marching cubes, convex hull). Optional: everything else runs
+# without it, and `ggssvt.cli mesh` reports what to install if it is absent.
+scikit-image>=0.22
+scipy>=1.11

@@ -419,6 +419,74 @@ negation for that path, but the files still need restoring: install upstream
 Nerfstudio (`pip install nerfstudio`) or re-clone it into that directory. Either
 way it needs CUDA and `tiny-cuda-nn`, per the root README.
 
+## Mesh-based biomass, and what it revealed
+
+```bash
+python -m ggssvt.cli mesh --export work_dirs/ggssvt/meshes
+```
+
+Marching cubes on the carved occupancy, then biomass from mesh descriptors:
+canopy surface area above the pot rim, enclosed volume by the divergence
+theorem, solidity (mesh volume over convex hull volume), area-to-volume ratio,
+and height. Validated against an analytic sphere — volume within 0.5%, area
+carrying the known ~8% marching-cubes bias on a binary grid.
+
+### Results, 28 specimens, leave-one-out
+
+| method | RMSE | MARE | R² |
+|---|---|---|---|
+| **mesh geometry** | **0.359 kg** | **27.7%** | **0.613** |
+| geometric features (voxel) | 0.397 kg | 32.8% | 0.526 |
+| direct 2D | 0.440 kg | 39.9% | 0.419 |
+| mean predictor | 0.598 kg | 62.5% | −0.075 |
+| volume allometric | 0.622 kg | 56.9% | −0.162 |
+| canopy area allometric | 0.642 kg | 52.1% | −0.236 |
+
+**The hypothesis this was built to test failed.** The reasoning was that a leaf's
+mass scales with its area while it encloses almost no volume, so canopy area
+should beat canopy volume. It does not: the single-term area law is the *worst*
+method tried, and head-to-head against the single-term volume law the difference
+is −0.020 kg with an interval spanning zero — the two are equally uninformative.
+
+The mechanism is worth stating, because it generalises. **A visual hull's surface
+area is envelope area, not leaf area.** Twelve views at 12 mm voxels cannot
+resolve individual leaves, so the mesh measures the outside of the canopy, and
+the outside of a canopy carries no more information than its volume does.
+
+The multi-feature mesh set is nonetheless the best method in the comparison,
+though a paired bootstrap against the voxel features gives −0.038 kg,
+95% CI [−0.099, +0.018] — not resolved. Leave-one-feature-out shows **height**
+carrying it (removing height costs 0.051 kg; removing canopy area costs 0.001).
+
+### The confound that caps every biomass claim here
+
+Chasing the mesh result down exposed something that applies to *all* the biomass
+numbers in this repository, not just the mesh ones.
+
+The Eucalyptus specimens fall into two batches with almost no overlap in mass:
+
+| batch | n | mean mass | character |
+|---|---|---|---|
+| E001–E010 | 10 | 0.538 kg | small, reconstruct as mostly pot |
+| E011–E020 | 8 usable | 1.844 kg | tall thin saplings |
+
+**Knowing only which batch a specimen came from explains R² = 0.887 of the
+Eucalyptus mass variance** — more than any method achieves. And within either
+batch, nothing predicts anything: no method clears R² = 0.2 on E001–E010 or
+E011–E020 taken alone, at n=10 and n=8.
+
+So the models are recovering *which group a plant belongs to* — tall and sparse
+versus short and solid — rather than estimating mass among comparable plants.
+Height and solidity are doing that work, which is exactly what the
+leave-one-feature-out analysis shows.
+
+This does not invalidate the reconstruction pipeline or the comparison harness.
+It does mean the honest claim is **"reconstructed geometry separates plant size
+classes"**, not "reconstructed geometry estimates biomass". The second claim
+needs specimens whose masses overlap across morphologies — the cheapest fix is
+a capture batch spanning a continuous mass range within one species, rather than
+more specimens of the two clusters already held.
+
 ## Known limitations
 
 - **Registration is estimated, not measured.** See above.
