@@ -308,6 +308,49 @@ Add `dinov3` to `--backbones` only if you have both the access and the hours.
 
 ---
 
+## Pose-free reconstruction — the registration check
+
+```bash
+python -m ggssvt.cli posefree --check-only
+```
+
+Reports which of DUSt3R, MASt3R and Fast3R are installed, with the clone command
+for each. All three sets of weights are open on HuggingFace; it is the
+repositories that must be cloned, with submodules:
+
+```bash
+git clone --recursive https://github.com/naver/mast3r && cd mast3r && pip install -r requirements.txt && pip install -e .
+```
+
+Then:
+
+```bash
+python -m ggssvt.cli posefree --methods mast3r --device cuda
+```
+
+**Run this for the poses, not for the biomass.** Every camera pose in the project
+is estimated from depth, and the azimuth refinement saturates its ±8° search
+bound on almost every specimen — so the registration is the least verified
+assumption in the pipeline, and nothing inside the pipeline can test it. A
+pose-free method shares no failure mode with a depth-based registration, so the
+residual after similarity alignment is a real measurement of how wrong the poses
+are. **Azimuth RMSE is the number to read.** Under 8° would be reassuring; more
+would not be.
+
+Use **MASt3R's metric checkpoint** first. DUSt3R and Fast3R return arbitrary
+scale, so their volumes depend on a scale recovered from the Kinect depth, which
+makes them only partly independent of the pipeline they are meant to check.
+MASt3R-metric has no such loop.
+
+The adapters are written against each project's documented interface but have
+**not been run against the real weights** — no GPU was available where they were
+written. The maths they feed is tested; the adapters are not. Watch the first run
+for import errors and convention drift rather than assuming quiet success.
+`sanity_check_result` warns if the cameras stop facing the scene, which is what a
+convention change looks like.
+
+---
+
 ## Evening — Nerfstudio, in the other environment
 
 ```bash
@@ -421,6 +464,8 @@ stem in all twelve frames, every number for that specimen is meaningless.
 | `loocv` | cache, checkpoint, **GPU** | ~40 min at 60 fine-tune epochs |
 | `experiment` | cache, **GPU** | one pretrain + one LOOCV per backbone |
 | `nerfstudio` | dataset | seconds — writes `transforms.json` |
+| `dashboard` | cache, mesh cache | ~1 min — the walkthrough page |
+| `posefree` | cloned repos, **GPU** | minutes per specimen per method |
 | `report` | cache | seconds |
 
 `experiment` is the single-factor backbone comparison; `factorial` supersedes it

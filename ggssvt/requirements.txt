@@ -40,3 +40,8 @@ ruff>=0.6
 # without it, and `ggssvt.cli mesh` reports what to install if it is absent.
 scikit-image>=0.22
 scipy>=1.11
+
+# Pose-free reconstruction (DUSt3R / MASt3R / Fast3R) is NOT pip-installable and
+# is deliberately absent here. Each needs its GitHub repository cloned with
+# submodules, plus a GPU. Run `python -m ggssvt.cli posefree --check-only` for
+# per-backend instructions. Everything else works without them.

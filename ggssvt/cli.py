@@ -621,6 +621,35 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_posefree(args: argparse.Namespace) -> int:
+    """Compare DUSt3R / MASt3R / Fast3R against the estimated rig."""
+    from .eval.pose_free_experiment import run_experiment
+    from .geometry.pose_free import available_backends
+
+    if args.check_only:
+        print("Pose-free backend availability:\n")
+        for name, (ok, reason) in available_backends().items():
+            print(f"  {'OK     ' if ok else 'MISSING'}  {name}")
+            if reason:
+                for line in reason.splitlines():
+                    print(f"      {line}")
+        return 0
+
+    report = run_experiment(
+        args.plants,
+        methods=tuple(args.methods),
+        device=args.device,
+        image_size=args.image_size,
+        cache_dir=args.cache_dir,
+        out_path=args.out,
+    )
+    print()
+    print(report.to_table())
+    if args.out:
+        print(f"\nSaved to {args.out}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="ggssvt",
@@ -823,6 +852,27 @@ def build_parser() -> argparse.ArgumentParser:
         "--out", type=Path, default=WORK_DIR / "reports" / "dashboard.html"
     )
     dashboard.set_defaults(func=cmd_dashboard)
+
+    posefree = sub.add_parser(
+        "posefree",
+        help="DUSt3R / MASt3R / Fast3R poses vs the estimated rig (needs a GPU)",
+    )
+    _add_common(posefree)
+    posefree.add_argument("--plants", nargs="*")
+    posefree.add_argument(
+        "--methods", nargs="+", default=["fast3r", "dust3r", "mast3r"],
+        choices=["dust3r", "mast3r", "fast3r"],
+    )
+    posefree.add_argument("--device", default="cuda")
+    posefree.add_argument("--image-size", type=int, default=512)
+    posefree.add_argument(
+        "--check-only", action="store_true",
+        help="report which backends are installed and stop",
+    )
+    posefree.add_argument(
+        "--out", type=Path, default=WORK_DIR / "reports" / "posefree.json"
+    )
+    posefree.set_defaults(func=cmd_posefree)
 
     nerf = sub.add_parser(
         "nerfstudio", help="export estimated poses as Nerfstudio transforms.json"
