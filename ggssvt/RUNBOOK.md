@@ -261,7 +261,8 @@ the same command and picks up where it stopped.
 python -m ggssvt.campaign --plan smoke --device cuda
 ```
 
-**Always run `smoke` first.** Two two-epoch runs, a few minutes, and it proves
+**Always run `smoke` first.** Two two-epoch runs over four specimens, about ten
+minutes on the GPU, and it proves
 the loop, the checkpointing, the resume logic and the result writing before you
 commit a night to them.
 

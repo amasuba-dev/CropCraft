@@ -384,7 +384,7 @@ def _write_summary(results: list[RunResult], out_dir: Path) -> None:
             lines.append(
                 f"{result.name:22s} {result.status:8s} "
                 f"{m.get('rmse_kg', float('nan')):7.3f} "
-                f"{m.get('r2', float('nan')):7.3f} "
+                f"{max(m.get('r2', float('nan')), -999.0):7.3f} "
                 f"{m.get('occupancy_ap', float('nan')):7.3f} "
                 f"{result.seconds / 60:6.0f}"
             )
