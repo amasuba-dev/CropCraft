@@ -54,6 +54,7 @@ class Run:
     pretrain_epochs: int = 120
     finetune_epochs: int = 60
     tokens_per_view: int = 64
+    max_specimens: int | None = None   # smoke runs only; None uses every usable specimen
 
     def cache_dir(self) -> Path:
         return WORK_DIR / ("cache_sam3d" if self.cache == "sam3d" else "cache")
@@ -143,6 +144,7 @@ def _smoke_runs() -> list[Run]:
             pretrain_epochs=2,
             finetune_epochs=2,
             tokens_per_view=16,
+            max_specimens=4,
         ),
         Run(
             name="smoke_dinov2",
@@ -152,6 +154,7 @@ def _smoke_runs() -> list[Run]:
             pretrain_epochs=2,
             finetune_epochs=2,
             tokens_per_view=16,
+            max_specimens=4,
         ),
     ]
 
@@ -222,6 +225,11 @@ def execute(
 
     try:
         plant_ids = usable_plant_ids(cache_dir)
+        if run.max_specimens is not None:
+            # A smoke run proves the plumbing, so it trims the specimen list rather
+            # than the epoch count alone: leave-one-out over all 28 costs hours even
+            # at two epochs, and a check nobody waits for is a check nobody runs.
+            plant_ids = plant_ids[: run.max_specimens]
         config = run.model_config()
 
         model = GGSSVT(
