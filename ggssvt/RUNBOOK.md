@@ -57,16 +57,24 @@ Expected: `2.5.1+cu121 True NVIDIA GeForce RTX 4080`.
 python -m pytest tests/ -q
 ```
 
-**Expect `89 passed, 7 skipped` at this point — that is correct.** Seven tests in
-`test_pipeline.py` are integration tests gated on the preprocessed cache, and
-`work_dirs/` is gitignored because it holds about 120 MB of derived data that
-regenerates in four minutes. They skip until step 1 below has run, then all
-**96** pass. Re-run the suite after preprocessing to collect them.
+**Expect `N passed, 7 skipped` — that is correct.** The seven are integration
+tests in `test_pipeline.py` gated on the preprocessed cache, which does not exist
+yet: `work_dirs/` is gitignored because it holds about 120 MB of derived data
+that regenerates in minutes. They skip until step 1 has run, then join in.
 
-What matters is the failure count, not the pass count. Any *failure* means
-something about the environment is wrong; fix it before spending GPU hours. A
-much lower pass count than 89 usually means a missing module rather than a real
-failure — check `git ls-files ggssvt/data/` returns five files.
+Read the **failure** count, not the pass count. The total changes whenever tests
+are added, so it is not a useful check:
+
+| What you see | What it means |
+|---|---|
+| `0 failed`, 7 skipped | Correct, before preprocessing |
+| `0 failed`, 0 skipped | Correct, after preprocessing |
+| any failures | Fix before spending GPU hours |
+| errors during *collection* | A module is missing — see below |
+
+Collection errors reading `ModuleNotFoundError: No module named 'ggssvt.data'`
+mean the repository is out of date. Check with `git ls-files ggssvt/data/`, which
+must list five files, and `git log --oneline -1` against the remote.
 
 ---
 
@@ -96,7 +104,12 @@ Everything works without them; the DINOv3 cells simply report as skipped.
 
 `work_dirs/` is not in the repository, so on a fresh machine there is no cache at
 all and everything downstream — baselines, probes, factorial, training — has
-nothing to read. Build the geometric one first:
+nothing to read.
+
+**Both commands are required, and the first one is easy to skip.** The default
+`--cache-dir` is `work_dirs/ggssvt/cache`, which only the *geometric* run
+writes. Running only the SAM3D command leaves that directory empty, and the next
+thing you run fails with `no quality report at .../cache/quality.json`.
 
 ```bash
 python -m ggssvt.cli preprocess
@@ -106,9 +119,10 @@ python -m ggssvt.cli preprocess
 python -m ggssvt.cli preprocess --segmenter sam3d --cache-dir work_dirs/ggssvt/cache_sam3d --sam-device cuda
 ```
 
-Expect 28/30 specimens to pass the quality gate on the geometric cache and 26/30
-on SAM3D. Then re-run the tests and the seven skipped integration tests should
-join in:
+Expect 28/30 specimens through the quality gate on the geometric cache and 26/30
+on SAM3D — SAM3D additionally drops E015 and E019. About 4 s/specimen for the
+geometric pass and 5 s/specimen for SAM3D on the GPU, so under five minutes for
+both. Then re-run the tests; the seven skipped ones should join in:
 
 ```bash
 python -m pytest tests/ -q
