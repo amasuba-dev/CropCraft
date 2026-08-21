@@ -25,7 +25,6 @@ from ..config import (
     INPUT_CROP_TOP,
     INPUT_HEIGHT,
     KINECT_V2,
-    VOXEL_RESOLUTION,
     VOXEL_SIZE_M,
     WORK_DIR,
 )

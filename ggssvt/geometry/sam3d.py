@@ -109,22 +109,20 @@ class Sam3DStats:
 
 
 def sam_is_available(model: str = "base") -> tuple[bool, str]:
-    """Whether a SAM checkpoint can be downloaded by this account."""
+    """Whether a SAM checkpoint can be downloaded by this account.
+
+    Delegates to :func:`ggssvt.models.backbones.repo_access`, which asks whether
+    *this account* can fetch the files rather than whether the repository is
+    gated at all. The distinction matters: a repository stays flagged as gated
+    forever, including for accounts that have been granted access.
+    """
+    from ..models.backbones import repo_access
+
     repo = SAM_REPOS.get(model, model)
-    try:
-        from huggingface_hub import model_info
-    except ImportError:
-        return False, "huggingface_hub is not installed"
-
-    try:
-        info = model_info(repo)
-    except Exception as exc:
-        return False, f"{repo} unavailable: {str(exc)[:160]}"
-
-    gated = getattr(info, "gated", False)
-    if gated:
-        return False, f"{repo} is gated ({gated}).\n{GATED_HELP}"
-    return True, ""
+    accessible, reason = repo_access(repo)
+    if accessible:
+        return True, ""
+    return False, f"{reason}\n{GATED_HELP}".rstrip()
 
 
 class Sam3DSegmenter:

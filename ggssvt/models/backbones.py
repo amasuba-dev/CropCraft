@@ -58,15 +58,30 @@ DINOV3_REPOS = {
     "large": "facebook/dinov3-vitl16-pretrain-lvd1689m",
 }
 
-DINOV3_ACCESS_HELP = (
-    "DINOv3 weights are gated on HuggingFace. Meta approves access manually, per "
-    "account.\n"
-    "  1. Open https://huggingface.co/facebook/dinov3-vits16-pretrain-lvd1689m\n"
-    "  2. Accept the licence and request access; wait for approval.\n"
-    "  3. Authenticate: `hf auth login` (or set the HF_TOKEN environment variable).\n"
-    "Until then, run the comparison with --backbones cnn dinov2, which needs no "
-    "access request."
-)
+def dinov3_access_help(variant: str = "base") -> str:
+    """Instructions for the specific DINOv3 repository that was refused.
+
+    Names the variant actually requested. Pointing at a different size than the
+    one that failed sends people to accept a licence that does not unblock them
+    -- access is granted per repository, not per model family.
+    """
+    repo = DINOV3_REPOS.get(variant, DINOV3_REPOS["base"])
+    return (
+        "DINOv3 weights are gated. Meta approves access manually, per account "
+        "AND per repository.\n"
+        f"  1. Open https://huggingface.co/{repo}\n"
+        "  2. Accept the licence and submit the access request.\n"
+        "  3. Wait for approval -- it is not instant, and `hf auth login` alone\n"
+        "     does nothing until it is granted.\n"
+        "  4. Re-check with:\n"
+        "     python -c \"from ggssvt.models.backbones import backbone_is_available; "
+        f"print(backbone_is_available('dinov3','{variant}'))\"\n"
+        "Until then run --backbones cnn dinov2, which needs no access request."
+    )
+
+
+# Kept as a module constant for callers that want the generic text.
+DINOV3_ACCESS_HELP = dinov3_access_help("base")
 
 
 class BackboneError(RuntimeError):
@@ -305,6 +320,41 @@ def build_backbone(
     return BACKBONES[kind](embed_dim=embed_dim, variant=variant, freeze=freeze)
 
 
+def repo_access(repo_id: str) -> tuple[bool, str]:
+    """Whether *this account* can download a repository's files.
+
+    Uses :func:`huggingface_hub.auth_check`, which is the only call that answers
+    the question actually being asked. Two weaker checks look like they work and
+    do not:
+
+    * ``model_info`` succeeding proves nothing -- a gated repository serves its
+      metadata to anonymous callers.
+    * ``info.gated`` describes the *repository's policy*, not the caller's
+      permission. It reads ``"manual"`` forever, including for accounts that
+      have been granted access. Gating a backbone on this flag means the
+      backbone stays skipped even after approval comes through, which is a
+      silent and very confusing failure.
+
+    Returns:
+        ``(accessible, reason)``. ``reason`` is empty when accessible.
+    """
+    try:
+        from huggingface_hub import auth_check
+        from huggingface_hub.errors import GatedRepoError, RepositoryNotFoundError
+    except ImportError:
+        return False, "huggingface_hub >= 0.26 is not installed"
+
+    try:
+        auth_check(repo_id)
+        return True, ""
+    except GatedRepoError:
+        return False, f"{repo_id} is gated and this account has not been granted access."
+    except RepositoryNotFoundError:
+        return False, f"{repo_id} does not exist, or requires a token to see."
+    except Exception as exc:
+        return False, f"{repo_id} could not be checked: {str(exc)[:160]}"
+
+
 def backbone_is_available(kind: str, variant: str = "small") -> tuple[bool, str]:
     """Check whether a backbone can actually be loaded, without building it.
 
@@ -317,28 +367,12 @@ def backbone_is_available(kind: str, variant: str = "small") -> tuple[bool, str]
     if variant not in repos:
         return False, f"unknown variant {variant!r}"
 
-    try:
-        from huggingface_hub import model_info
-    except ImportError:
-        return False, "huggingface_hub is not installed"
+    accessible, reason = repo_access(repos[variant])
+    if accessible:
+        return True, ""
 
-    try:
-        info = model_info(repos[variant])
-    except Exception as exc:
-        return False, f"{repos[variant]} unavailable: {str(exc)[:200]}"
-
-    # A gated repository still serves its metadata to anonymous callers, so
-    # model_info succeeding proves nothing about whether the weights can be
-    # downloaded. The gated flag is the part that matters, and it reads False
-    # once this account has been granted access.
-    gated = getattr(info, "gated", False)
-    if gated:
-        help_text = DINOV3_ACCESS_HELP if kind == "dinov3" else ""
-        return False, (
-            f"{repos[variant]} is gated ({gated}); this account has not been "
-            f"granted access.\n{help_text}"
-        )
-    return True, ""
+    help_text = dinov3_access_help(variant) if kind == "dinov3" else ""
+    return False, f"{reason}\n{help_text}".rstrip()
 
 
 __all__ = [
@@ -350,5 +384,7 @@ __all__ = [
     "Dinov2Backbone",
     "Dinov3Backbone",
     "backbone_is_available",
+    "dinov3_access_help",
+    "repo_access",
     "build_backbone",
 ]

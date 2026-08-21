@@ -190,3 +190,37 @@ def test_sam_stats_report_what_changed():
     assert stats.acceptance_rate == pytest.approx(0.75)
     assert stats.pixel_change == pytest.approx(0.2)
     assert stats.as_dict()["n_views"] == 12
+
+
+def test_access_check_asks_about_permission_not_repo_policy():
+    """A gated repo stays flagged gated forever, including once you have access.
+
+    `model_info(...).gated` describes the repository's policy, not the caller's
+    permission, so gating a backbone on it means the backbone stays skipped even
+    after approval arrives -- silent, and very hard to diagnose. The check must
+    use `auth_check`, which answers the question actually being asked.
+    """
+    from ggssvt.models.backbones import repo_access
+
+    accessible, reason = repo_access("facebook/dinov2-base")
+    assert accessible, f"an open repo must read as accessible: {reason}"
+    assert reason == ""
+
+
+def test_access_check_reports_a_missing_repo_distinctly():
+    from ggssvt.models.backbones import repo_access
+
+    accessible, reason = repo_access("facebook/definitely-not-a-real-model-xyz")
+    assert not accessible
+    assert "does not exist" in reason or "could not be checked" in reason
+
+
+def test_dinov3_help_names_the_variant_that_was_refused():
+    """Sending someone to accept the wrong repo's licence does not unblock them."""
+    from ggssvt.models.backbones import DINOV3_REPOS, dinov3_access_help
+
+    for variant in ("small", "base", "large"):
+        help_text = dinov3_access_help(variant)
+        assert DINOV3_REPOS[variant] in help_text
+        for other in set(DINOV3_REPOS) - {variant}:
+            assert DINOV3_REPOS[other] not in help_text
