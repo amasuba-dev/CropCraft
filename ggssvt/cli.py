@@ -1,6 +1,7 @@
 """Command-line interface.
 
     python -m ggssvt.cli inspect        # dataset audit, no computation
+    python -m ggssvt.cli access         # HuggingFace account and model access
     python -m ggssvt.cli preprocess     # register, segment, carve, cache
     python -m ggssvt.cli baselines      # LOOCV baselines from the cache
     python -m ggssvt.cli pretrain       # stage 1, self-supervised
@@ -108,6 +109,77 @@ def cmd_inspect(args: argparse.Namespace) -> int:
             "  described in dataset/README.md would replace that estimate with a\n"
             "  measurement."
         )
+    return 0
+
+
+def cmd_access(args: argparse.Namespace) -> int:
+    """Report which account is authenticated and what it can actually download.
+
+    Authentication is ambient: `hf auth login` writes a token that
+    huggingface_hub and transformers pick up on their own, so nothing in this
+    codebase takes a token argument and no script should contain one. What goes
+    wrong is almost never the token itself -- it is being logged in as a
+    different account than the one that was approved.
+    """
+    from .geometry.sam3d import SAM3D_OBJECTS_REPO, SAM3_REPO, SAM_REPOS
+    from .models.backbones import DINOV2_REPOS, DINOV3_REPOS, repo_access
+
+    try:
+        from huggingface_hub import get_token, whoami
+    except ImportError:
+        print("huggingface_hub is not installed", file=sys.stderr)
+        return 2
+
+    token = get_token()
+    if not token:
+        print("No HuggingFace token found.")
+        print("  Interactive:  hf auth login")
+        print("  Headless:     export HF_TOKEN=hf_...")
+        print("Gated models will be unavailable until one of those is set.")
+    else:
+        try:
+            account = whoami().get("name", "?")
+            print(f"Authenticated as: {account}")
+        except Exception as exc:
+            print(f"Token present but rejected: {str(exc)[:120]}", file=sys.stderr)
+            return 1
+        import os
+
+        # HF_TOKEN wins over the cached login, so a stale environment variable
+        # silently overrides `hf auth login` and you stay on the wrong account
+        # no matter how many times you log in again.
+        source = (
+            "HF_TOKEN environment variable"
+            if os.environ.get("HF_TOKEN")
+            else "cached login (~/.cache/huggingface)"
+        )
+        print(f"Token source: {source}")
+
+    checks: list[tuple[str, str]] = []
+    for variant, repo in DINOV2_REPOS.items():
+        checks.append((f"dinov2-{variant}", repo))
+    for variant, repo in DINOV3_REPOS.items():
+        checks.append((f"dinov3-{variant}", repo))
+    for variant, repo in SAM_REPOS.items():
+        checks.append((f"sam-{variant}", repo))
+    checks.append(("sam3", SAM3_REPO))
+    checks.append(("sam-3d-objects", SAM3D_OBJECTS_REPO))
+
+    print()
+    blocked = []
+    for label, repo in checks:
+        accessible, reason = repo_access(repo)
+        print(f"  {'OK     ' if accessible else 'BLOCKED'}  {label:16s} {repo}")
+        if not accessible:
+            blocked.append((label, reason))
+
+    if blocked:
+        print(f"\n{len(blocked)} repositories are not accessible to this account.")
+        print("If the HuggingFace settings page shows them ACCEPTED, the usual")
+        print("cause is being logged in here as a different account than the one")
+        print("that was approved. Check the name printed above.")
+    else:
+        print("\nEverything this project can use is accessible.")
     return 0
 
 
@@ -472,6 +544,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     inspect = sub.add_parser("inspect", help="audit the raw dataset")
     inspect.set_defaults(func=cmd_inspect)
+
+    access = sub.add_parser(
+        "access", help="which HuggingFace account is active, and what it can download"
+    )
+    access.set_defaults(func=cmd_access)
 
     preprocess = sub.add_parser(
         "preprocess", help="register, segment and carve every specimen"

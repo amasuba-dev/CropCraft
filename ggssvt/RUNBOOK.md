@@ -90,11 +90,37 @@ first and let them run in the background.
 hf auth login
 ```
 
+Then check what this machine can actually reach:
+
 ```bash
-python -c "from ggssvt.models.backbones import backbone_is_available; print(backbone_is_available('dinov3','base'))"
+python -m ggssvt.cli access
 ```
 
-Everything works without them; the DINOv3 cells simply report as skipped.
+It prints the authenticated account, where the token came from, and an OK/BLOCKED
+line per model. **Nothing needs a token added to it.** `hf auth login` writes one
+to `~/.cache/huggingface`, and `huggingface_hub` and `transformers` pick it up on
+their own — no function in this codebase takes a token argument, and no script
+should ever contain one.
+
+Two ways an approved model still reads BLOCKED:
+
+**Wrong account.** Approvals are per account. If the settings page says ACCEPTED
+but `access` reports BLOCKED, compare the name it prints against the account that
+was approved. Fix with `hf auth login --force`.
+
+**`HF_TOKEN` overriding the login.** If that variable is set — in `.bashrc`, a
+job script, a conda activation hook — it **takes precedence over `hf auth login`
+entirely**, so logging in again changes nothing. `access` reports which source is
+in play. To clear it:
+
+```bash
+unset HF_TOKEN && python -m ggssvt.cli access
+```
+
+For headless or batch jobs, `HF_TOKEN` is the right mechanism — just make sure it
+holds the approved account's token, and keep it out of anything committed.
+
+Everything runs without either model; the DINOv3 cells simply report as skipped.
 
 ---
 
