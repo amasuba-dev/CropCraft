@@ -167,6 +167,29 @@ difference in means, so it does not depend on n or on a regulariser: **8 of 36
 reconstructions are the right size to weigh what the plant weighs.** That is what
 RQ3 should be answered with.
 
+### Within species, where the confound is weakest, 3D fails outright
+
+The pooled comparison mixes species. Restricting to Eucalyptus — now 26
+specimens including V, the least confounded set this project has — is the
+sharpest available test:
+
+| method | RMSE | R² |
+|---|---|---|
+| **direct 2D** | **0.520 kg** | **+0.311** |
+| mean predictor | 0.651 kg | −0.082 |
+| volume allometric | 0.666 kg | −0.131 |
+| **geometric features** | **0.717 kg** | **−0.313** |
+
+**Geometric features are worse than predicting the mean.** Mango alone (n=10) is
+the same story, at R² −1.971 against the mean's −0.235.
+
+An R² below the mean-predictor floor is a different kind of statement from losing
+a head-to-head: it says the feature carries no usable signal about mass at this
+resolution, rather than less signal than a rival. It is also exactly what §3
+predicts — a volume that is an envelope has nothing to regress against — and it
+is consistent across both species. **This, not the pooled ordering, is the
+result worth reporting.**
+
 ### The batch confound weakened — because V was designed to break it
 
 | set | batch-only R² |

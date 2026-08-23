@@ -170,6 +170,14 @@ with all ten Mango at 26–77 kg/m³ — and three imply more, meaning thin stem
 never carved. **The reconstructed object is a canopy envelope, not a plant**, so
 its volume cannot carry mass information regardless of what is fitted to it.
 
+**Within species the failure is unambiguous.** Restricted to Eucalyptus (n=26,
+the least confounded set available), geometric features score R² **−0.313** —
+*worse than predicting the mean*, whose floor is −0.082 — while direct 2D reaches
++0.311. Mango alone is the same, −1.971 against the mean's −0.235. Falling below
+the mean-predictor floor is a stronger statement than losing a head-to-head: the
+feature carries no usable mass signal at this resolution, which is exactly what
+an envelope-shaped volume predicts.
+
 This is a real answer to RQ3 rather than a failure to answer it, and it is the
 form the answer should take — it does not depend on n, on a regulariser, or on
 which method happened to win a run. Stated for the dissertation:
