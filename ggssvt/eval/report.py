@@ -15,7 +15,9 @@ from pathlib import Path
 import numpy as np
 
 from ..config import WORK_DIR
+from ..config import voxel_grid_centres
 from ..data.preprocess import load_cached, load_quality
+from .plausibility import classify, summarise
 from .baselines import evaluate_baselines, load_features
 from .metrics import RegressionMetrics, bootstrap_interval, regression_metrics
 
@@ -46,6 +48,18 @@ def _markdown_table(header: list[str], rows: list[list]) -> str:
     return "\n".join(lines)
 
 
+def _above_ground_volume_m3(cached) -> float:
+    """Volume above this specimen's own pot rim, not the global constant.
+
+    Using each specimen's measured rim is what makes the implied density
+    comparable across batches: V pots weigh 17-32 kg against E's 0.7-2.2, so a
+    shared cut height counts a different amount of pot as plant in each.
+    """
+    centres = voxel_grid_centres()
+    above = cached.occupancy & (centres[..., 2] > cached.pot_height_m)
+    return float(above.sum()) * cached.voxel_size_m ** 3
+
+
 def dataset_table(plant_ids: list[str]) -> tuple[list[str], list[list]]:
     """Per-specimen geometry and ground truth."""
     quality = load_quality()
@@ -58,22 +72,30 @@ def dataset_table(plant_ids: list[str]) -> tuple[list[str], list[list]]:
         "coverage",
         "agreement",
         "connected",
+        "pot_rim_m",
+        "kg_m3",
+        "verdict",
         "usable",
     ]
     rows = []
     for plant_id in plant_ids:
         q = quality[plant_id]
         cached = load_cached(plant_id)
+        volume = _above_ground_volume_m3(cached)
+        check = classify(plant_id, float(cached.target_kg), volume)
         rows.append(
             [
                 plant_id,
                 cached.species,
                 f"{cached.target_kg:.3f}",
-                f"{q.above_ground_volume_m3 * 1000:.2f}",
+                f"{volume * 1000:.2f}",
                 f"{q.height_m:.2f}",
                 f"{q.surface_coverage:.3f}",
                 f"{q.multiview_agreement:.3f}",
                 f"{q.connected_fraction:.2f}",
+                f"{cached.pot_height_m:.3f}" + ("" if cached.pot.confident else "*"),
+                f"{check.density_kg_m3:.0f}",
+                check.verdict,
                 "yes" if q.is_usable() else "no",
             ]
         )
@@ -245,7 +267,40 @@ def write_report(
     if per_species_sections:
         lines += ["## Within species", "", *per_species_sections]
 
-    lines += ["## Dataset and reconstruction quality", "", _markdown_table(data_header, data_rows), ""]
+    checks = []
+    for plant_id in plant_ids:
+        cached = load_cached(plant_id)
+        checks.append(
+            classify(
+                plant_id, float(cached.target_kg), _above_ground_volume_m3(cached)
+            )
+        )
+    summary = summarise(checks)
+    lines += [
+        "## Can the reconstruction weigh what the plant weighs?",
+        "",
+        "Measured mass divided by reconstructed above-ground volume. Fresh "
+        "above-ground tissue is roughly 300-900 kg/m3, so a specimen far below "
+        "the band has a hull enclosing the air between leaves rather than the "
+        "plant, and one far above it was barely reconstructed at all.",
+        "",
+        f"**{summary['n_plausible']} of {summary['n']} specimens** fall inside a "
+        f"generous {summary['band_kg_m3'][0]:.0f}-{summary['band_kg_m3'][1]:.0f} "
+        f"kg/m3 band; the median is {summary['median_density_kg_m3']:.0f} kg/m3. "
+        f"Envelope (too light): {summary['verdicts'].get('envelope', 0)}. "
+        f"Missing material (too heavy): {summary['verdicts'].get('missing', 0)}.",
+        "",
+        "This bounds what any biomass method here can achieve, independently of "
+        "which method wins a regression.",
+        "",
+        "## Dataset and reconstruction quality",
+        "",
+        "`pot_rim_m` is estimated per specimen; a `*` means no rim was "
+        "detectable and the configured constant was used instead.",
+        "",
+        _markdown_table(data_header, data_rows),
+        "",
+    ]
 
     path = report_dir / "report.md"
     path.write_text("\n".join(lines), encoding="utf-8")
