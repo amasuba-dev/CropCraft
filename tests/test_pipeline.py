@@ -117,17 +117,36 @@ def test_baselines_beat_the_mean_predictor():
 
 
 @requires_cache
-def test_reconstruction_features_beat_image_only_features():
-    """Research question 3: does reconstructing geometry actually help?"""
+def test_reconstruction_features_do_not_beat_image_only_features():
+    """Research question 3: does reconstructing geometry actually help?
+
+    On this dataset, no -- and the test records that rather than asserting the
+    hoped-for direction. It used to require 3D < 2D, which held while the cache
+    was E and M only (RMSE 0.397 vs 0.440 kg). Adding V001-V008 reverses it
+    (0.544 vs 0.469).
+
+    The reversal is the point. V are small shoots, 0.5-1.8 kg, standing in
+    17-32 kg pots, and their masses span the range the other batches occupy
+    rather than forming a separate cluster. The volume feature was largely
+    reading batch membership, which correlates with mass when the batches sit at
+    different sizes; V removes that correlation and the feature's apparent skill
+    goes with it. So this assertion is a guard on a finding: if a change ever
+    makes 3D win here again, the reason needs to be understood, not celebrated.
+    """
     from ggssvt.data.preprocess import usable_plant_ids
     from ggssvt.eval.baselines import evaluate_baselines, load_features
 
     features = load_features(usable_plant_ids(CACHE_DIR), CACHE_DIR)
     results = evaluate_baselines(features)
 
-    assert (
-        results["geometric features"][0].rmse_kg < results["direct 2D"][0].rmse_kg
-    ), "3D reconstruction did not improve on image-only regression"
+    geometric = results["geometric features"][0].rmse_kg
+    image_only = results["direct 2D"][0].rmse_kg
+
+    assert geometric > image_only, (
+        f"3D features now beat image-only ({geometric:.3f} vs {image_only:.3f} kg). "
+        "That contradicts the recorded result; check whether the cache still "
+        "contains all four batches before treating it as an improvement."
+    )
 
 
 @requires_cache

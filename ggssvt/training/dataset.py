@@ -126,6 +126,7 @@ class SpecimenBatch:
     query_points: torch.Tensor     # (B, Q, 3)
     query_labels: torch.Tensor     # (B, Q)
     target_kg: torch.Tensor        # (B,)
+    pot_height_m: torch.Tensor     # (B,) per-specimen rim, not a constant
     occupancy: torch.Tensor | None = None   # (B, R, R, R), eval only
 
     def to(self, device: torch.device | str) -> "SpecimenBatch":
@@ -219,6 +220,7 @@ class SpecimenDataset(Dataset):
             "query_points": torch.from_numpy(query_points),
             "query_labels": torch.from_numpy(query_labels),
             "target_kg": torch.tensor(cached.target_kg, dtype=torch.float32),
+            "pot_height_m": torch.tensor(cached.pot_height_m, dtype=torch.float32),
         }
         if self.return_volume:
             item["occupancy"] = torch.from_numpy(cached.occupancy)
@@ -268,6 +270,7 @@ def collate(items: list[dict]) -> SpecimenBatch:
         query_points=torch.stack([item["query_points"] for item in items]),
         query_labels=torch.stack([item["query_labels"] for item in items]),
         target_kg=torch.stack([item["target_kg"] for item in items]),
+        pot_height_m=torch.stack([item["pot_height_m"] for item in items]),
         occupancy=(
             torch.stack([item["occupancy"] for item in items])
             if "occupancy" in items[0]

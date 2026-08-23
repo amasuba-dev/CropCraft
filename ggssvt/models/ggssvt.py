@@ -164,7 +164,7 @@ class GGSSVT(nn.Module):
         *,
         predict_biomass: bool = False,
         voxel_volume_m3: float = VOXEL_SIZE_M ** 3,
-        pot_height_m: float = POT_HEIGHT_M,
+        pot_height_m: float | torch.Tensor = POT_HEIGHT_M,
         chunk: int | None = None,
     ) -> GGSSVTOutput:
         """

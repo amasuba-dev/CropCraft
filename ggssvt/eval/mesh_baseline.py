@@ -77,6 +77,7 @@ def compute_mesh_table(
         _, metrics = mesh_metrics(
             cached.occupancy,
             voxel_size_m=cached.voxel_size_m,
+            pot_height_m=cached.pot_height_m,
             smoothing=smoothing,
         )
         table[plant_id] = metrics.as_dict()

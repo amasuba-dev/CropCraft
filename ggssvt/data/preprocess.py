@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import asdict, dataclass
+from functools import cached_property
 from pathlib import Path
 
 import numpy as np
@@ -29,6 +30,7 @@ from ..config import (
     WORK_DIR,
 )
 from ..geometry.carving import carve, largest_connected_component, surface_coverage
+from ..geometry.pot import PotEstimate, estimate_pot_height
 from ..geometry.rig import estimate_rig
 from ..geometry.segment import multiview_agreement, segment_specimen
 from .dataset import Specimen, load_dataset, load_specimen, select_views
@@ -300,6 +302,26 @@ class CachedSpecimen:
     @property
     def n_views(self) -> int:
         return len(self.position_ids)
+
+    @cached_property
+    def pot(self) -> PotEstimate:
+        """Where this specimen's pot rim sits, measured from its own carve.
+
+        Derived rather than stored: it is a function of the occupancy already in
+        the cache, so keeping it here costs one pass over a 128^3 boolean and
+        avoids a cache format that could disagree with the volume beside it.
+        """
+        return estimate_pot_height(self.occupancy, voxel_size_m=self.voxel_size_m)
+
+    @property
+    def pot_height_m(self) -> float:
+        """Pot rim height, per specimen, falling back to the global constant.
+
+        Prefer this over ``config.POT_HEIGHT_M``. The constant was fitted by eye
+        to the E and M batches and is wrong by 0.14 m on V001-V008, whose pots
+        weigh 17-32 kg against their 0.7-2.2 kg.
+        """
+        return self.pot.height_m
 
     def points_world(self) -> np.ndarray:
         """Per-pixel world coordinates, ``(V, H, W, 3)`` float32.

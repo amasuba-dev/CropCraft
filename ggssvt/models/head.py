@@ -86,7 +86,7 @@ class BiomassHead(nn.Module):
         voxel_volume_m3: float,
         tokens: torch.Tensor,
         token_valid: torch.Tensor,
-        pot_height_m: float = POT_HEIGHT_M,
+        pot_height_m: float | torch.Tensor = POT_HEIGHT_M,
     ) -> dict[str, torch.Tensor]:
         """
         Args:
@@ -98,12 +98,19 @@ class BiomassHead(nn.Module):
             tokens: ``(B, N, C)`` fused view tokens.
             token_valid: ``(B, N)``.
             pot_height_m: heights below this are pot and soil, not plant.
+                Either a scalar or ``(B,)``, one rim per specimen -- pot mass
+                spans 0.7-32 kg across the three batches, so a single cut
+                height is only ever right for one of them.
 
         Returns:
             Dict with ``mass_kg``, ``volume_m3``, ``density_kg_m3`` and
             ``residual_kg``, each ``(B,)`` except ``volume_m3``.
         """
-        above_pot = (query_points[..., 2] > pot_height_m).to(occupancy.dtype)
+        if torch.is_tensor(pot_height_m):
+            rim = pot_height_m.to(query_points.device).reshape(-1, 1)
+        else:
+            rim = pot_height_m
+        above_pot = (query_points[..., 2] > rim).to(occupancy.dtype)
         weighted = occupancy * above_pot
 
         volume = weighted.sum(dim=1) * voxel_volume_m3            # (B,)

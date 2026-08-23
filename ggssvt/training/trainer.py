@@ -51,7 +51,8 @@ def resolve_device(requested: str) -> torch.device:
 
 def _carved_above_ground_volume(batch: SpecimenBatch, volume_per_query_m3: float) -> torch.Tensor:
     """Above-pot carved volume for each item, from its query labels."""
-    above = (batch.query_points[..., 2] > POT_HEIGHT_M).to(batch.query_labels.dtype)
+    rim = batch.pot_height_m.to(batch.query_points.device).reshape(-1, 1)
+    above = (batch.query_points[..., 2] > rim).to(batch.query_labels.dtype)
     return (batch.query_labels * above).sum(dim=1) * volume_per_query_m3
 
 
@@ -173,6 +174,7 @@ def train_stage(
                     batch.query_points,
                     predict_biomass=(stage == "finetune"),
                     voxel_volume_m3=dataset.volume_per_query_m3,
+                    pot_height_m=batch.pot_height_m,
                 )
                 carved = (
                     _carved_above_ground_volume(batch, dataset.volume_per_query_m3)
@@ -247,6 +249,7 @@ def predict(
             batch.query_points,
             predict_biomass=True,
             voxel_volume_m3=dataset.volume_per_query_m3,
+            pot_height_m=batch.pot_height_m,
         )
         for index, plant_id in enumerate(batch.plant_id):
             results[plant_id] = {

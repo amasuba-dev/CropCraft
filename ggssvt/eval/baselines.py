@@ -34,7 +34,7 @@ from pathlib import Path
 
 import numpy as np
 
-from ..config import POT_HEIGHT_M, WORK_DIR, voxel_grid_centres
+from ..config import WORK_DIR, voxel_grid_centres
 from ..data.preprocess import CachedSpecimen, load_cached
 from .metrics import RegressionMetrics, regression_metrics
 
@@ -113,7 +113,10 @@ def extract_features(cached: CachedSpecimen) -> SpecimenFeatures:
     occupancy = cached.occupancy
     voxel_volume = cached.voxel_size_m ** 3
 
-    above = occupancy & (centres[..., 2] > POT_HEIGHT_M)
+    # Per specimen, not the global constant: pot mass spans 0.7-32 kg across the
+    # three batches, so one cut height cannot be right for all of them.
+    pot_height = cached.pot_height_m
+    above = occupancy & (centres[..., 2] > pot_height)
     above_points = centres[above]
 
     if above_points.size:
@@ -123,7 +126,7 @@ def extract_features(cached: CachedSpecimen) -> SpecimenFeatures:
         max_spread = float(radial.max())
         above_volume = float(above.sum()) * voxel_volume
         # Occupied fraction of the cylinder the canopy sweeps out.
-        envelope = np.pi * max(max_spread, 1e-3) ** 2 * max(height - POT_HEIGHT_M, 1e-3)
+        envelope = np.pi * max(max_spread, 1e-3) ** 2 * max(height - pot_height, 1e-3)
         compactness = above_volume / envelope
         # Projected area of the canopy onto the floor.
         footprint = above.any(axis=2).sum() * cached.voxel_size_m ** 2
