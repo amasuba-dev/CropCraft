@@ -20,7 +20,25 @@ from pathlib import Path
 
 import numpy as np
 
-from ..config import POT_HEIGHT_M, WORK_DIR
+from ..config import POT_HEIGHT_M, WORK_DIR, voxel_grid_centres
+
+
+def _batch_of(plant_id: str) -> str | None:
+    """Which collection batch a Eucalyptus specimen belongs to.
+
+    Batch, not species prefix. E001-E010 and E011-E020 were collected two weeks
+    apart and sit at different sizes, which is the confound; V001-V008 are
+    Eucalyptus as well and were collected specifically to span both, so counting
+    them would be wrong and excluding them would overstate the problem.
+    """
+    if not plant_id[1:].isdigit():
+        return None
+    index = int(plant_id[1:])
+    if plant_id.startswith("V"):
+        return "V001-V008"
+    if plant_id.startswith("E"):
+        return "E001-E010" if index <= 10 else "E011-E020"
+    return None
 
 
 def _quantise(occupancy: np.ndarray, downsample: int = 2, max_points: int = 18000) -> dict:
@@ -80,6 +98,7 @@ def build_payload(
     from .factorial import CACHE_DIRS
     from .mesh_baseline import evaluate_with_mesh
     from .metrics import paired_bootstrap_difference
+    from .plausibility import classify, summarise
 
     cache_dirs = cache_dirs or {
         name: path
@@ -117,6 +136,24 @@ def build_payload(
             entry["clouds"][name] = _quantise(cached.occupancy)
             entry.setdefault("species", cached.species)
             entry.setdefault("target_kg", round(float(cached.target_kg), 3))
+            # Per-specimen rim, so the pot/canopy split drawn in the viewer is
+            # this plant's own boundary rather than a constant that is wrong by
+            # 0.14 m on the V batch. `pot_confident` is False where no rim was
+            # detectable and the constant was used after all.
+            entry.setdefault("pot_height_m", round(cached.pot_height_m, 3))
+            entry.setdefault("pot_confident", bool(cached.pot.confident))
+
+            above = cached.occupancy & (
+                voxel_grid_centres()[..., 2] > cached.pot_height_m
+            )
+            check = classify(
+                plant_id,
+                float(cached.target_kg),
+                float(above.sum()) * cached.voxel_size_m ** 3,
+            )
+            entry.setdefault("density_kg_m3", round(check.density_kg_m3, 1)
+                             if np.isfinite(check.density_kg_m3) else None)
+            entry.setdefault("density_verdict", check.verdict)
 
             q = quality[name].get(plant_id)
             if q is not None:
@@ -163,23 +200,24 @@ def build_payload(
             }
         methods.append(row)
 
-    # The batch confound, computed rather than asserted.
+    # The batch confound, computed rather than asserted. Grouped by collection
+    # batch rather than by the "E" prefix: V001-V008 are Eucalyptus too, and
+    # they are the batch that weakens this, so filtering them out would report
+    # the confound as worse than it now is.
     eucalyptus = [
-        (p, t) for p, t in zip(plant_ids, targets) if p.startswith("E")
+        (p, t)
+        for p, t in zip(plant_ids, targets)
+        if _batch_of(p) is not None
     ]
-    batches = {
-        "E001-E010": [t for p, t in eucalyptus if int(p[1:]) <= 10],
-        "E011-E020": [t for p, t in eucalyptus if int(p[1:]) > 10],
-    }
-    masses = np.array([t for _, t in eucalyptus])
-    means = np.array(
-        [
-            np.mean(batches["E001-E010"]) if int(p[1:]) <= 10 else np.mean(batches["E011-E020"])
-            for p, _ in eucalyptus
-        ]
-    )
-    batch_r2 = float(
-        1.0 - ((masses - means) ** 2).sum() / ((masses - masses.mean()) ** 2).sum()
+    batches: dict[str, list[float]] = {}
+    for plant_id, target in eucalyptus:
+        batches.setdefault(_batch_of(plant_id), []).append(float(target))
+
+    masses = np.array([t for _, t in eucalyptus], dtype=float)
+    means = np.array([np.mean(batches[_batch_of(p)]) for p, _ in eucalyptus])
+    spread = ((masses - masses.mean()) ** 2).sum()
+    batch_r2 = (
+        float(1.0 - ((masses - means) ** 2).sum() / spread) if spread > 0 else 0.0
     )
 
     summary = {
@@ -188,7 +226,19 @@ def build_payload(
         "segmenters": sorted(cache_dirs),
         "species": sorted({s["species"] for s in specimens}),
         "mass_range_kg": [round(float(targets.min()), 2), round(float(targets.max()), 2)],
-        "pot_height_m": POT_HEIGHT_M,
+        "pot_height_m": POT_HEIGHT_M,   # fallback only; specimens carry their own
+        "plausibility": summarise(
+            [
+                classify(
+                    s["id"],
+                    s.get("target_kg", 0.0),
+                    (s.get("target_kg", 0.0) / s["density_kg_m3"])
+                    if s.get("density_kg_m3")
+                    else 0.0,
+                )
+                for s in specimens
+            ]
+        ),
         "batch_confound_r2": round(batch_r2, 3),
         "batch_means_kg": {
             k: round(float(np.mean(v)), 3) for k, v in batches.items() if v
@@ -203,7 +253,17 @@ def build_payload(
         ),
         "target": (
             "Ground truth is as-collected fresh mass, not oven-dry above-ground "
-            "biomass, and every pot mass is estimated rather than weighed."
+            "biomass. Pot mass is measured for V001-V008 and estimated for the "
+            "rest; against the measured eight the estimates run 10.9% light "
+            "(sd 1.8), so E and M net masses are overstated by roughly that "
+            "much and more where the pot dominates the total."
+        ),
+        "plausibility": (
+            "Measured mass over reconstructed above-ground volume gives an "
+            "implied bulk density. Fresh tissue is 300-900 kg/m3, and only 8 of "
+            "36 specimens land inside a generous 200-1000 band. Most fall far "
+            "below it: the visual hull encloses the air between leaves, so what "
+            "is being measured is the canopy envelope and not the plant."
         ),
         "confound": (
             "Batch membership alone explains more of the Eucalyptus mass variance "

@@ -199,29 +199,49 @@ running on a marginally more confounded sample than the geometric arm.
 *(Previous figures, n=30: 96% accepted, 15.3% removed, agreement +1.9%, coverage
 −6.0%, usable 28 → 26.)*
 
-### The 2×2 factorial (26 shared specimens)
+### The 2×2 factorial (33 shared specimens, re-run with V)
 
 |  | no DINO | DINOv2-base |
 |---|---|---|
-| **no SAM3D** | 0.306 kg / R² 0.712 | 0.302 / 0.720 |
-| **SAM3D** | 0.317 / 0.690 | **0.295 / 0.732** |
+| **no SAM3D** | 0.576 kg / R² −0.080 | **0.385 / +0.518** |
+| **SAM3D** | **0.778 / −0.967** | 0.390 / +0.505 |
 
-| effect | ΔRMSE | 95% CI |
-|---|---|---|
-| DINO alone | −0.004 | [−0.065, +0.065] |
-| SAM3D alone | **+0.011** | [−0.010, +0.034] |
-| DINO given SAM3D | −0.022 | [−0.091, +0.055] |
-| **interaction** | **−0.018** | [−0.037, **+0.000**] |
+| effect | ΔRMSE | 95% CI | |
+|---|---|---|---|
+| DINO alone | −0.191 | [−0.404, +0.021] | not resolved |
+| SAM3D alone | **+0.201** | [−0.017, +0.394] | not resolved |
+| **DINO given SAM3D** | **−0.387** | **[−0.757, −0.039]** | **resolved** |
+| SAM3D given DINO | +0.005 | [−0.007, +0.019] | no effect |
+| interaction | −0.196 | [−0.393, +0.031] | not resolved |
 
-**SAM3D alone slightly hurts; SAM3D given DINO helps. The sign flips.** A
-one-factor-at-a-time ablation would have concluded "SAM3D doesn't help" and
-dropped it. Plausible mechanism: a tighter mask loses volume for hand-built
-descriptors but removes background contamination for a pooled DINO descriptor.
+**The first resolved effect this project has produced.** DINO features help
+significantly *when the hull came from SAM3D* — and the reason is visible in the
+table: SAM3D on its own is catastrophic for the hand-crafted descriptors
+(0.576 → 0.778, R² −0.967, far below the mean-predictor floor), and DINO simply
+does not care which segmenter produced the hull (0.385 → 0.390, an effect of
+0.005 kg with an interval of ±0.013).
 
-Nothing is statistically resolved. **And the 26-specimen shared set is not a
-random subset of the 28** — SAM3D fails the gate on E015 and E019, and dropping
-them moved the control from 0.358 to 0.306 kg, a larger shift than any effect in
-the table.
+That asymmetry is the finding. **The hand-crafted geometric descriptors are
+fragile to the segmentation; the learned image features are not.** Which follows
+from §3: those descriptors summarise a volume that is a canopy envelope rather
+than a plant, so perturbing the mask moves them a great deal and costs nothing
+real, while DINO reads the images and never depended on the volume being
+meaningful.
+
+Read the "resolved" carefully. It is resolved partly because SAM3D + no DINO is
+so bad, so it evidences *fragility of the descriptors* more than *value of DINO*.
+DINO alone against neither remains unresolved at [−0.404, +0.021].
+
+**The 33-specimen shared set is not a random subset of the 36.** SAM3D fails the
+gate on E015, E019 and V006 on top of the E012/E016 the geometric gate drops.
+Losing V006 matters beyond the count: V is the batch that breaks the mass/batch
+confound, so both arms here run on a marginally more confounded sample than the
+n=36 baselines table.
+
+*(Previous run, 26 shared specimens: all four cells within 0.295–0.317 kg and
+nothing resolved. The spread has widened enormously, which is what adding a batch
+that does not share the others' size structure does to features that were reading
+size.)*
 
 ---
 

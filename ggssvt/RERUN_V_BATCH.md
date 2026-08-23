@@ -213,6 +213,43 @@ is a real improvement to the design regardless of what happens to any RMSE.
 
 ---
 
+## 4b. The factorial produced the project's first resolved effect
+
+2×2, 33 shared specimens (SAM3D drops E015, E019, V006 on top of the geometric
+gate's E012/E016):
+
+|  | no DINO | DINOv2-base |
+|---|---|---|
+| **no SAM3D** | 0.576 kg / R² −0.080 | **0.385 / +0.518** |
+| **SAM3D** | **0.778 / −0.967** | 0.390 / +0.505 |
+
+| effect | ΔRMSE | 95% CI | |
+|---|---|---|---|
+| DINO alone | −0.191 | [−0.404, +0.021] | not resolved |
+| SAM3D alone | +0.201 | [−0.017, +0.394] | not resolved |
+| **DINO given SAM3D** | **−0.387** | **[−0.757, −0.039]** | **resolved** |
+| SAM3D given DINO | +0.005 | [−0.007, +0.019] | no effect |
+
+**The hand-crafted descriptors are fragile to the segmentation; the learned
+features are not.** SAM3D alone drives the geometric descriptors to R² −0.967 —
+far below the mean-predictor floor — while DINO moves 0.385 to 0.390, an effect
+of 5 grams.
+
+That follows directly from §3. Those descriptors summarise a volume that is a
+canopy envelope rather than a plant, so changing the mask moves them a lot and
+costs nothing real; DINO reads the images and never depended on the volume
+meaning anything.
+
+Read the "resolved" honestly: it is resolved largely *because* SAM3D + no DINO is
+so bad, so it evidences descriptor fragility more than it evidences DINO's value.
+DINO against neither is still unresolved.
+
+At n=26 all four cells sat within 0.295–0.317 kg with nothing resolved. Adding a
+batch that does not share the others' size structure blew the spread wide open —
+which is what happens to features that were reading size.
+
+---
+
 ## 5. H3 unchanged in direction, strengthened in evidence
 
 V re-run through the spectral characterisation:

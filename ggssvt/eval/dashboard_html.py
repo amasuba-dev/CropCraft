@@ -12,7 +12,9 @@ from pathlib import Path
 
 from ..config import WORK_DIR
 
-HEAD = """<title>Reconstructing Plant Biomass</title>
+HEAD = """<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reconstructing Plant Biomass</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
@@ -285,11 +287,19 @@ BODY = r"""<div class="wrap">
   <div class="callout bad">
     <h3>Batch membership explains more than any method</h3>
     <p id="confound"></p>
-    <p class="small">So the comparison measures how well a method separates <em>size
-    classes</em>, not how well it estimates mass among comparable plants. The defensible
-    claim is "reconstructed geometry separates plant size classes". Fixing it needs a
-    capture batch spanning a continuous mass range within one species &mdash; not more
-    specimens of the two clusters already held.</p>
+    <p class="small">So the comparison partly measures how well a method separates
+    <em>size classes</em>, not how well it estimates mass among comparable plants.
+    V001&ndash;V008 was captured to break this &mdash; its masses span both existing
+    clusters instead of forming a third &mdash; and it did, but not all the way.</p>
+  </div>
+
+  <div class="callout bad">
+    <h3>Most reconstructions cannot weigh what the plant weighs</h3>
+    <p id="plausibility"></p>
+    <p class="small">A visual hull encloses the space <em>between</em> leaves and
+    branches, so for a canopy it measures the envelope rather than the plant. That is a
+    property of the method at this resolution, not a fitting problem &mdash; no
+    regressor recovers mass from a volume that is an order of magnitude too large.</p>
   </div>
 
   <div class="callout">
@@ -359,7 +369,7 @@ async function cloud(id, seg){
       pts[i*3+2] = (bytes[i*3+2]-mid[2])/span + 0.5;
       h[i] = bytes[i*3+2] * metresPerByte;
     }
-    out = {pts, h, n};
+    out = {pts, h, n, id};
   }
   cache.set(key,out); return out;
 }
@@ -386,7 +396,7 @@ function draw(canvas, c, {dot=3, mode=colourMode, yawL=yaw, pitchL=pitch, zoomL=
   const dspan = Math.max(1e-6,dmax-dmin);
   const nc=hex(css("--near")), fc=hex(css("--far"));
   const cc=hex(css("--canopy")), pc=hex(css("--pot"));
-  const pot = D.summary.pot_height_m;
+  const pot = potHeight(c);
 
   for(const i of ord){
     const sx=w/2+P[i*3]*scale, sv=hgt/2-P[i*3+1]*scale;
@@ -403,11 +413,20 @@ function draw(canvas, c, {dot=3, mode=colourMode, yawL=yaw, pitchL=pitch, zoomL=
   }
 }
 
+/* Each specimen's own rim: pot mass spans 0.7-32 kg across the batches, so a
+   shared cut height draws the pot/canopy boundary in the wrong place for most
+   of them. Falls back to the global constant for specimens where no rim was
+   detectable. */
+function potHeight(c){
+  const s = c && D.specimens ? D.specimens.find(x => x.id === c.id) : null;
+  return (s && s.pot_height_m != null) ? s.pot_height_m : D.summary.pot_height_m;
+}
+
 /* ---------- slices ---------- */
 function drawSlices(c){
   const host = document.getElementById("slices"); host.innerHTML="";
   if(!c) return;
-  const pot = D.summary.pot_height_m;
+  const pot = potHeight(c);
   const hmax = Math.max(...c.h);
   const bands = 6, step = hmax/bands;
   for(let b=0;b<bands;b++){
@@ -492,10 +511,19 @@ function honesty(){
   document.getElementById("confound").innerHTML =
     `Across the Eucalyptus specimens, knowing only which capture batch a plant came from
      explains <strong>R² = ${s.batch_confound_r2}</strong> of the mass variance &mdash;
-     more than any method in the table above achieves. The two batches average
-     <strong>${s.batch_means_kg["E001-E010"]} kg</strong> and
-     <strong>${s.batch_means_kg["E011-E020"]} kg</strong>, with almost no overlap, and
-     within either batch no method reaches R² = 0.2.`;
+     more than any method in the table above achieves. The batches average
+     ${Object.entries(s.batch_means_kg).map(([k,v])=>`<strong>${v} kg</strong> (${k})`).join(", ")}.
+     It was R² = 0.887 on the two original batches alone; V001&ndash;V008 overlaps both
+     and brings it down.`;
+  const pl = s.plausibility;
+  document.getElementById("plausibility").innerHTML =
+    `Dividing each measured mass by its reconstructed above-ground volume gives an implied
+     bulk density. Fresh plant tissue is 300&ndash;900 kg/m³. Only
+     <strong>${pl.n_plausible} of ${pl.n}</strong> specimens land inside a generous
+     ${pl.band_kg_m3[0]}&ndash;${pl.band_kg_m3[1]} band; the median is
+     <strong>${pl.median_density_kg_m3} kg/m³</strong>.
+     ${pl.verdicts.envelope || 0} imply less &mdash; hull enclosing air &mdash; and
+     ${pl.verdicts.missing || 0} imply more, meaning they were barely reconstructed.`;
   document.getElementById("notes").innerHTML =
     Object.values(D.notes).map(t=>`• ${t}`).join("<br>");
 }
