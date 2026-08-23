@@ -153,11 +153,17 @@ python -m ggssvt.cli inspect && python -m ggssvt.cli baselines
 
 `inspect` audits the raw dataset and reports the missing calibration; `baselines`
 prints the leave-one-out table the whole day is measured against. If `baselines`
-does not roughly reproduce geometric features at RMSE 0.397 / R² 0.526, the
-preprocessing differed from the reference run and everything after it will too.
+does not roughly reproduce geometric features at **RMSE 0.544 / R² 0.030** and
+direct 2D at **0.469 / 0.279**, the preprocessing differed from the reference run
+and everything after it will too.
 
-Expect 28/30 specimens through the quality gate on the geometric cache and 26/30
-on SAM3D — SAM3D additionally drops E015 and E019. About 4 s/specimen for the
+**Those are the post-V001–V008 numbers, and 2D being ahead is expected — though
+the difference is not statistically resolved, so do not read it as a result.** If you see
+geometric features at 0.397 / 0.526 you are running the old 28-specimen cache
+without the V batch — check `dataset/ground_truth.csv` has `measured` in the
+`pot_weight_source` column for V001–V008, and re-run `preprocess`.
+
+Expect 36/38 specimens through the quality gate on the geometric cache. About 4 s/specimen for the
 geometric pass and 5 s/specimen for SAM3D on the GPU, so under five minutes for
 both. Then re-run the tests; the seven skipped ones should join in:
 
@@ -233,20 +239,29 @@ on this machine went wrong in a way the quality gate did not catch.
 
 Read this before interpreting anything the afternoon produces.
 
-The Eucalyptus specimens are two batches with almost no overlap in mass —
-E001–E010 average 0.538 kg, E011–E020 average 1.844 kg. **Batch membership alone
-explains R² = 0.887**, which is more than any method achieves. Within either
-batch, no method clears R² = 0.2.
+**Two things cap every biomass number, and both are now measured.**
 
-So the comparison is measuring how well each method separates *size classes*, not
-how well it estimates mass among comparable plants. That is still a real
-comparison and worth running — a method that separates the classes better is
-extracting more from the reconstruction — but the headline claim it supports is
-"reconstructed geometry separates plant size classes", not "estimates biomass".
+*The batch confound, weakened but present.* E001–E010 average 0.538 kg and
+E011–E020 average 1.844 kg, with almost no overlap; batch membership alone
+explained **R² = 0.887**. V001–V008 was the batch that breaks it — 500–1800 g,
+overlapping every other batch — and takes it down to **0.744** across the three
+Eucalyptus batches, **0.697** across all four. Still high. The comparison is
+partly measuring how well each method separates *size classes*.
 
-Nothing today fixes this; only a capture batch spanning a continuous mass range
-within one species will. Note it in the log so the framing is decided now rather
-than at examination.
+*The reconstructions are envelopes, not plants.* Measured mass over reconstructed
+above-ground volume implies a bulk density; fresh tissue is 300–900 kg/m³. Only
+**8 of 36** specimens land in a generous 200–1000 band — 25 imply less (the hull
+enclosing air between leaves; all ten Mango at 26–77) and 3 imply more (thin
+stems never carved). No amount of training fixes a volume that is the wrong size
+for its mass, and this — not any RMSE ordering — is what to report.
+
+**The 3D-versus-2D RMSE comparison is not resolved in either direction.** Paired
+bootstrap gives [−0.051, +0.227] on the current set and [−0.168, +0.099] on the
+old n=28 one, and the winner flips depending on whether features are whitened
+before the ridge. Do not quote an ordering from it.
+
+Decide the framing now rather than at examination:
+[RERUN_V_BATCH.md](RERUN_V_BATCH.md) §3 has the argument and the numbers.
 
 ---
 

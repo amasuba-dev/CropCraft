@@ -58,9 +58,10 @@ Radial power spectrum of each carved 128³ volume, 28 specimens.
 
 | group | n | 95% bandwidth | high-frequency share |
 |---|---|---|---|
-| Eucalyptus E001–E010 (small, mostly pot) | 10 | 29.3 cycles/m | 0.128 |
-| Eucalyptus E011–E020 (thin saplings) | 8 | 40.6 cycles/m | 0.254 |
-| Mango (dense canopy) | 10 | **41.7 cycles/m** | **0.273** |
+| Eucalyptus E001–E010 (small, mostly pot) | 10 | 29.3 ± 2.0 cycles/m | 0.128 ± 0.010 |
+| Eucalyptus E011–E020 (thin saplings) | 8 | 40.6 ± 2.3 cycles/m | 0.254 ± 0.045 |
+| Mango (dense canopy) | 10 | **41.7 ± 0.0 cycles/m** | **0.273 ± 0.020** |
+| **Eucalyptus V001–V008** | **8** | **41.7 ± 0.0 cycles/m** | **0.257 ± 0.025** |
 
 High-frequency energy **doubles** from the smooth potted specimens to the
 branching ones. A pot is a smooth solid of revolution and lives at low
@@ -93,16 +94,24 @@ null result there is itself the finding — it would say the encoding's reach is
 not what limits this model, which is worth knowing precisely because the proposal
 assumed otherwise.
 
-## H3c — Mango saturates the grid Nyquist ✅ **established**
+## H3c — Half the dataset saturates the grid Nyquist ✅ **established**
 
-Every Mango specimen reports a 95% bandwidth of **41.7 ± 0.0** cycles/m — exactly
-the Nyquist limit. The distribution is not merely near the ceiling, it is *at* it
-for all ten.
+Every Mango specimen **and every V specimen** reports a 95% bandwidth of
+**41.7 ± 0.0** cycles/m — exactly the Nyquist limit. Not near the ceiling, *at*
+it, for all eighteen.
 
-**The voxel resolution, not the method, is the binding constraint for Mango.**
-Their true spectral content exceeds what a 12 mm grid can represent. No
-architectural change recovers detail the grid cannot hold; only a finer grid can,
-and that is a directly testable prediction.
+**The voxel resolution, not the method, is the binding constraint for half the
+dataset.** Their true spectral content exceeds what a 12 mm grid can represent.
+No architectural change recovers detail the grid cannot hold; only a finer grid
+can, and that is a directly testable prediction.
+
+The V batch strengthened this from a Mango quirk into a general property of the
+morphologies here — and it arrives alongside the finding that these same
+reconstructions are canopy envelopes rather than plants
+([RERUN_V_BATCH.md](RERUN_V_BATCH.md) §3). Both point at resolution: a grid too
+coarse to resolve a leaf cannot do anything but enclose the space around it.
+**Of everything in this project, halving the voxel size is the change with the
+clearest predicted effect.**
 
 ## H3d — The two axes are independent ✅ **established, and counter-intuitive**
 

@@ -6,8 +6,8 @@ above-ground mass of a specimen is a **measurement** rather than a total minus a
 estimate. Everything below is the pipeline re-run end to end on the enlarged,
 corrected set.
 
-**Headline: two results reversed, one new diagnostic explains both, and the new
-batch is the most useful one collected so far.**
+**Headline: one claim has to be withdrawn, one new diagnostic replaces it with
+something firmer, and the new batch is the most useful one collected so far.**
 
 ---
 
@@ -109,34 +109,63 @@ object, by this factor, for these species".
 
 ---
 
-## 4. Two results reversed
+## 4. The 3D-versus-2D claim has to be withdrawn
 
-### 3D geometric features no longer beat image-only regression
+### It was never resolved, in either direction
 
-| set | rim | 3D RMSE / R² | 2D RMSE / R² | winner |
+The proposal's third research question was answered at n=28 with "reconstruction
+beats pixels" — 0.397 kg RMSE against 0.440. Re-tested with a paired bootstrap on
+exactly that condition:
+
+> **dRMSE −0.043 kg, 95% CI [−0.168, +0.099]. Not resolved.**
+
+The interval spans zero comfortably. **That claim should not have been made**; a
+point-estimate gap was reported as a finding without the interval that decides it.
+
+Adding V flips the point estimate, and it stays unresolved:
+
+| set | rim | 3D RMSE / R² | 2D RMSE / R² | ahead |
 |---|---|---|---|---|
 | E+M only (n=28) | constant 0.28 | 0.397 / +0.526 | 0.440 / +0.419 | 3D |
 | E+M only (n=28) | per-specimen | 0.434 / +0.435 | 0.440 / +0.419 | 3D, barely |
-| **all incl. V (n=36)** | constant 0.28 | 0.512 / +0.140 | 0.469 / +0.279 | **2D** |
+| all incl. V (n=36) | constant 0.28 | 0.512 / +0.140 | 0.469 / +0.279 | 2D |
 | **all incl. V (n=36)** | **per-specimen** | **0.544 / +0.030** | **0.469 / +0.279** | **2D** |
 
-Both changes push the same way; **V dominates**. Full leave-one-out on n=36:
+### And the direction depends on an arbitrary preprocessing choice
 
-| method | RMSE kg | MAE | MARE% | R² |
-|---|---|---|---|---|
-| **direct 2D** | **0.469** | 0.370 | 42.8 | **+0.279** |
-| mesh geometry | 0.507 | 0.367 | 37.4 | +0.157 |
-| geometric features | 0.544 | 0.420 | 43.8 | +0.030 |
-| mean | 0.568 | 0.477 | 57.8 | −0.058 |
-| volume allometric | 0.592 | 0.495 | 53.0 | −0.150 |
-| canopy area allometric | 0.598 | 0.460 | 47.3 | −0.170 |
+The DINO probe whitens by rotating onto principal components before
+standardising; the baselines table standardises the raw features. On seven
+features PCA keeps all seven, so this is a pure rotation — same data, same ridge
+penalty, different regulariser. Run both feature sets through both protocols:
 
-**Every 3D-derived method now loses to image-only regression.** Section 3 says
-why: 28 of 36 reconstructions are not the right size for their mass, so the
-volume feature cannot carry mass information.
+| protocol | 3D RMSE / R² | 2D RMSE / R² | ahead |
+|---|---|---|---|
+| standardise only | 0.544 / +0.030 | 0.469 / +0.279 | 2D |
+| PCA-rotate then standardise | **0.458 / +0.312** | 0.491 / +0.209 | **3D** |
 
-`test_pipeline.py` now asserts this direction, with the reason, instead of the
-direction that was hoped for.
+Paired bootstrap, 20,000 resamples, dRMSE = 3D − 2D:
+
+| protocol | dRMSE | 95% CI | |
+|---|---|---|---|
+| standardise only | +0.075 | [−0.051, +0.227] | not resolved |
+| PCA-rotate then standardise | −0.033 | [−0.143, +0.076] | not resolved |
+
+**Neither direction is resolved, and the winner changes with a preprocessing
+choice that has no principled justification either way.** The honest statement is
+that **at n=36 this comparison cannot be settled by RMSE differences at all** —
+not that 3D lost.
+
+This also means the two tables in this project are not comparable: the probe's
+"cnn (no DINO)" at R² 0.312 and the baselines table's "geometric features" at
+0.030 are the *same seven features* under different preprocessing. Do not put
+them in one table.
+
+### What replaces the claim
+
+Section 3. The implied-density result is a physical measurement rather than a
+difference in means, so it does not depend on n or on a regulariser: **8 of 36
+reconstructions are the right size to weigh what the plant weighs.** That is what
+RQ3 should be answered with.
 
 ### The batch confound weakened — because V was designed to break it
 
@@ -155,13 +184,9 @@ direction that was hoped for.
 
 V has the **widest within-batch spread of any batch** (sd 484 g, CV 43%) and its
 range **overlaps every other batch**. That is exactly what the study was missing:
-previously the batches sat at separate sizes, so a feature that read batch
-membership scored well without measuring mass. V removes that shortcut.
-
-**This is why the 3D advantage disappeared — it was substantially the confound.**
-Losing a result to a better-designed sample is a good trade, and it is a
-defensible thing to write up: the earlier n=28 comparison was measuring size-class
-separation, and the n=36 comparison is measuring mass estimation.
+previously the batches sat at separate sizes, so a feature reading batch
+membership scored well without measuring mass. V removes that shortcut, and this
+is a real improvement to the design regardless of what happens to any RMSE.
 
 ---
 
@@ -196,12 +221,14 @@ throughout: 2 views, one specimen, a species of its own.
 diagnostic and the 8-of-36 result (§3) — this is a genuine methodological
 contribution, not a negative result to bury. The confound weakening (§4).
 
-**Reframe.** Anywhere the argument was "3D reconstruction improves biomass
-estimation", it now has to be "3D reconstruction of these species by visual hull
-produces canopy envelopes, which do not carry mass information; image-only
-regression does better". That is a stronger dissertation chapter than the
-original claim, because it is supported by a physical measurement rather than a
-difference in means at small n.
+**Reframe.** Drop "3D reconstruction improves biomass estimation" — it was never
+resolved and the point estimate is not stable. Replace it with what the data does
+support: *visual-hull reconstruction of these species recovers the canopy
+envelope rather than the plant, with implied bulk densities one to two orders of
+magnitude below plant tissue, so its volume cannot carry mass information.* That
+is a stronger chapter, because it rests on a physical measurement instead of a
+difference in means at small n — and it explains the weak RMSE numbers rather
+than merely reporting them.
 
 **Do next, in order.**
 1. Weigh pots directly for any future capture. Ten minutes, removes the largest

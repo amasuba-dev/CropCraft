@@ -130,8 +130,14 @@ def test_reconstruction_features_do_not_beat_image_only_features():
     rather than forming a separate cluster. The volume feature was largely
     reading batch membership, which correlates with mass when the batches sit at
     different sizes; V removes that correlation and the feature's apparent skill
-    goes with it. So this assertion is a guard on a finding: if a change ever
-    makes 3D win here again, the reason needs to be understood, not celebrated.
+    goes with it.
+
+    **Neither ordering is statistically resolved** -- paired bootstrap gives
+    [-0.051, +0.227] here and [-0.168, +0.099] on the old n=28 condition -- and
+    the direction flips if features are whitened before the ridge rather than
+    standardised. So this is a guard against silent drift in the baselines
+    protocol, not evidence for either direction. If it ever fails, find out what
+    changed; do not read a passing or failing run as a result.
     """
     from ggssvt.data.preprocess import usable_plant_ids
     from ggssvt.eval.baselines import evaluate_baselines, load_features

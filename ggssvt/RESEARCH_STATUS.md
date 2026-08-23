@@ -25,8 +25,8 @@ stated once here and applies throughout.
 |---|---|---|
 | **RQ1** — SSL ViTs learn plant representations | Partial | Needs training; confound caps the label-efficiency claim |
 | **RQ2** — grounding and fusion for 3D reconstruction | Partial | Architecture built and validated, never trained |
-| **RQ3** — reconstruction → biomass, label-efficiently | **Substantially answered** | Answer is qualified, not clean |
-| **H1** — ViT beats CNN; label efficiency | Partial | DINOv2 probe done, not significant at n=28 |
+| **RQ3** — reconstruction → biomass, label-efficiently | **Answered, via the mechanism** | RMSE comparison is unresolved either way; the physical measurement is not |
+| **H1** — ViT beats CNN; label efficiency | Partial | DINOv2 probe done, not significant at n=28; re-running at n=36 |
 | **H2** — geometry grounding → viewpoint consistency | Partial | Ablation implemented, not run |
 | **H3** — frequency + geometry grounding | **Best evidenced of the four** | 4 of 6 sub-claims established; see [HYPOTHESIS_3.md](HYPOTHESIS_3.md) |
 | **H4** — robustness to occlusion, noise, sparse sampling | Partial | Sparse-sampling clause answered; occlusion/noise not |
@@ -135,9 +135,53 @@ the trained ablation, which has not run.
 
 ## RQ3 — Can the reconstructed 3D representation predict biomass label-efficiently, and how does reconstruction quality relate to estimation accuracy?
 
-**Status: substantially answered. The answer is qualified.**
+**Status: answered — but by a physical measurement, not by a model comparison.**
 
-### What is established
+> **This section was rewritten after V001–V008 was added.** The n=28 table below
+> is kept as the record of what was run then; the current result is the n=36 one
+> beneath it, and it points the other way. Full account:
+> [RERUN_V_BATCH.md](RERUN_V_BATCH.md).
+
+### The current result — 36 specimens, measured pot weights
+
+| method | RMSE | MARE | R² |
+|---|---|---|---|
+| **direct 2D (no 3D)** | **0.469 kg** | 42.8% | **+0.279** |
+| mesh geometry | 0.507 kg | 37.4% | +0.157 |
+| geometric features (voxel) | 0.544 kg | 43.8% | +0.030 |
+| mean predictor | 0.568 kg | 57.8% | −0.058 |
+| volume allometric | 0.592 kg | 53.0% | −0.150 |
+| canopy area allometric | 0.598 kg | 47.3% | −0.170 |
+
+**Do not read that ordering as "2D beats 3D".** A paired bootstrap puts the
+3D−2D difference at +0.075 kg with a 95% interval of [−0.051, +0.227] — not
+resolved — and the ordering flips if the features are whitened before the ridge
+rather than merely standardised (3D 0.458 against 2D 0.491, also not resolved).
+The same test on the original n=28 condition gives [−0.168, +0.099], so the
+earlier "reconstruction beats pixels" was never resolved either. **At these
+sample sizes the comparison cannot be settled by RMSE differences.**
+
+What *can* be settled is the mechanism, because it is a measurement rather than a
+difference in means: dividing measured mass by reconstructed above-ground
+volume gives an implied bulk density, and against the 300–900 kg/m³ of fresh
+tissue only **8 of 36** specimens land in a generous 200–1000 band. Twenty-five
+imply *less* — the visual hull has enclosed the air between leaves and branches,
+with all ten Mango at 26–77 kg/m³ — and three imply more, meaning thin stems were
+never carved. **The reconstructed object is a canopy envelope, not a plant**, so
+its volume cannot carry mass information regardless of what is fitted to it.
+
+This is a real answer to RQ3 rather than a failure to answer it, and it is the
+form the answer should take — it does not depend on n, on a regulariser, or on
+which method happened to win a run. Stated for the dissertation:
+
+> *Twelve-view visual-hull reconstruction at 12 mm resolution recovers the canopy
+> envelope rather than the plant for these species: only 8 of 36 specimens have a
+> reconstructed above-ground volume whose implied bulk density is within an order
+> of magnitude of plant tissue. Its volume therefore cannot carry mass
+> information, and no difference in fitted RMSE against image-only regression is
+> resolved at this sample size in either direction.*
+
+### What was established at n=28, before the V batch
 
 Leave-one-out over 28 specimens, identical protocol for every method:
 
@@ -150,9 +194,10 @@ Leave-one-out over 28 specimens, identical protocol for every method:
 | volume allometric | 0.622 kg | 56.9% | −0.162 |
 | canopy area allometric | 0.642 kg | 52.1% | −0.236 |
 
-**Reconstruction helps.** Features from the 3D reconstruction (0.397) beat
-image-only regression (0.440), and mesh-derived features beat both. This is the
-direct answer to the first half of RQ3, on the project's own data.
+~~**Reconstruction helps.**~~ **Withdrawn.** The 0.397-against-0.440 gap was
+never statistically resolved — paired bootstrap 95% CI [−0.168, +0.099] — and it
+was reported without that interval. On the enlarged set the point estimate goes
+the other way and is equally unresolved.
 
 **Two negative results that are worth as much as the positive one:**
 
@@ -166,16 +211,24 @@ with area while enclosing no volume, so canopy area should win. The single-term
 area law is the **worst** method tried, and head-to-head against the volume law
 the difference spans zero. The mechanism generalises: **a visual hull's surface
 area is envelope area, not leaf area** — twelve views at 12 mm voxels cannot
-resolve individual leaves.
+resolve individual leaves. The implied-density result above extends this from the
+hull's surface to its volume, and is what turned the qualification into the
+answer.
 
 ### The qualification
 
 Leave-one-feature-out on the mesh set shows **height** carrying the result
 (removing it costs 0.051 kg RMSE; removing canopy area costs 0.001). Height,
 with solidity, is separating the two Eucalyptus batches — and batch membership
-alone explains R² = 0.887. So the honest reading of "reconstruction improves
-biomass estimation" is **"reconstruction separates size classes better than
-pixels do"**, which is true and useful but is not the claim the proposal makes.
+alone explained R² = 0.887. So the honest reading of "reconstruction improves
+biomass estimation" was **"reconstruction separates size classes better than
+pixels do"**.
+
+V001–V008 tested exactly that reading and confirmed it. Its masses span 500–1800
+g, overlapping every other batch instead of forming a cluster, which drops the
+batch-only R² to 0.744 across the Eucalyptus batches and 0.697 across all four —
+and removes the 3D advantage along with it. The size-class explanation was
+right.
 
 The label-efficiency half is untested for the same reason as RQ1.
 

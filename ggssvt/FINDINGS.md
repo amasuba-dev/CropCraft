@@ -78,10 +78,10 @@ more. This is the least verified assumption in the entire pipeline.
 
 ## 3. Biomass comparison — the core result
 
-> **Superseded.** Re-run on 36 specimens with corrected targets, the ordering
-> inverts and **direct 2D wins**: 0.469 kg / R² 0.279, against 0.507 for mesh
-> geometry and 0.544 for geometric features. See
-> [RERUN_V_BATCH.md](RERUN_V_BATCH.md) §4 for the table and §3 for why.
+> **Superseded.** Re-run on 36 specimens with corrected targets the ordering
+> inverts, direct 2D leading at 0.469 kg / R² 0.279 — but **neither ordering is
+> statistically resolved**, and the one below never was either (paired bootstrap
+> [−0.168, +0.099]). See [RERUN_V_BATCH.md](RERUN_V_BATCH.md) §4.
 
 Leave-one-out, 28 specimens, identical protocol for every method.
 
@@ -94,12 +94,14 @@ Leave-one-out, 28 specimens, identical protocol for every method.
 | volume allometric | 0.622 kg | 0.529 | 56.9% | −0.162 |
 | canopy area allometric | 0.642 kg | 0.505 | 52.1% | −0.236 |
 
-~~**Reconstruction beats pixels** — 0.397 against 0.440.~~ **This did not
-hold.** On the n=36 set it is 0.544 against 0.469, the other way round. The
-margin here rested on a sample whose batches sat at separate sizes; V001–V008
-overlaps them and the advantage disappears. The answer to the proposal's third
-research question on this data is **no** — see the implied-density diagnostic for
-the mechanism.
+~~**Reconstruction beats pixels** — 0.397 against 0.440.~~ **Withdrawn.** The
+gap was never statistically resolved: paired bootstrap 95% CI [−0.168, +0.099].
+It was reported as a finding without the interval that decides it. On the n=36
+set the point estimate goes the other way (0.544 against 0.469) and is equally
+unresolved, and the direction flips again under a different feature-whitening
+choice. The proposal's third research question is answered by the
+implied-density diagnostic below instead, which is a measurement rather than a
+difference in means.
 
 **Volume allometry is worse than the mean.** Carved hull density varies ~10×
 between bushy mango and thin eucalyptus, so one volume-to-mass law cannot span
