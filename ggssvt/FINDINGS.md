@@ -186,8 +186,18 @@ SAM (ViT-B) prompted from the registered geometry, with three consistency rules:
 3D gating to the working cylinder, a prompt-box coverage guard, and reverting
 views whose masks disagree with the rest in 3D.
 
-**Effect:** 96% of views accepted, 15.3% of subject pixels removed. Multi-view
-agreement +1.9%; surface coverage −6.0%; usable specimens 28 → 26.
+**Effect on the n=38 set:** 96.7% of views accepted, 17.0% of subject pixels
+changed. Multi-view agreement **+0.020**; surface coverage **−0.065**; usable
+specimens **36 → 33**.
+
+The same trade as before, at the same size: SAM makes the views agree with each
+other slightly more and cover the subject noticeably less, and three specimens
+fall below the gate as a result. It now drops E015, E019 and V006 on top of the
+E012/E016 that the geometric gate drops too. Losing V006 matters more than the
+count suggests — V is the batch that breaks the confound, so the SAM3D arm is
+running on a marginally more confounded sample than the geometric arm.
+*(Previous figures, n=30: 96% accepted, 15.3% removed, agreement +1.9%, coverage
+−6.0%, usable 28 → 26.)*
 
 ### The 2×2 factorial (26 shared specimens)
 
