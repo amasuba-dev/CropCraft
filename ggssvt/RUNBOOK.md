@@ -2,6 +2,19 @@
 
 Everything in order, with what it costs.
 
+> **⚠ The targets changed on 2026-08-22. Every trained number predates it.**
+>
+> V001–V008 were added and their pot weights are now *measured* rather than
+> estimated, which moved their net masses by 2.1–5.6×. The dataset is 38
+> specimens, 36 usable. Any checkpoint or result produced before that date was
+> fitted against the old targets and cannot be compared with anything produced
+> after it.
+>
+> **Rebuild both caches before running anything**, then re-run the whole
+> campaign. The campaign's resume logic skips runs marked `done` — so delete
+> `work_dirs/ggssvt/campaign/` first, or it will happily skip every stale run
+> you are trying to replace. See [RERUN_V_BATCH.md](RERUN_V_BATCH.md).
+
 **Hardware note.** This was first written for an RTX 4060 (8 GB). The lab card is
 an **RTX 4080: 16 GB and roughly three times the compute**. Same Ada
 architecture, so the `cu121` torch install is unchanged — but the VRAM ceiling
@@ -305,6 +318,10 @@ cut short, what completed is what the write-up needs.
 | `h3_bands_8_freq7` | **H3** | encoding matched to the grid Nyquist, 41.7 cyc/m |
 | `h3_bands_6_freq6` | **H3** | half the Nyquist, 20.8 cyc/m — expected to hurt |
 | `h3_bands_16_freq10` | **H3** | 8× the Nyquist, 333 cyc/m — expected to add nothing |
+
+**Delete `work_dirs/ggssvt/campaign/` before the first re-run.** Resume works by
+skipping runs whose status is `done`, which is what you want after a crash and
+exactly what you do not want after the targets changed.
 | `sam3d_cnn`, `sam3d_dinov2` | factorial | tests whether the probe's interaction survives training |
 | `h1_dinov3` | H1 | if access has been granted |
 

@@ -27,6 +27,7 @@ is what the write-up needs.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import dataclasses
 import json
 import time
@@ -177,10 +178,34 @@ class RunResult:
     metrics: dict = field(default_factory=dict)
     config: dict = field(default_factory=dict)
     error: str = ""
+    dataset: str = ""                 # fingerprint of the targets fitted against
 
 
 def _result_path(name: str, out_dir: Path) -> Path:
     return out_dir / f"{name}.json"
+
+
+def dataset_fingerprint(cache_dir: Path) -> str:
+    """Identity of the targets a run was fitted against.
+
+    Resume skips any run already marked done, which is right after a crash and
+    badly wrong after the ground truth changes -- an overnight campaign would
+    skip every run and report numbers fitted to targets that no longer exist.
+    Recording which specimens and which masses a result came from lets the resume
+    tell those two cases apart.
+
+    Covers the specimen list and their target masses, which is what a stale
+    result would be stale with respect to. It deliberately does not cover the
+    carved geometry: re-running preprocess produces byte-identical volumes and
+    should not invalidate a night of training.
+    """
+    from .data.preprocess import load_cached, usable_plant_ids
+
+    digest = hashlib.sha256()
+    for plant_id in sorted(usable_plant_ids(cache_dir)):
+        digest.update(plant_id.encode())
+        digest.update(f"{load_cached(plant_id, cache_dir).target_kg:.6f}".encode())
+    return digest.hexdigest()[:16]
 
 
 def execute(
@@ -290,6 +315,7 @@ def execute(
             "predictions": predicted.tolist(),
             "plant_ids": list(plant_ids),
         }
+        result.dataset = dataset_fingerprint(cache_dir)
         result.status = "done"
 
         if verbose:
@@ -338,6 +364,7 @@ def run_campaign(
         runs = [r for r in runs if r.name in only]
 
     results: list[RunResult] = []
+    fingerprints: dict[str, str] = {}
     campaign_started = time.time()
 
     for index, run in enumerate(runs, start=1):
@@ -346,10 +373,21 @@ def run_campaign(
         if path.exists() and not force:
             existing = json.loads(path.read_text(encoding="utf-8"))
             if existing.get("status") == "done":
-                if verbose:
-                    print(f"[{index}/{len(runs)}] {run.name}: already done, skipping")
-                results.append(RunResult(**existing))
-                continue
+                stored = existing.get("dataset", "")
+                current = fingerprints.setdefault(
+                    run.cache, dataset_fingerprint(run.cache_dir())
+                )
+                if stored and stored != current:
+                    if verbose:
+                        print(
+                            f"[{index}/{len(runs)}] {run.name}: re-running -- it was "
+                            f"fitted against different targets ({stored}, now {current})"
+                        )
+                else:
+                    if verbose:
+                        print(f"[{index}/{len(runs)}] {run.name}: already done, skipping")
+                    results.append(RunResult(**existing))
+                    continue
 
         if verbose:
             print(f"\n[{index}/{len(runs)}] {run.name}")
