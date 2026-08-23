@@ -4,6 +4,13 @@ A record of every experiment executed, what it showed, and what follows for the
 research. Companion to [RESEARCH_STATUS.md](RESEARCH_STATUS.md), which maps this
 onto the proposal's questions and hypotheses.
 
+> **Superseded in places by [RERUN_V_BATCH.md](RERUN_V_BATCH.md).** V001–V008
+> were added with *measured* pot weights and the pipeline re-run on 36
+> specimens. Two results reversed: 3D geometric features no longer beat
+> image-only regression, and the batch confound fell from R² 0.887 to 0.697.
+> Where a number below is marked n=28 or n=30, the n=36 value in that document
+> is the current one.
+
 **The headline, stated once.** The pipeline is built, validated and reproducible
 across two machines. The GG-SSVT model **has not been trained** — every number
 here comes from the geometry pipeline, frozen pretrained features, or classical
@@ -15,10 +22,11 @@ baselines. And a batch confound caps what any of the biomass numbers can claim.
 
 | | |
 |---|---|
-| Specimens | 30 captured, **28 usable** (geometric), 26 (SAM3D) |
+| Specimens | 38 captured, **36 usable** (geometric) — was 30/28 before V001–V008 |
 | Views | 12 per specimen, 30° apart, dual Kinect v2, 512×424 RGB-D |
-| Species | Eucalyptus ×20, Mango ×10, Xylem ×1 (excluded, 2 views) |
-| Mass range | 0.40 – 2.35 kg fresh |
+| Species | Eucalyptus ×28, Mango ×10, Xylem ×1 (excluded, 2 views) |
+| Mass range | 0.20 – 2.35 kg fresh |
+| Pot mass | **measured** for V001–V008, estimated for the rest (biased −10.9%) |
 
 ### Problems found in the capture set
 
@@ -70,6 +78,11 @@ more. This is the least verified assumption in the entire pipeline.
 
 ## 3. Biomass comparison — the core result
 
+> **Superseded.** Re-run on 36 specimens with corrected targets, the ordering
+> inverts and **direct 2D wins**: 0.469 kg / R² 0.279, against 0.507 for mesh
+> geometry and 0.544 for geometric features. See
+> [RERUN_V_BATCH.md](RERUN_V_BATCH.md) §4 for the table and §3 for why.
+
 Leave-one-out, 28 specimens, identical protocol for every method.
 
 | method | RMSE | MAE | MARE | R² |
@@ -81,8 +94,12 @@ Leave-one-out, 28 specimens, identical protocol for every method.
 | volume allometric | 0.622 kg | 0.529 | 56.9% | −0.162 |
 | canopy area allometric | 0.642 kg | 0.505 | 52.1% | −0.236 |
 
-**Reconstruction beats pixels** — 0.397 against 0.440. Directly answers the
-proposal's third research question on the project's own data.
+~~**Reconstruction beats pixels** — 0.397 against 0.440.~~ **This did not
+hold.** On the n=36 set it is 0.544 against 0.469, the other way round. The
+margin here rested on a sample whose batches sat at separate sizes; V001–V008
+overlaps them and the advantage disappears. The answer to the proposal's third
+research question on this data is **no** — see the implied-density diagnostic for
+the mechanism.
 
 **Volume allometry is worse than the mean.** Carved hull density varies ~10×
 between bushy mango and thin eucalyptus, so one volume-to-mass law cannot span
@@ -93,6 +110,14 @@ hypothesis that leaf mass scales with area; the area law is the worst method
 tried. **A visual hull's surface is envelope area, not leaf area** — 12 views at
 12 mm voxels cannot resolve leaves. This is a mechanism, not a tuning failure,
 and it generalises to any hull-based method at this resolution.
+
+**And the same is true of its volume.** Dividing measured mass by reconstructed
+above-ground volume gives an implied bulk density; fresh tissue is 300–900 kg/m³.
+Only **8 of 36** specimens land in a generous 200–1000 band. Twenty-five imply
+*less* — the hull has enclosed the air between leaves, all ten Mango at 26–77
+kg/m³. Three imply more, meaning thin stems were never carved at all. This is the
+mechanism behind every weak biomass number in this document, now measured rather
+than inferred: `ggssvt/eval/plausibility.py`.
 
 ---
 
@@ -106,10 +131,18 @@ down:
 |---|---|---|---|
 | E001–E010 | 10 | 0.538 kg | small; reconstruct as mostly pot |
 | E011–E020 | 8 usable | 1.844 kg | tall thin saplings |
+| **V001–V008** | **8** | **1.138 kg** | **added later; sd 484 g, spans both** |
 
-**Batch membership alone explains R² = 0.887** — more than any method achieves,
-including mesh geometry's 0.788 on that subset. **Within either batch, no method
-reaches R² = 0.2.**
+**Batch membership alone explained R² = 0.887** on the two Eucalyptus batches —
+more than any method achieved, including mesh geometry's 0.788 on that subset.
+**Within either batch, no method reached R² = 0.2.**
+
+**V001–V008 was collected to break this, and did.** Its range (500–1800 g)
+overlaps every other batch instead of forming its own cluster, and the batch-only
+R² falls to **0.744** across the three Eucalyptus batches and **0.697** across all
+four. The cost is that the 3D advantage went with it — see
+[RERUN_V_BATCH.md](RERUN_V_BATCH.md) §4. That is the correct trade: the earlier
+comparison was measuring size-class separation.
 
 Every model is recovering *which size class* a plant belongs to — tall-and-sparse
 versus short-and-solid — not estimating mass among comparable plants.
@@ -118,9 +151,10 @@ versus short-and-solid — not estimating mass among comparable plants.
 statement is *"reconstructed geometry separates plant size classes"*; the
 proposal's *"estimates biomass"* is not yet supported.
 
-**The fix is data.** A capture batch spanning a continuous mass range within one
-species. More specimens of the two existing clusters will reinforce the confound
-rather than break it.
+**The fix was data, and it worked.** A capture batch spanning a continuous mass
+range within one species — which is what V001–V008 turned out to be. More
+specimens of the two original clusters would have reinforced the confound rather
+than broken it.
 
 ---
 
