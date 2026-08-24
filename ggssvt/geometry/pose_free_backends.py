@@ -1,13 +1,21 @@
 """Adapters for the DUSt3R, MASt3R and Fast3R backends.
 
-**These have not been executed against the real weights.** None of the three
-installs without a GPU and the machine this was written on has none, so they are
-written against each project's documented interface and verified only for shape
-and convention handling against stubs. The maths they feed --
-:func:`~ggssvt.geometry.pose_free.compare_poses` and
+**These have not been executed against the real weights**, which needs a GPU. All
+three now install and import on CPU, though, and every call below has been
+checked against the installed code rather than against documentation --
+see :mod:`tests.test_pose_free_api`, which pins each signature and skips when the
+repositories are absent.
+
+That check earned its keep immediately. The Fast3R adapter was wrong three ways:
+there is no function named ``inference_multiview``, its ``inference`` takes views
+before the model and requires a ``dtype``, and camera poses do not ride inside
+each prediction the way :func:`_from_multiview` assumed -- they come from a
+separate global PnP solve. DUSt3R's and MASt3R's calls were correct as written.
+
+The maths they feed -- :func:`~ggssvt.geometry.pose_free.compare_poses` and
 :func:`~ggssvt.geometry.pose_free.recover_scale_from_depth` -- *is* tested, so a
-first run should be watched for import and API drift rather than for silently
-wrong numbers.
+first run should be watched for wrong conventions rather than for wrong numbers.
+:doc:`POSEFREE.md <../POSEFREE>` has the install and run plan.
 
 Two conventions decide whether the output is meaningful, and both are handled
 here rather than left to the caller:
@@ -64,7 +72,7 @@ class PoseFreeBackend(ABC):
             raise PoseFreeError(reason)
 
     @abstractmethod
-    def load(self) -> "PoseFreeBackend":
+    def load(self) -> PoseFreeBackend:
         """Load the weights. Idempotent."""
 
     @abstractmethod
@@ -80,15 +88,17 @@ class Dust3rBackend(PoseFreeBackend):
     """DUSt3R: pairwise point maps fused by global alignment.
 
     Pairwise means the cost grows with the square of the view count. Twelve views
-    is 66 pairs at ``complete`` pairing, which is affordable; the swin or oneref
-    strategies exist if it is not.
+    is 66 unordered pairs at ``complete`` pairing -- but ``symmetrize=True``
+    below runs each in both directions, so the real cost is **132 forward
+    passes per specimen**, and the whole set is 36 times that. The swin or
+    oneref scene graphs exist if that proves too slow.
     """
 
     name = "dust3r"
     repo = DUST3R_REPO
     returns_metric_scale = False
 
-    def load(self) -> "Dust3rBackend":
+    def load(self) -> Dust3rBackend:
         if self._model is not None:
             return self
         self.ensure_available()
@@ -135,7 +145,7 @@ class Mast3rBackend(PoseFreeBackend):
     repo = MAST3R_METRIC_REPO
     returns_metric_scale = True
 
-    def load(self) -> "Mast3rBackend":
+    def load(self) -> Mast3rBackend:
         if self._model is not None:
             return self
         self.ensure_available()
@@ -189,7 +199,7 @@ class Fast3rBackend(PoseFreeBackend):
     repo = FAST3R_REPO
     returns_metric_scale = False
 
-    def load(self) -> "Fast3rBackend":
+    def load(self) -> Fast3rBackend:
         if self._model is not None:
             return self
         self.ensure_available()
@@ -205,16 +215,35 @@ class Fast3rBackend(PoseFreeBackend):
     def reconstruct(self, specimen) -> PoseFreeResult:
         self.load()
         try:
-            from fast3r.dust3r.inference_multiview import inference_multiview
+            import torch
+            from fast3r.dust3r.inference_multiview import inference
             from fast3r.dust3r.utils.image import load_images
+            from fast3r.models.multiview_dust3r_module import MultiViewDUSt3RLitModule
         except ImportError as exc:
             raise PoseFreeError(INSTALL_HELP["fast3r"]) from exc
 
         paths, position_ids = self._image_paths(specimen)
-        images = load_images(paths, size=self.image_size)
-        output = inference_multiview(self._model, images, device=self.device)
+        images = load_images(paths, size=self.image_size, verbose=False)
 
-        return _from_multiview(output, self.name, position_ids)
+        # Positional: the views come first and the model second, and `dtype` is
+        # required rather than defaulted. `profiling=False` returns the dict
+        # alone; with profiling it returns a (dict, info) tuple instead.
+        output = inference(
+            images, self._model, self.device, dtype=torch.float32, verbose=False
+        )
+
+        # Fast3R does not put a pose in each prediction the way the earlier
+        # adapter assumed. The predictions carry point maps only, and camera
+        # poses come from a separate PnP step over all of them at once -- which
+        # is the whole point of the method: one global solve rather than the
+        # pairwise alignment DUSt3R and MASt3R run.
+        poses, _focals = MultiViewDUSt3RLitModule.estimate_camera_poses(
+            output["preds"],
+            niter_PnP=100,
+            focal_length_estimation_method="first_view_from_global_head",
+        )
+
+        return _from_multiview(output, poses[0], self.name, position_ids)
 
 
 # --------------------------------------------------------------------------
@@ -246,19 +275,27 @@ def _from_scene(scene, method: str, position_ids: list[str], *, is_metric: bool)
     )
 
 
-def _from_multiview(output, method: str, position_ids: list[str]):
-    """Normalise a Fast3R multi-view output."""
-    preds = output["preds"] if isinstance(output, dict) else output
-    rotations, centres, clouds = [], [], []
+def _from_multiview(output, poses, method: str, position_ids: list[str]):
+    """Normalise a Fast3R multi-view output.
 
-    for view in preds:
-        pose = view["camera_pose"] if "camera_pose" in view else view.get("pose")
-        if pose is None:
-            raise PoseFreeError(
-                "Fast3R output carries no camera pose; the upstream API changed"
-            )
-        pose = np.asarray(pose.detach().cpu() if hasattr(pose, "detach") else pose)
-        pose = pose.reshape(4, 4)
+    Args:
+        output: the dict returned by ``fast3r.dust3r.inference_multiview.inference``.
+        poses: one ``(4, 4)`` camera-to-world matrix per view, from
+            ``MultiViewDUSt3RLitModule.estimate_camera_poses``. They arrive
+            separately because Fast3R's predictions hold point maps only -- the
+            poses come from a single global PnP solve across every view.
+    """
+    preds = output["preds"] if isinstance(output, dict) else output
+    if len(poses) != len(preds):
+        raise PoseFreeError(
+            f"Fast3R returned {len(preds)} predictions but {len(poses)} poses"
+        )
+
+    rotations, centres, clouds = [], [], []
+    for view, pose in zip(preds, poses):
+        pose = np.asarray(
+            pose.detach().cpu() if hasattr(pose, "detach") else pose, dtype=np.float64
+        ).reshape(4, 4)
         rotations.append(pose[:3, :3])
         centres.append(pose[:3, 3])
 

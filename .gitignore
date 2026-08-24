@@ -171,3 +171,8 @@ cython_debug/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+# Pose-free backends: upstream clones and their isolated environment.
+# DUSt3R and MASt3R ship no setup.py, so they live on sys.path from here
+# rather than being pip-installed; see ggssvt/POSEFREE.md.
+/third_party/
+/.venv-posefree/

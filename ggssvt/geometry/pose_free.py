@@ -47,20 +47,31 @@ FAST3R_REPO = "jedyang97/Fast3R_ViT_Large_512"
 INSTALL_HELP = {
     "dust3r": (
         "DUSt3R needs its GitHub repository, not just the weights:\n"
-        "  git clone --recursive https://github.com/naver/dust3r\n"
-        "  cd dust3r && pip install -r requirements.txt && pip install -e .\n"
-        "The --recursive matters: the CroCo backbone is a submodule."
+        "  git clone --recursive https://github.com/naver/dust3r third_party/dust3r\n"
+        "The --recursive matters: the CroCo backbone is a submodule.\n"
+        "There is no setup.py, so `pip install -e .` fails. Put the repo root on\n"
+        "sys.path instead -- a .pth file in site-packages holding its absolute\n"
+        "path, or PYTHONPATH. dust3r adds croco to sys.path itself on import.\n"
+        "Inference needs only: torch torchvision roma einops opencv-python scipy\n"
+        "trimesh 'huggingface-hub[torch]>=0.22'. The rest of requirements.txt is\n"
+        "demo and training tooling."
     ),
     "mast3r": (
         "MASt3R needs its GitHub repository, which vendors DUSt3R in turn:\n"
-        "  git clone --recursive https://github.com/naver/mast3r\n"
-        "  cd mast3r && pip install -r requirements.txt && pip install -e .\n"
+        "  git clone --recursive https://github.com/naver/mast3r third_party/mast3r\n"
+        "No setup.py here either; put the repo root on sys.path the same way.\n"
+        "Its vendored dust3r/ is byte-identical to the standalone clone, so the\n"
+        "two backends share one environment safely despite differing commit SHAs.\n"
         "Use the *metric* checkpoint; the others return arbitrary scale."
     ),
     "fast3r": (
         "Fast3R needs its GitHub repository:\n"
-        "  git clone https://github.com/facebookresearch/fast3r\n"
-        "  cd fast3r && pip install -e .\n"
+        "  git clone https://github.com/facebookresearch/fast3r third_party/fast3r\n"
+        "  pip install --no-deps -e third_party/fast3r\n"
+        "This one does have a setup.py. Use --no-deps: requirements.txt pulls\n"
+        "deepspeed, open3d, wandb and numpy<2 for training, none of which\n"
+        "inference needs and several of which fight a modern environment.\n"
+        "Inference imports need only: omegaconf hydra-core lightning rich.\n"
         "It ingests all views in one pass rather than pairwise."
     ),
 }

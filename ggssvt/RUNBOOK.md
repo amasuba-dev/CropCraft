@@ -428,6 +428,14 @@ Add `dinov3` to `--backbones` only if you have both the access and the hours.
 
 ## Pose-free reconstruction — the registration check
 
+> **Read [POSEFREE.md](POSEFREE.md) first.** All three backends are installed and
+> their APIs verified against the real code; the install instructions that were
+> here before were wrong for two of the three (DUSt3R and MASt3R ship no
+> `setup.py`, so `pip install -e .` fails). That document has the working
+> dependency set, the Python 3.11 constraint that `open3d` imposes, and the run
+> order — Fast3R first, because it is twenty times cheaper and exercises the same
+> comparison code.
+
 ```bash
 python -m ggssvt.cli posefree --check-only
 ```
