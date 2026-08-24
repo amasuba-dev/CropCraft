@@ -122,7 +122,7 @@ def estimate_pot_height(
     if not profile.any():
         return PotEstimate(fallback_m, False, 0, 0, 0.0, "empty volume")
 
-    search_max = min(n - 1 - above_slices, int(round(search_max_m / voxel_size_m)))
+    search_max = min(n - 1 - above_slices, round(search_max_m / voxel_size_m))
     if search_max <= below_slices:
         return PotEstimate(fallback_m, False, 0, 0, 0.0, "search window too small")
 
@@ -158,7 +158,7 @@ def estimate_pot_height(
         return PotEstimate(
             height_m=float(rim * voxel_size_m),
             confident=True,
-            body_voxels=int(round(body)),
+            body_voxels=round(body),
             rim_voxels=int(profile[rim]) if rim < n else 0,
             drop_ratio=ratio,
             reason=(
@@ -170,7 +170,7 @@ def estimate_pot_height(
     return PotEstimate(
         height_m=fallback_m,
         confident=False,
-        body_voxels=int(round(body)),
+        body_voxels=round(body),
         rim_voxels=0,
         drop_ratio=1.0,
         reason="no step found; the profile tapers smoothly, so pot and plant "

@@ -237,6 +237,32 @@ def cmd_preprocess(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_views(args: argparse.Namespace) -> int:
+    from .eval.view_ablation import format_table, run_ablation
+
+    results = run_ablation(args.work_dir, verbose=True)
+    if not results:
+        print("\nNo view-count caches found. Build them first (see above).")
+        return 1
+
+    print()
+    print(format_table(results))
+    print(
+        "\n`plausible` counts specimens whose reconstructed above-ground volume "
+        "could\nphysically weigh the measured mass (200-1000 kg/m3). Agreement "
+        "degrades gently\nas views are removed; plausibility does not, which is "
+        "the point of reporting both."
+    )
+
+    if args.out:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(
+            json.dumps([r.as_dict() for r in results], indent=2), encoding="utf-8"
+        )
+        print(f"\nSaved to {args.out}")
+    return 0
+
+
 def cmd_baselines(args: argparse.Namespace) -> int:
     from .data.preprocess import usable_plant_ids
     from .eval.baselines import evaluate_baselines, load_features
@@ -724,6 +750,15 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common(baselines)
     baselines.add_argument("--plants", nargs="*")
     baselines.set_defaults(func=cmd_baselines)
+
+    views = sub.add_parser(
+        "views", help="view-count ablation across the per-view caches"
+    )
+    views.add_argument("--work-dir", type=Path, default=WORK_DIR)
+    views.add_argument(
+        "--out", type=Path, default=WORK_DIR / "reports" / "view_ablation.json"
+    )
+    views.set_defaults(func=cmd_views)
 
     pretrain = sub.add_parser("pretrain", help="stage 1, self-supervised")
     _add_common(pretrain)

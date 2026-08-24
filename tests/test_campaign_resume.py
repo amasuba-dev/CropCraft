@@ -54,7 +54,7 @@ def test_every_planned_run_has_a_distinct_name(plan):
 
 def test_fingerprint_depends_on_targets_not_just_specimen_names(monkeypatch, tmp_path):
     """The whole point: a changed mass must produce a changed fingerprint."""
-    import ggssvt.campaign as campaign
+    from ggssvt import campaign
 
     class FakeCached:
         def __init__(self, target_kg: float):
@@ -62,7 +62,7 @@ def test_fingerprint_depends_on_targets_not_just_specimen_names(monkeypatch, tmp
 
     masses = {"A": 1.0, "B": 2.0}
 
-    import ggssvt.data.preprocess as preprocess
+    from ggssvt.data import preprocess
 
     monkeypatch.setattr(preprocess, "usable_plant_ids", lambda *_a, **_k: list(masses))
     monkeypatch.setattr(
@@ -77,8 +77,8 @@ def test_fingerprint_depends_on_targets_not_just_specimen_names(monkeypatch, tmp
 
 
 def test_fingerprint_is_stable_when_nothing_changes(monkeypatch, tmp_path):
-    import ggssvt.campaign as campaign
-    import ggssvt.data.preprocess as preprocess
+    from ggssvt import campaign
+    from ggssvt.data import preprocess
 
     class FakeCached:
         target_kg = 1.25
@@ -90,8 +90,8 @@ def test_fingerprint_is_stable_when_nothing_changes(monkeypatch, tmp_path):
 
 
 def test_fingerprint_ignores_specimen_ordering(monkeypatch, tmp_path):
-    import ggssvt.campaign as campaign
-    import ggssvt.data.preprocess as preprocess
+    from ggssvt import campaign
+    from ggssvt.data import preprocess
 
     class FakeCached:
         def __init__(self, target_kg: float):

@@ -221,6 +221,24 @@ it is evidence the backbone is doing something rather than that one run got
 lucky. ViT-L/14 is 300M frozen parameters; it did not fit comfortably in 8 GB and
 fits easily in 16.
 
+### 3b-bis. View-count ablation (~20 min CPU, run once)
+
+Answers "would four images do?" with a physical criterion rather than a quality
+score. Build the reduced caches, then score them:
+
+```bash
+for v in 3 4 6; do python -m ggssvt.cli preprocess --views $v --cache-dir work_dirs/ggssvt/cache_v$v; done
+```
+
+```bash
+python -m ggssvt.cli views
+```
+
+Expect **0 of 25 plausible at four views** against 8 of 36 at twelve, and a
+median implied density of 9.2 kg/m³ — lighter than polystyrene. Agreement only
+falls from 0.608 to 0.424 over the same range, which is why it is worth printing
+both.
+
 ### 3c. Mesh arm and reconstruction gallery (~5 min, CPU)
 
 ```bash
