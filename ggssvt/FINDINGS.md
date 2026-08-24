@@ -12,7 +12,7 @@ onto the proposal's questions and hypotheses.
 > is the current one.
 
 **The headline, stated once.** The pipeline is built, validated and reproducible
-across two machines. The GG-SSVT model **has not been trained** — every number
+across two machines. The GG-SSVT model **has not been trained**, every number
 here comes from the geometry pipeline, frozen pretrained features, or classical
 baselines. And a batch confound caps what any of the biomass numbers can claim.
 
@@ -22,7 +22,7 @@ baselines. And a batch confound caps what any of the biomass numbers can claim.
 
 | | |
 |---|---|
-| Specimens | 38 captured, **36 usable** (geometric) — was 30/28 before V001–V008 |
+| Specimens | 38 captured, **36 usable** (geometric), was 30/28 before V001–V008 |
 | Views | 12 per specimen, 30° apart, dual Kinect v2, 512×424 RGB-D |
 | Species | Eucalyptus ×28, Mango ×10, Xylem ×1 (excluded, 2 views) |
 | Mass range | 0.20 – 2.35 kg fresh |
@@ -37,7 +37,7 @@ literally places camB on top of camA and **silently collapses the 12-view rig
 into a 6-view one**. Resolved in `data/naming.py`; the collection script should
 be fixed at source.
 
-**No calibration exists.** `dataset/calib` is entirely empty — no ChArUco
+**No calibration exists.** `dataset/calib` is entirely empty, no ChArUco
 intrinsics, no per-day `rig_positions.json`. `make_transforms.py` has never had
 an input.
 
@@ -60,12 +60,12 @@ coordinate descent.
 
 **Result:** mean multi-view agreement 0.625, surface coverage 0.788. Camera
 heights recover consistently to ~3 cm across a sweep, an independent check the
-fit is working. Refinement raises coverage substantially — E011 0.29 → 0.48,
+fit is working. Refinement raises coverage substantially, E011 0.29 → 0.48,
 M001 0.16 → 0.43.
 
 **One failure worth recording.** An earlier version picked the strongest
 *single-view* subject candidate and locked onto background structure a metre
-behind the plant on several specimens — producing a confident, internally
+behind the plant on several specimens, producing a confident, internally
 consistent, completely wrong registration. It was caught only by projecting the
 world axis back into the images and looking. Consensus-based selection fixed it.
 **Visual verification caught what every numerical diagnostic missed.**
@@ -76,10 +76,10 @@ more. This is the least verified assumption in the entire pipeline.
 
 ---
 
-## 3. Biomass comparison — the core result
+## 3. Biomass comparison, the core result
 
 > **Superseded.** Re-run on 36 specimens with corrected targets the ordering
-> inverts, direct 2D leading at 0.469 kg / R² 0.279 — but **neither ordering is
+> inverts, direct 2D leading at 0.469 kg / R² 0.279, but **neither ordering is
 > statistically resolved**, and the one below never was either (paired bootstrap
 > [−0.168, +0.099]). See [RERUN_V_BATCH.md](RERUN_V_BATCH.md) §4.
 
@@ -94,7 +94,7 @@ Leave-one-out, 28 specimens, identical protocol for every method.
 | volume allometric | 0.622 kg | 0.529 | 56.9% | −0.162 |
 | canopy area allometric | 0.642 kg | 0.505 | 52.1% | −0.236 |
 
-~~**Reconstruction beats pixels** — 0.397 against 0.440.~~ **Withdrawn.** The
+~~**Reconstruction beats pixels**, 0.397 against 0.440.~~ **Withdrawn.** The
 gap was never statistically resolved: paired bootstrap 95% CI [−0.168, +0.099].
 It was reported as a finding without the interval that decides it. On the n=36
 set the point estimate goes the other way (0.544 against 0.469) and is equally
@@ -109,21 +109,21 @@ both. This is the empirical case for a learned density.
 
 **Surface area does not beat volume.** The mesh arm was built to test the
 hypothesis that leaf mass scales with area; the area law is the worst method
-tried. **A visual hull's surface is envelope area, not leaf area** — 12 views at
+tried. **A visual hull's surface is envelope area, not leaf area**, 12 views at
 12 mm voxels cannot resolve leaves. This is a mechanism, not a tuning failure,
 and it generalises to any hull-based method at this resolution.
 
 **And the same is true of its volume.** Dividing measured mass by reconstructed
 above-ground volume gives an implied bulk density; fresh tissue is 300–900 kg/m³.
 Only **8 of 36** specimens land in a generous 200–1000 band. Twenty-five imply
-*less* — the hull has enclosed the air between leaves, all ten Mango at 26–77
+*less*. The hull has enclosed the air between leaves, all ten Mango at 26–77
 kg/m³. Three imply more, meaning thin stems were never carved at all. This is the
 mechanism behind every weak biomass number in this document, now measured rather
 than inferred: `ggssvt/eval/plausibility.py`.
 
 ---
 
-## 4. The batch confound — the finding that caps everything
+## 4. The batch confound, the finding that caps everything
 
 Leave-one-feature-out on the mesh set showed **height** carrying the result
 (removing it costs 0.051 kg; removing canopy area costs 0.001). Chasing that
@@ -135,26 +135,26 @@ down:
 | E011–E020 | 8 usable | 1.844 kg | tall thin saplings |
 | **V001–V008** | **8** | **1.138 kg** | **added later; sd 484 g, spans both** |
 
-**Batch membership alone explained R² = 0.887** on the two Eucalyptus batches —
+**Batch membership alone explained R² = 0.887** on the two Eucalyptus batches,
 more than any method achieved, including mesh geometry's 0.788 on that subset.
 **Within either batch, no method reached R² = 0.2.**
 
 **V001–V008 was collected to break this, and did.** Its range (500–1800 g)
 overlaps every other batch instead of forming its own cluster, and the batch-only
 R² falls to **0.744** across the three Eucalyptus batches and **0.697** across all
-four. The cost is that the 3D advantage went with it — see
+four. The cost is that the 3D advantage went with it, see
 [RERUN_V_BATCH.md](RERUN_V_BATCH.md) §4. That is the correct trade: the earlier
 comparison was measuring size-class separation.
 
-Every model is recovering *which size class* a plant belongs to — tall-and-sparse
-versus short-and-solid — not estimating mass among comparable plants.
+Every model is recovering *which size class* a plant belongs to, tall-and-sparse
+versus short-and-solid, not estimating mass among comparable plants.
 
 **This does not invalidate the pipeline.** It caps the claim. The defensible
 statement is *"reconstructed geometry separates plant size classes"*; the
 proposal's *"estimates biomass"* is not yet supported.
 
 **The fix was data, and it worked.** A capture batch spanning a continuous mass
-range within one species — which is what V001–V008 turned out to be. More
+range within one species, which is what V001–V008 turned out to be. More
 specimens of the two original clusters would have reinforced the confound rather
 than broken it.
 
@@ -171,7 +171,7 @@ inside each fold.
 | DINOv2-small | 0.335 kg | 0.663 | 768 |
 | **DINOv2-base** | **0.295 kg** | **0.738** | 1536 |
 
-Paired: **ΔRMSE −0.062 kg, CI [−0.160, +0.036], p ≈ 0.22 — not significant.**
+Paired: **ΔRMSE −0.062 kg, CI [−0.160, +0.036], p ≈ 0.22, not significant.**
 The direction is consistent and scales with backbone size; the sample cannot
 resolve it. Adding geometry features on top of DINO changes nothing
 (0.295 → 0.296).
@@ -194,7 +194,7 @@ The same trade as before, at the same size: SAM makes the views agree with each
 other slightly more and cover the subject noticeably less, and three specimens
 fall below the gate as a result. It now drops E015, E019 and V006 on top of the
 E012/E016 that the geometric gate drops too. Losing V006 matters more than the
-count suggests — V is the batch that breaks the confound, so the SAM3D arm is
+count suggests, V is the batch that breaks the confound, so the SAM3D arm is
 running on a marginally more confounded sample than the geometric arm.
 *(Previous figures, n=30: 96% accepted, 15.3% removed, agreement +1.9%, coverage
 −6.0%, usable 28 → 26.)*
@@ -215,7 +215,7 @@ running on a marginally more confounded sample than the geometric arm.
 | interaction | −0.196 | [−0.393, +0.031] | not resolved |
 
 **The first resolved effect this project has produced.** DINO features help
-significantly *when the hull came from SAM3D* — and the reason is visible in the
+significantly *when the hull came from SAM3D*, and the reason is visible in the
 table: SAM3D on its own is catastrophic for the hand-crafted descriptors
 (0.576 → 0.778, R² −0.967, far below the mean-predictor floor), and DINO simply
 does not care which segmenter produced the hull (0.385 → 0.390, an effect of
@@ -259,15 +259,15 @@ justified on its own. But the plausibility column settles it far more sharply
 than the agreement column ever could.
 
 **At four views, zero of twenty-five reconstructions are physically capable of
-weighing what the plant weighs.** The median implied bulk density is 9.2 kg/m³ —
+weighing what the plant weighs.** The median implied bulk density is 9.2 kg/m³,
 lighter than expanded polystyrene, and thirty to ninety times below fresh plant
 tissue. The hulls average 126 L for plants of at most 2.35 kg. These are not
 poor reconstructions, they are not reconstructions of the plant at all.
 
 Four views at 90° is the visual-hull minimum for a *convex* object. A plant is
 the opposite of convex, and every unsampled azimuth leaves a prism of empty space
-uncarved. Twelve views is where the number becomes non-absurd — 10.4 L and 117
-kg/m³ — and even there only 8 of 36 clear the bar.
+uncarved. Twelve views is where the number becomes non-absurd, 10.4 L and 117
+kg/m³, and even there only 8 of 36 clear the bar.
 
 **This is the answer to "could we get away with four images?"** No, and the
 reason is measurable rather than a matter of taste. It also disposes of the
@@ -287,10 +287,10 @@ Several would have produced confident wrong numbers rather than errors.
 | Bug | Consequence had it stood |
 |---|---|
 | `.gitignore` `data/` matched at any depth | `ggssvt/data/` and `nerfstudio/…/data/` never committed; fresh clones fail at import |
-| Carve thresholds did not scale with view count | 4-view carve returns **empty**, reported as 0/30 usable — looks like a finding |
+| Carve thresholds did not scale with view count | 4-view carve returns **empty**, reported as 0/30 usable, looks like a finding |
 | Subject axis from single-view candidate | Confident registration onto background a metre behind the plant |
 | Token anchors averaged background pixels | Anchors dragged off the specimen, corrupting the distance bias |
-| Decoder used self-attention over concatenated queries | O((Q+N)²) — several GB where O(Q·N) was needed |
+| Decoder used self-attention over concatenated queries | O((Q+N)²), several GB where O(Q·N) was needed |
 | Decoder MLP not gain-corrected for GELU | Signal attenuated 85× at init; near-constant output |
 | HF access checked `.gated` not `auth_check` | DINOv3 would stay skipped **after** approval arrived |
 | 6-connectivity in component cleanup | Diagonal stems severed; 0.3 m of plant amputated on E002 |
@@ -321,7 +321,7 @@ classes" is supported. "Estimates biomass" is not, and an examiner who checks
 the batch structure will find this in minutes. Saying it first is far stronger
 than being asked.
 
-**Keep H3, restated** — see [HYPOTHESIS_3.md](HYPOTHESIS_3.md). An earlier draft
+**Keep H3, restated**, see [HYPOTHESIS_3.md](HYPOTHESIS_3.md). An earlier draft
 recommended dropping it on the grounds frequency grounding was never implemented;
 that was wrong. The Fourier positional encoding is exactly what the proposal's
 wording names, and once measured H3 has four of six sub-claims already
@@ -342,8 +342,8 @@ one species is worth more than any modelling work currently planned.
 
 **Inverse procedural modelling is the principled route past the leaf-area
 ceiling.** The area hypothesis failed because a hull's surface is envelope area.
-CropCraft's approach — fitting a biologically plausible parametric model whose
-leaves are explicit — makes leaf area a *model parameter* rather than something
+CropCraft's approach, fitting a biologically plausible parametric model whose
+leaves are explicit, makes leaf area a *model parameter* rather than something
 the sensor must resolve. It needs a mango/eucalyptus morphology model, which is
 substantial, but it is the direction that addresses the actual obstacle.
 
@@ -351,20 +351,20 @@ substantial, but it is the direction that addresses the actual obstacle.
 
 These stand on evidence already collected, with intervals:
 
-1. **Calibration-free rig registration** from depth alone — method, diagnostics,
+1. **Calibration-free rig registration** from depth alone, method, diagnostics,
    and the visual-verification failure case. A contribution the proposal did not
    anticipate.
-2. **Reconstruction beats direct 2D regression** (0.397 vs 0.440) — RQ3's first
+2. **Reconstruction beats direct 2D regression** (0.397 vs 0.440), RQ3's first
    half, on own data.
-3. **Volume allometry fails across morphologies** (R² = −0.162) — motivates a
+3. **Volume allometry fails across morphologies** (R² = −0.162), motivates a
    learned density.
-4. **Surface area does not beat volume, and why** — envelope area is not leaf
+4. **Surface area does not beat volume, and why**, envelope area is not leaf
    area. A mechanism that generalises to any hull-based method.
-5. **View-count requirement** — monotone degradation, and 12 views justified
+5. **View-count requirement**, monotone degradation, and 12 views justified
    against the 4-view protocol used previously.
-6. **The batch confound** — reported as a limitation, it is a methodological
+6. **The batch confound**, reported as a limitation. It is a methodological
    contribution about evaluating small phenotyping datasets.
-7. **The F-score / voxel-IoU gap** — implemented and demonstrated on a synthetic
+7. **The F-score / voxel-IoU gap**, implemented and demonstrated on a synthetic
    shell (F-score 1.0 at IoU 0.58); this is Paper 1's thesis.
 
 ### Cheap data fixes worth doing before the next capture

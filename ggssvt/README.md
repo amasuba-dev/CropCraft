@@ -18,12 +18,12 @@ The four components named in the dissertation scaffold:
 
 ## Where the research stands
 
-- **[RESEARCH_STATUS.md](RESEARCH_STATUS.md)** — every research question and
+- **[RESEARCH_STATUS.md](RESEARCH_STATUS.md)**: every research question and
   hypothesis from the proposal, what answers it, what is pending, and what to do
   about each. Includes the recommended scope change.
-- **[HYPOTHESIS_3.md](HYPOTHESIS_3.md)** — the frequency hypothesis, restructured
+- **[HYPOTHESIS_3.md](HYPOTHESIS_3.md)**: the frequency hypothesis, restructured
   into six measurable sub-claims; four are already established.
-- **[FINDINGS.md](FINDINGS.md)** — every experiment run, the deductions, the bugs
+- **[FINDINGS.md](FINDINGS.md)**: every experiment run, the deductions, the bugs
   found, and what can be reported today.
 
 ## Setup and today's experiments
@@ -35,7 +35,7 @@ worth repeating here:
 - **Two conda environments are required.** Nerfstudio pins torch 2.0.1+cu118 and
   Python 3.8; GG-SSVT needs `transformers >= 4.56`, which will not install there.
   [`environment.yml`](environment.yml) builds the GG-SSVT one.
-- **`--finetune-epochs` defaults to 200**, which in a 28-fold leave-one-out sweep
+- **`--finetune-epochs` defaults to 200**: which in a 28-fold leave-one-out sweep
   is about 29 GPU-hours per condition. Override it.
 
 ## Quick start
@@ -99,19 +99,19 @@ There are therefore no measured extrinsics to load.
 
 [`geometry/rig.py`](geometry/rig.py) estimates them from the depth data instead:
 
-1. **Floor plane** (RANSAC per view) gives tilt, roll and camera height — four
+1. **Floor plane** (RANSAC per view) gives tilt, roll and camera height, four
    of six degrees of freedom, with no calibration target. Recovered camera
    heights are consistent to about 3 cm across a sweep, which is a useful
    independent check that the fit is working.
 2. **Subject axis** puts the world origin on the plant. Several candidate
    columns are proposed per view and the winner is the one whose registration
-   the *other views actually agree with* — scored by how many voxels several
+   the *other views actually agree with*, scored by how many voxels several
    cameras land on together. This matters: an earlier version picked the
    strongest single-view candidate and silently locked onto background
    structure a metre behind the plant on several specimens.
 3. **Azimuth** comes from the filename, then
    [`geometry/refine.py`](geometry/refine.py) corrects it. The correction is
-   worth a lot — surface coverage on E011 goes from 0.29 to 0.48, and on M001
+   worth a lot, surface coverage on E011 goes from 0.29 to 0.48, and on M001
    from 0.16 to 0.43.
 
 **This is an estimate, not a measurement.** The azimuth corrections saturate the
@@ -164,7 +164,7 @@ information.
 
 ### DINOv3 needs an access request
 
-DINOv3 weights are **gated** on HuggingFace — Meta approves access manually, per
+DINOv3 weights are **gated** on HuggingFace, Meta approves access manually, per
 account. Every command degrades gracefully and tells you what to do:
 
 1. Open <https://huggingface.co/facebook/dinov3-vits16-pretrain-lvd1689m>
@@ -188,10 +188,10 @@ python -m ggssvt.cli experiment --backbones cnn dinov2 dinov3 --variant base
 ```
 
 The full comparison: GG-SSVT pretrained and cross-validated once per backbone.
-Needs a GPU. Pretraining is re-run per condition — sharing a checkpoint across
+Needs a GPU. Pretraining is re-run per condition, sharing a checkpoint across
 backbones would be meaningless, since the stems produce different features.
 
-### Probe results, 28 specimens
+### Probe results: 28 specimens
 
 | condition | RMSE | MAE | MARE | R² | dims |
 |---|---|---|---|---|---|
@@ -199,10 +199,10 @@ backbones would be meaningless, since the stems produce different features.
 | DINOv2-small | 0.335 kg | 0.260 | 25.8% | 0.663 | 768 |
 | **DINOv2-base** | **0.295 kg** | **0.230** | **22.9%** | **0.738** | 1536 |
 | DINOv2-base + geometry | 0.296 kg | 0.232 | 23.3% | 0.738 | 1543 |
-| DINOv3 | *gated — not run* | | | | |
+| DINOv3 | *gated, not run* | | | | |
 
 Paired bootstrap, DINOv2-base against the control: **ΔRMSE −0.062 kg, 95% CI
-[−0.160, +0.036], p≈0.22 — not significant at n=28.**
+[−0.160, +0.036], p≈0.22, not significant at n=28.**
 
 Three things follow, and the third is the one that matters most:
 
@@ -226,13 +226,13 @@ back-projection*: promptable 2D masks per view, lifted to 3D, made consistent
 across views. That is what [`geometry/sam3d.py`](geometry/sam3d.py) implements.
 It is **not** Meta's SAM 3D Objects, which is a single-image mesh generator. If
 you meant the mesh generator, that is a different component and a different
-experiment — say so and it can be added, but note its weights are gated too.
+experiment, say so and it can be added, but note its weights are gated too.
 
 Availability, checked 21 August 2026:
 
 | model | status |
 |---|---|
-| `facebook/sam-vit-base` / `-large` / `-huge` | **open** — used by default |
+| `facebook/sam-vit-base` / `-large` / `-huge` | **open**, used by default |
 | `facebook/sam2-hiera-*` | open |
 | `facebook/sam3` | **gated**, manual approval |
 | `facebook/sam-3d-objects` | **gated**, manual approval |
@@ -241,22 +241,22 @@ Availability, checked 21 August 2026:
 
 The default cylinder segmentation keeps everything physically inside a cylinder
 about the plant axis. That is robust, but anything *inside* that cylinder counts
-as subject — a rig pole or bench edge directly behind the plant is kept. SAM3D
+as subject, a rig pole or bench edge directly behind the plant is kept. SAM3D
 cuts those away on appearance.
 
 SAM needs a prompt, and because the views are already registered, the projected
 plant axis and the bounding box of the geometric mask are free. So SAM3D refines
-the geometric mask rather than replacing it — which is why it needs no manual
+the geometric mask rather than replacing it, which is why it needs no manual
 clicks, and equally why it cannot recover a plant the geometric stage missed.
 
 Three rules keep SAM honest, and the third is what makes the result *3D* rather
 than twelve independent 2D segmentations:
 
-1. **3D gating** — the SAM mask is intersected with the working cylinder, so a
+1. **3D gating**. The SAM mask is intersected with the working cylinder, so a
    mask leaking onto the far wall is trimmed by geometry.
-2. **Coverage guard** — a mask covering implausibly much or little of its prompt
+2. **Coverage guard**, a mask covering implausibly much or little of its prompt
    box is rejected and that view falls back to geometry.
-3. **Multi-view agreement** — a mask whose back-projected points do not land
+3. **Multi-view agreement**, a mask whose back-projected points do not land
    where the other views' points already are is reverted.
 
 ### Running it
@@ -274,8 +274,8 @@ encoder; far faster on a GPU with `--sam-device cuda`.
 
 ## The full factorial
 
-SAM3D and DINO act at different stages — one changes what counts as the subject,
-the other changes how pixels become tokens — so they can interact. One-factor-
+SAM3D and DINO act at different stages, one changes what counts as the subject,
+the other changes how pixels become tokens, so they can interact. One-factor-
 at-a-time ablations cannot see that; the factorial can.
 
 ```bash
@@ -289,7 +289,7 @@ python -m ggssvt.cli factorial
 
 Conditions are compared on the **specimens that pass the quality gate under
 every segmenter**, not on whichever subset each pipeline happens to leave
-standing — otherwise the conditions would be scored on different plants.
+standing, otherwise the conditions would be scored on different plants.
 
 Effects are reported as paired bootstraps against the same control: the main
 effect of each factor, each factor *given* the other, and the interaction
@@ -301,7 +301,7 @@ harness prints the intervals rather than the point estimates alone, because with
 four conditions and a small sample, one arrangement looking good by luck is
 likely, not unlikely.
 
-### Factorial results, 26 specimens, frozen-feature probe
+### Factorial results: 26 specimens, frozen-feature probe
 
 |  | no DINO | DINOv2-base |
 |---|---|---|
@@ -341,7 +341,7 @@ not a finding it established.
 *The 26-specimen set is not a random subset of the 28.* Conditions are compared
 on the specimens usable under **both** segmenters, and SAM3D fails the quality
 gate on E015 and E019, which the geometric pipeline passes. Dropping those two
-moved the no-DINO/no-SAM3D control from 0.358 kg (n=28) to 0.306 kg (n=26) — a
+moved the no-DINO/no-SAM3D control from 0.358 kg (n=28) to 0.306 kg (n=26), a
 larger shift than any effect in the table. The comparison between cells is fair
 because all four see the same plants; the comparison against the earlier
 28-specimen numbers is not.
@@ -358,7 +358,7 @@ because all four see the same plants; the comparison against the earlier
 
 SAM accepted 96% of views (minimum 67% on the worst specimen) and removed 15.3%
 of subject pixels on average. The masks are tighter and more view-consistent,
-which is what it was added to do — but tighter masks also cost coverage and
+which is what it was added to do, but tighter masks also cost coverage and
 push two marginal specimens below the quality gate.
 
 ## Ablations
@@ -367,8 +367,8 @@ push two marginal specimens below the quality gate.
 python -m ggssvt.cli pretrain --no-geometry --out work_dirs/ggssvt/checkpoints/ablation.pt
 ```
 
-`--no-geometry` zeroes and freezes both geometric pathways — the Fourier
-back-projected positional code and the 3D-distance attention bias — leaving a
+`--no-geometry` zeroes and freezes both geometric pathways, the Fourier
+back-projected positional code and the 3D-distance attention bias, leaving a
 multi-view transformer of the same shape with no 3D prior. Everything else is
 identical, so the difference is attributable to geometry grounding alone.
 
@@ -386,7 +386,7 @@ Writes `transforms.json` into every specimen directory, plus the
 `rig_positions.json` and per-camera intrinsics that
 [`rig_calibration/make_transforms.py`](../rig_calibration/make_transforms.py)
 expects. That script was written against `calibrate_extrinsics.py` output that
-was never captured — the estimated rig supplies the same poses, so both paths now
+was never captured, the estimated rig supplies the same poses, so both paths now
 work.
 
 ```bash
@@ -404,7 +404,7 @@ ns-viewer --load-config outputs/M001/splatfacto/<timestamp>/config.yml
 **Always enable the camera optimiser.** The exported poses are estimated, not
 measured, and the azimuth refinement saturates its ±8° search bound on most
 specimens. Letting the radiance field refine them from image evidence is an
-independent estimate — and comparing the optimised poses against the exported
+independent estimate, and comparing the optimised poses against the exported
 ones is a direct, quantitative check on the registration this whole pipeline
 rests on.
 
@@ -418,12 +418,12 @@ Get it wrong and the scene trains upside down and back to front, which looks lik
 a failed reconstruction rather than a failed export.
 
 **Twelve views is thin.** Radiance fields normally want 50–200. The depth maps
-help — prefer `depth-nerfacto`, or splatfacto with depth — but expect floaters
+help (prefer `depth-nerfacto`, or splatfacto with depth) but expect floaters
 between the sparse viewpoints, especially above ~1.15 m where the frames truncate.
 
 **The vendored copy in `nerfstudio/` does not import.** `.gitignore` line 1 is
 `data/`, which matches at any depth and silently excluded
-`nerfstudio/nerfstudio/data/` — the dataparsers, datasets and pixel samplers — so
+`nerfstudio/nerfstudio/data/` (the dataparsers, datasets and pixel samplers) so
 it was never committed and is absent on disk. The ignore rule now carries a
 negation for that path, but the files still need restoring: install upstream
 Nerfstudio (`pip install nerfstudio`) or re-clone it into that directory. Either
@@ -438,10 +438,10 @@ python -m ggssvt.cli mesh --export work_dirs/ggssvt/meshes
 Marching cubes on the carved occupancy, then biomass from mesh descriptors:
 canopy surface area above the pot rim, enclosed volume by the divergence
 theorem, solidity (mesh volume over convex hull volume), area-to-volume ratio,
-and height. Validated against an analytic sphere — volume within 0.5%, area
+and height. Validated against an analytic sphere, volume within 0.5%, area
 carrying the known ~8% marching-cubes bias on a binary grid.
 
-### Results, 36 specimens, leave-one-out
+### Results: 36 specimens, leave-one-out
 
 | method | RMSE | MARE | R² |
 |---|---|---|---|
@@ -453,7 +453,7 @@ carrying the known ~8% marching-cubes bias on a binary grid.
 | canopy area allometric | 0.598 kg | 47.3% | −0.170 |
 
 **Do not read the ordering as a result.** The 3D-versus-2D difference is not
-statistically resolved in either direction — paired bootstrap [−0.051, +0.227] —
+statistically resolved in either direction (paired bootstrap [−0.051, +0.227])
 and it flips if features are whitened before the ridge. The same test on the
 earlier n=28 set gives [−0.168, +0.099], so the "reconstruction beats pixels"
 that used to head this table was never resolved either.
@@ -473,7 +473,7 @@ geometry 0.359 / 0.613, geometric 0.397 / 0.526, direct 2D 0.440 / 0.419.)*
 mass scales with its area while it encloses almost no volume, so canopy area
 should beat canopy volume. It does not: the single-term area law is the *worst*
 method tried, and head-to-head against the single-term volume law the difference
-is −0.020 kg with an interval spanning zero — the two are equally uninformative.
+is −0.020 kg with an interval spanning zero. The two are equally uninformative.
 
 The mechanism is worth stating, because it generalises. **A visual hull's surface
 area is envelope area, not leaf area.** Twelve views at 12 mm voxels cannot
@@ -481,7 +481,7 @@ resolve individual leaves, so the mesh measures the outside of the canopy, and
 the outside of a canopy carries no more information than its volume does.
 
 The multi-feature mesh set is the best of the 3D methods, though a paired
-bootstrap against the voxel features gives −0.037 kg, 95% CI [−0.128, +0.066] —
+bootstrap against the voxel features gives −0.037 kg, 95% CI [−0.128, +0.066],
 not resolved. Leave-one-feature-out shows **height**
 carrying it (removing height costs 0.051 kg; removing canopy area costs 0.001).
 
@@ -499,25 +499,25 @@ The Eucalyptus specimens fall into two batches with almost no overlap in mass:
 | **V001–V008** | 8 | **1.138 kg** | **spans both; sd 484 g, the widest of any batch** |
 
 **Knowing only which batch a specimen came from explained R² = 0.887 of the
-Eucalyptus mass variance** — more than any method achieved. And within either
+Eucalyptus mass variance**, more than any method achieved. And within either
 batch, nothing predicted anything: no method cleared R² = 0.2 on E001–E010 or
 E011–E020 taken alone, at n=10 and n=8.
 
 **V001–V008 was collected to break this.** Its masses run 500–1800 g, overlapping
 both existing batches rather than forming a third cluster, and it brings the
 batch-only R² down to **0.744** across the three Eucalyptus batches and **0.697**
-across all four. Still high, but the shortcut is no longer free — and the
+across all four. Still high, but the shortcut is no longer free, and the
 apparent 3D advantage went with it, which is the correct trade.
 
-So the models are recovering *which group a plant belongs to* — tall and sparse
-versus short and solid — rather than estimating mass among comparable plants.
+So the models are recovering *which group a plant belongs to*, tall and sparse
+versus short and solid, rather than estimating mass among comparable plants.
 Height and solidity are doing that work, which is exactly what the
 leave-one-feature-out analysis shows.
 
 This does not invalidate the reconstruction pipeline or the comparison harness.
 It does mean the honest claim is **"reconstructed geometry separates plant size
 classes"**, not "reconstructed geometry estimates biomass". The second claim
-needs specimens whose masses overlap across morphologies — the cheapest fix is
+needs specimens whose masses overlap across morphologies, the cheapest fix is
 a capture batch spanning a continuous mass range within one species, rather than
 more specimens of the two clusters already held.
 
@@ -528,7 +528,7 @@ python -m ggssvt.cli preprocess --views 4 --cache-dir work_dirs/ggssvt/cache_v4
 ```
 
 Only divisors of 12 give a uniform subset, so 2, 3, 4 and 6 are accepted and
-anything else is refused rather than approximated — an uneven subset clusters the
+anything else is refused rather than approximated, an uneven subset clusters the
 views on one side and biases the hull in a direction unrelated to the plant.
 
 ### Reconstruction quality, and it is monotone
@@ -543,7 +543,7 @@ views on one side and biases the hull in a direction unrelated to the plant.
 Usable count and multi-view agreement both improve monotonically with view count,
 which justifies the 12-view protocol on its own. The volume column is the blunter
 finding: **below twelve views the carve is uselessly loose.** A hull of 130–250 L
-above the pot rim, for plants weighing at most 2.35 kg, is not a reconstruction —
+above the pot rim, for plants weighing at most 2.35 kg, is not a reconstruction,
 four silhouettes simply do not constrain a branching plant. Four views at 90° is
 the classic visual-hull minimum for a convex object, and a plant is the opposite
 of convex.
@@ -555,7 +555,7 @@ columns do not depend on that scaling and are clean.
 ### The biomass comparison across view counts is not informative
 
 Only 15 specimens pass the quality gate under *every* view count, and on that
-subset almost every R² is negative — worse than predicting the mean. Twelve views
+subset almost every R² is negative, worse than predicting the mean. Twelve views
 against four is ΔRMSE −0.000 kg, 95% CI [−0.106, +0.105]. The apparent ordering
 is noise and should not be read; the reconstruction metrics above are the result.
 
@@ -563,8 +563,8 @@ is noise and should not be read; the reconstruction metrics above are the result
 
 `CARVE_MIN_INFORMATIVE_VIEWS = 6` and `CARVE_MAX_VOTES = 3` were tuned against
 the 12-view sweep. Held fixed, a four-view carve returns an **empty** volume
-rather than a poor one — no voxel can have six informative views when only four
-exist — so the first run of this ablation reported 0/30 usable at 3 and 4 views,
+rather than a poor one: no voxel can have six informative views when only four
+exist, so the first run of this ablation reported 0/30 usable at 3 and 4 views,
 which looks like a finding and is a leftover constant. Both thresholds now derive
 from the view count (half and a quarter respectively) unless passed explicitly,
 with a regression test that carves at 3, 4, 6 and 12 views and asserts none comes
@@ -583,12 +583,12 @@ sitting alongside this one looks like it should apply.
 | NeRF from SfM poses over a field traverse | 12 registered RGB-D views on a circle |
 
 Applying it would mean writing a mango and a eucalyptus procedural morphology
-model — which is the paper's central contribution, not a configuration change.
+model, which is the paper's central contribution, not a configuration change.
 
 **But its core idea is the principled fix for the failure documented above.** The
 canopy-area hypothesis failed because a visual hull's surface is *envelope* area,
 not leaf area: twelve views at 12 mm voxels cannot resolve individual leaves.
-Inverse procedural modelling sidesteps that entirely — it fits a biologically
+Inverse procedural modelling sidesteps that entirely, it fits a biologically
 plausible parametric model whose leaves are explicit, so leaf area becomes a
 *model parameter* rather than something the sensor has to see. That is exactly
 the quantity a leafy canopy's mass scales with.
@@ -598,7 +598,7 @@ is also the most promising route past the ceiling this dataset currently hits.
 
 ## Known limitations
 
-- **Registration is estimated, not measured.** See above.
+- **Registration is estimated: not measured.** See above.
 - **Tall specimens are truncated.** At the ~1 m working radius the vertical
   field of view reaches about 1.15 m above the floor. The E011–E020 eucalyptus
   saplings extend past the top of frame, so their canopies are cut off and their
@@ -612,7 +612,7 @@ is also the most promising route past the ceiling this dataset currently hits.
   carries `pot_weight_source = estimated`, so the target itself has unquantified
   error. Weighing a sample of empty pots would bound it cheaply.
 - **Two specimens fail the quality gate** (E012, E016) and `X001` has only two
-  views. That leaves 28 usable specimens across two species — enough to fit a
+  views. That leaves 28 usable specimens across two species, enough to fit a
   head, not enough for a strong generalisation claim.
 
 ## Layout

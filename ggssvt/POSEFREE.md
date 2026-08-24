@@ -10,7 +10,7 @@ against real weights**, because that needs the GPU.
 
 `dataset/calib` is empty. Every camera pose in this project comes from
 `geometry/rig.py` estimating them from the depth data, and the azimuth
-corrections **saturate the ±8° search bound on 25 of 30 specimens** — the least
+corrections **saturate the ±8° search bound on 25 of 30 specimens**, the least
 verified assumption in the pipeline.
 
 These three methods estimate pose from images alone. They are the independent
@@ -32,7 +32,7 @@ GPU time, which is not true of most remaining experiments.
 
 ## What is installed, and where
 
-Nothing was installed into the main environment — `pip install -r
+Nothing was installed into the main environment, `pip install -r
 requirements.txt` for these repos would fight the working pipeline over numpy and
 torch versions. They live in an isolated venv instead:
 
@@ -52,7 +52,7 @@ CropCraft root. Run the experiment with that venv's interpreter:
 ### Three things the old install instructions got wrong
 
 **DUSt3R and MASt3R have no `setup.py`.** The runbook said `pip install -e .` for
-both; it fails. They are used by putting the repo root on `sys.path` — which is
+both; it fails. They are used by putting the repo root on `sys.path`, which is
 what the `.pth` file does. Each repo adds its own vendored dependency to
 `sys.path` on import (`dust3r.utils.path_to_croco`,
 `mast3r.utils.path_to_dust3r`), so two entries cover all four packages.
@@ -60,7 +60,7 @@ what the `.pth` file does. Each repo adds its own vendored dependency to
 **Their two copies of `dust3r` do not collide.** MASt3R vendors dust3r at commit
 `3cc8c88` while the standalone clone is `4c24a6e`, which looks like a version
 conflict waiting to happen. `diff -rq` on the two package trees reports **zero
-differing files** — the commits differ elsewhere in the repo. One environment
+differing files**, the commits differ elsewhere in the repo. One environment
 hosts both safely. Fast3R namespaces its copy as `fast3r.dust3r`, so it never
 enters the argument.
 
@@ -79,14 +79,14 @@ pip install --no-deps -e third_party/fast3r
 ```
 
 `Warning, cannot find cuda-compiled version of RoPE2D, using a slow pytorch
-version instead` is expected and harmless — DUSt3R falls back to a pure-PyTorch
+version instead` is expected and harmless, DUSt3R falls back to a pure-PyTorch
 rotary embedding. Building the CUDA kernel (`croco/models/curope`) on the lab
 machine is worth ~15% and is optional.
 
 ### The one Python-version constraint
 
 **`open3d` has no Python 3.13 wheel, and Fast3R imports it at module top level**
-in `models/multiview_dust3r_module.py` — the module holding `estimate_camera_poses`.
+in `models/multiview_dust3r_module.py`, the module holding `estimate_camera_poses`.
 
 Stubbing `open3d` out confirms the pose path never touches it: it is there for
 ICP refinement this project does not use. But the import is unconditional, so on
@@ -105,11 +105,11 @@ against the installed code found one real error and confirmed the rest.
 
 **Fast3R was wrong in three ways.** There is no function named
 `inference_multiview`; the entry point is `inference_multiview.inference`. Its
-signature is `(views, model, device, dtype, ...)` — views first, model second,
+signature is `(views, model, device, dtype, ...)`, views first, model second,
 `dtype` required. And camera poses do **not** ride inside each prediction, which
 is what `_from_multiview` assumed: predictions carry point maps only, and poses
 come from a separate `MultiViewDUSt3RLitModule.estimate_camera_poses(preds, ...)`
-call. That is the method's whole design — one global PnP solve over every view,
+call. That is the method's whole design, one global PnP solve over every view,
 rather than the pairwise alignment DUSt3R and MASt3R run.
 
 Fixed, and `tests/test_pose_free_api.py` now pins every call the adapters make.
@@ -136,11 +136,11 @@ fail loudly at the start of a lab session, which is when you want to know.
 
 The driver is `scene_graph="complete"` with `symmetrize=True`: twelve views is
 66 unordered pairs run in both directions, so **132 forward passes per
-specimen**, then a 300-iteration global alignment. Measured, not assumed — the
+specimen**, then a 300-iteration global alignment. Measured, not assumed, the
 adapter's docstring used to say 66, which is half the real cost. Fast3R
 ingests all twelve in one pass instead, so it is the cheap one.
 
-Rough 4080 estimates — **time one specimen before trusting them**:
+Rough 4080 estimates, **time one specimen before trusting them**:
 
 | method | per specimen | 36 specimens |
 |---|---|---|
@@ -170,7 +170,7 @@ DUSt3R and Fast3R return geometry up to an **unknown global scale**. A volume
 computed from arbitrary scale measures the rescaling, not the plant, so both must
 go through `recover_scale_from_depth` first; `PoseFreeResult.is_metric` records
 which happened. MASt3R's `_metric` checkpoint is the exception and the reason to
-prefer it — use that checkpoint, not the others.
+prefer it, use that checkpoint, not the others.
 
 ### What to watch on the first run
 
@@ -197,7 +197,7 @@ calibration-free rig estimate is trustworthy**, so the comparison is against
 2. **Carve the volume from pose-free poses and re-run the plausibility check.**
    This is the experiment that matters. If the implied densities stay one to two
    orders of magnitude below plant tissue with better poses, then the visual hull
-   is simply the wrong instrument for these species — the strongest form of the
+   is simply the wrong instrument for these species, the strongest form of the
    [RERUN_V_BATCH.md](RERUN_V_BATCH.md) §3 argument, and no longer open to "your
    poses were bad".
 

@@ -57,6 +57,32 @@ def occupied_points(occupancy: np.ndarray, voxel_size_m: float = VOXEL_SIZE_M) -
     )
 
 
+# Viridis, as ten anchors interpolated on demand. The same ramp the project page
+# uses, so a specimen looks the same in the gallery as in the interactive viewer.
+# Perceptually uniform and monotonic in lightness, which the green tint this
+# replaced was not: mid-depth voxels there were indistinguishable from near ones
+# in greyscale or to a red-green colour-blind reader.
+VIRIDIS = np.array(
+    [
+        (68, 1, 84), (72, 40, 120), (62, 73, 137), (49, 104, 142),
+        (38, 130, 142), (31, 158, 137), (53, 183, 121), (110, 206, 88),
+        (181, 222, 43), (253, 231, 37),
+    ],
+    dtype=np.float64,
+)
+
+
+def viridis(t: np.ndarray) -> np.ndarray:
+    """Sample the ramp at ``t`` in [0, 1]. Returns ``(n, 3)`` uint8."""
+    t = np.clip(np.asarray(t, dtype=np.float64), 0.0, 1.0)
+    x = t * (len(VIRIDIS) - 1)
+    lo = np.clip(np.floor(x).astype(int), 0, len(VIRIDIS) - 2)
+    frac = (x - lo)[:, None]
+    return np.round(
+        VIRIDIS[lo] * (1.0 - frac) + VIRIDIS[lo + 1] * frac
+    ).astype(np.uint8)
+
+
 def render_volume(
     occupancy: np.ndarray,
     *,
@@ -66,8 +92,9 @@ def render_volume(
 ) -> np.ndarray:
     """Depth-cued orthographic projection of an occupancy grid.
 
-    Nearer voxels are drawn darker, so the projection reads as a solid shape
-    rather than a flat silhouette while still showing the whole extent.
+    Nearer voxels take the bright end of the viridis ramp, so the projection
+    reads as a solid shape rather than a flat silhouette while still showing the
+    whole extent.
 
     Returns:
         ``(size, size, 3)`` uint8.
@@ -95,16 +122,15 @@ def render_volume(
     u, v, depth = u[order], v[order], depth[order]
 
     span = max(1.0, depth.max() - depth.min())
-    shade = 60 + 150 * (depth - depth.min()) / span
+    # Near voxels take the bright end of the ramp. The top view reverses, because
+    # there "near" is the top of the plant rather than the side facing the camera.
+    position = (depth - depth.min()) / span
     if view != "top":
-        shade = 210 - shade + 60
+        position = 1.0 - position
+    colours = viridis(position)
 
-    for x, y, tone in zip(u, v, shade.astype(np.uint8)):
-        canvas[max(0, y - 1) : y + 1, max(0, x - 1) : x + 1] = (
-            int(tone * 0.35),
-            int(tone),
-            int(tone * 0.45),
-        )
+    for x, y, colour in zip(u, v, colours):
+        canvas[max(0, y - 1) : y + 1, max(0, x - 1) : x + 1] = colour
 
     return canvas
 

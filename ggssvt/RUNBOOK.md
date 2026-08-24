@@ -11,13 +11,13 @@ Everything in order, with what it costs.
 > after it.
 >
 > **Rebuild both caches before running anything**, then re-run the whole
-> campaign. The campaign's resume logic skips runs marked `done` — so delete
+> campaign. The campaign's resume logic skips runs marked `done`, so delete
 > `work_dirs/ggssvt/campaign/` first, or it will happily skip every stale run
 > you are trying to replace. See [RERUN_V_BATCH.md](RERUN_V_BATCH.md).
 
 **Hardware note.** This was first written for an RTX 4060 (8 GB). The lab card is
 an **RTX 4080: 16 GB and roughly three times the compute**. Same Ada
-architecture, so the `cu121` torch install is unchanged — but the VRAM ceiling
+architecture, so the `cu121` torch install is unchanged, but the VRAM ceiling
 that shaped the original settings is gone, and the epoch counts below are raised
 accordingly.
 
@@ -29,7 +29,7 @@ README instead of from here, you will start a multi-day run by accident.
 **The bottleneck moves to the CPU.** Each specimen means decompressing a 4 MB
 archive and back-projecting 2.5 M points. On a 4060 that overlapped with GPU
 work; on a 4080 it will not. Run with `--workers 8` throughout, and if
-`nvidia-smi` shows the GPU below about 70% utilisation, raise it further — a
+`nvidia-smi` shows the GPU below about 70% utilisation, raise it further, a
 faster card buys nothing while it waits on numpy.
 
 ---
@@ -70,7 +70,7 @@ Expected: `2.5.1+cu121 True NVIDIA GeForce RTX 4080`.
 python -m pytest tests/ -q
 ```
 
-**Expect `N passed, 7 skipped` — that is correct.** The seven are integration
+**Expect `N passed, 7 skipped`. That is correct.** The seven are integration
 tests in `test_pipeline.py` gated on the preprocessed cache, which does not exist
 yet: `work_dirs/` is gitignored because it holds about 120 MB of derived data
 that regenerates in minutes. They skip until step 1 has run, then join in.
@@ -83,7 +83,7 @@ are added, so it is not a useful check:
 | `0 failed`, 7 skipped | Correct, before preprocessing |
 | `0 failed`, 0 skipped | Correct, after preprocessing |
 | any failures | Fix before spending GPU hours |
-| errors during *collection* | A module is missing — see below |
+| errors during *collection* | A module is missing, see below |
 
 Collection errors reading `ModuleNotFoundError: No module named 'ggssvt.data'`
 mean the repository is out of date. Check with `git ls-files ggssvt/data/`, which
@@ -96,8 +96,8 @@ must list five files, and `git log --oneline -1` against the remote.
 Both are manual approvals by Meta and can take hours to days, so submit them
 first and let them run in the background.
 
-- DINOv3 — <https://huggingface.co/facebook/dinov3-vitb16-pretrain-lvd1689m>
-- SAM 3 / SAM 3D Objects — <https://huggingface.co/facebook/sam-3d-objects>
+- DINOv3, <https://huggingface.co/facebook/dinov3-vitb16-pretrain-lvd1689m>
+- SAM 3 / SAM 3D Objects, <https://huggingface.co/facebook/sam-3d-objects>
 
 ```bash
 hf auth login
@@ -112,7 +112,7 @@ python -m ggssvt.cli access
 It prints the authenticated account, where the token came from, and an OK/BLOCKED
 line per model. **Nothing needs a token added to it.** `hf auth login` writes one
 to `~/.cache/huggingface`, and `huggingface_hub` and `transformers` pick it up on
-their own — no function in this codebase takes a token argument, and no script
+their own, no function in this codebase takes a token argument, and no script
 should ever contain one.
 
 Two ways an approved model still reads BLOCKED:
@@ -121,8 +121,8 @@ Two ways an approved model still reads BLOCKED:
 but `access` reports BLOCKED, compare the name it prints against the account that
 was approved. Fix with `hf auth login --force`.
 
-**`HF_TOKEN` overriding the login.** If that variable is set — in `.bashrc`, a
-job script, a conda activation hook — it **takes precedence over `hf auth login`
+**`HF_TOKEN` overriding the login.** If that variable is set, in `.bashrc`, a
+job script, a conda activation hook. It **takes precedence over `hf auth login`
 entirely**, so logging in again changes nothing. `access` reports which source is
 in play. To clear it:
 
@@ -130,19 +130,19 @@ in play. To clear it:
 unset HF_TOKEN && python -m ggssvt.cli access
 ```
 
-For headless or batch jobs, `HF_TOKEN` is the right mechanism — just make sure it
+For headless or batch jobs, `HF_TOKEN` is the right mechanism, just make sure it
 holds the approved account's token, and keep it out of anything committed.
 
 Everything runs without either model; the DINOv3 cells simply report as skipped.
 
 ---
 
-## Morning — cheap, and it unblocks the afternoon
+## Morning, cheap, and it unblocks the afternoon
 
 ### 1. Build both caches (~4 min geometric, ~3 min SAM3D on GPU)
 
 `work_dirs/` is not in the repository, so on a fresh machine there is no cache at
-all and everything downstream — baselines, probes, factorial, training — has
+all and everything downstream (baselines, probes, factorial, training) has
 nothing to read.
 
 **Both commands are required, and the first one is easy to skip.** The default
@@ -170,10 +170,10 @@ does not roughly reproduce geometric features at **RMSE 0.544 / R² 0.030** and
 direct 2D at **0.469 / 0.279**, the preprocessing differed from the reference run
 and everything after it will too.
 
-**Those are the post-V001–V008 numbers, and 2D being ahead is expected — though
+**Those are the post-V001–V008 numbers, and 2D being ahead is expected, though
 the difference is not statistically resolved, so do not read it as a result.** If you see
 geometric features at 0.397 / 0.526 you are running the old 28-specimen cache
-without the V batch — check `dataset/ground_truth.csv` has `measured` in the
+without the V batch, check `dataset/ground_truth.csv` has `measured` in the
 `pot_weight_source` column for V001–V008, and re-run `preprocess`.
 
 Expect 36/38 specimens through the quality gate on the geometric cache. About 4 s/specimen for the
@@ -193,7 +193,7 @@ python -m ggssvt.cli pretrain --epochs 3 --workers 8 --batch-size 2 --device cud
 Note the seconds per epoch. **Every estimate below assumes ~12 s/epoch** on this
 card. Watch `nvidia-smi` while it runs: if utilisation sits low you are
 dataloader-bound and should raise `--workers` before anything else. Scale every
-duration below by whatever ratio you actually measure — do not trust these
+duration below by whatever ratio you actually measure, do not trust these
 numbers over your own stopwatch.
 
 ### 3. Full frozen-feature factorial (~10 min on GPU)
@@ -207,7 +207,7 @@ DINOv2-base was the best cell, but nothing was statistically resolved at n=26.
 Re-running adds the DINOv3 row if your access came through. Descriptors are
 cached, so the DINOv2 cells return instantly.
 
-### 3b. DINOv2-large — the best use of the extra VRAM (~15 min)
+### 3b. DINOv2-large, the best use of the extra VRAM (~15 min)
 
 ```bash
 python -m ggssvt.cli dino-probe --variant large --backbones dinov2
@@ -216,8 +216,8 @@ python -m ggssvt.cli dino-probe --variant large --backbones dinov2
 Do this one. The probe already shows DINOv2 small to base improving
 (RMSE 0.335 to 0.295), but a single pairwise delta at n=28 was not significant.
 **A third scale turns two points into a trend**, and a monotone
-small/base/large improvement is far more persuasive than any one comparison —
-it is evidence the backbone is doing something rather than that one run got
+small/base/large improvement is far more persuasive than any one comparison.
+It is evidence the backbone is doing something rather than that one run got
 lucky. ViT-L/14 is 300M frozen parameters; it did not fit comfortably in 8 GB and
 fits easily in 16.
 
@@ -235,7 +235,7 @@ python -m ggssvt.cli views
 ```
 
 Expect **0 of 25 plausible at four views** against 8 of 36 at twelve, and a
-median implied density of 9.2 kg/m³ — lighter than polystyrene. Agreement only
+median implied density of 9.2 kg/m³, lighter than polystyrene. Agreement only
 falls from 0.608 to 0.424 over the same range, which is why it is worth printing
 both.
 
@@ -245,7 +245,7 @@ both.
 python -m ggssvt.cli mesh --export work_dirs/ggssvt/meshes
 ```
 
-Marching cubes on the carved occupancy, then biomass from mesh descriptors —
+Marching cubes on the carved occupancy, then biomass from mesh descriptors,
 scored under the same leave-one-out protocol as every other method, so the table
 is directly comparable. It is currently the **best** method (RMSE 0.359,
 R² 0.613, against 0.397 / 0.526 for the voxel features), though the paired
@@ -274,17 +274,17 @@ Read this before interpreting anything the afternoon produces.
 
 *The batch confound, weakened but present.* E001–E010 average 0.538 kg and
 E011–E020 average 1.844 kg, with almost no overlap; batch membership alone
-explained **R² = 0.887**. V001–V008 was the batch that breaks it — 500–1800 g,
-overlapping every other batch — and takes it down to **0.744** across the three
+explained **R² = 0.887**. V001–V008 was the batch that breaks it, 500–1800 g,
+overlapping every other batch, and takes it down to **0.744** across the three
 Eucalyptus batches, **0.697** across all four. Still high. The comparison is
 partly measuring how well each method separates *size classes*.
 
 *The reconstructions are envelopes, not plants.* Measured mass over reconstructed
 above-ground volume implies a bulk density; fresh tissue is 300–900 kg/m³. Only
-**8 of 36** specimens land in a generous 200–1000 band — 25 imply less (the hull
+**8 of 36** specimens land in a generous 200–1000 band, 25 imply less (the hull
 enclosing air between leaves; all ten Mango at 26–77) and 3 imply more (thin
 stems never carved). No amount of training fixes a volume that is the wrong size
-for its mass, and this — not any RMSE ordering — is what to report.
+for its mass, and this, not any RMSE ordering, is what to report.
 
 **The 3D-versus-2D RMSE comparison is not resolved in either direction.** Paired
 bootstrap gives [−0.051, +0.227] on the current set and [−0.168, +0.099] on the
@@ -300,7 +300,7 @@ Decide the framing now rather than at examination:
 
 With more than a day on the machine, do not drive the training by hand. One
 command queues the whole programme, writes a JSON result per run, and **skips
-whatever already finished** — so a campaign that dies at 3am is restarted with
+whatever already finished**, so a campaign that dies at 3am is restarted with
 the same command and picks up where it stopped.
 
 ```bash
@@ -325,7 +325,7 @@ python -m ggssvt.campaign --plan full --device cuda --workers 8 --batch-size 2
 
 ### What the plans contain, and which question each run closes
 
-Runs are ordered so the hypothesis-answering ones come first — if the campaign is
+Runs are ordered so the hypothesis-answering ones come first, if the campaign is
 cut short, what completed is what the write-up needs.
 
 | run | closes | why |
@@ -334,8 +334,8 @@ cut short, what completed is what the write-up needs.
 | `h2_no_geometry` | **H2** | the geometry-grounding ablation; γ frozen at zero, capacity identical |
 | `h1_dinov2` | **H1** | ViT backbone against the CNN stem, inside the trained model |
 | `h3_bands_8_freq7` | **H3** | encoding matched to the grid Nyquist, 41.7 cyc/m |
-| `h3_bands_6_freq6` | **H3** | half the Nyquist, 20.8 cyc/m — expected to hurt |
-| `h3_bands_16_freq10` | **H3** | 8× the Nyquist, 333 cyc/m — expected to add nothing |
+| `h3_bands_6_freq6` | **H3** | half the Nyquist, 20.8 cyc/m, expected to hurt |
+| `h3_bands_16_freq10` | **H3** | 8× the Nyquist, 333 cyc/m, expected to add nothing |
 
 **Delete `work_dirs/ggssvt/campaign/` before the first re-run.** Resume works by
 skipping runs whose status is `done`, which is what you want after a crash and
@@ -343,7 +343,7 @@ exactly what you do not want after the targets changed.
 | `sam3d_cnn`, `sam3d_dinov2` | factorial | tests whether the probe's interaction survives training |
 | `h1_dinov3` | H1 | if access has been granted |
 
-`core` is six runs — roughly **8–10 hours** at 120 pretrain and 60 fine-tune
+`core` is six runs, roughly **8–10 hours** at 120 pretrain and 60 fine-tune
 epochs. `full` is nine, roughly 13–15 hours. Time one epoch first (step 2) and
 scale.
 
@@ -353,9 +353,9 @@ The campaign writes `summary.txt` and a per-run JSON carrying everything below.
 For the research status document you need, per run:
 
 - **RMSE, MAE, MARE, R²** with the bootstrap interval on RMSE
-- **occupancy AP and best-threshold IoU** — reconstruction quality, threshold-free
-- **parameter count**, total and trainable — H3's efficiency claim needs it
-- **the paired bootstrap against `baseline_cnn`**, not the two point estimates
+- **occupancy AP and best-threshold IoU**: reconstruction quality, threshold-free
+- **parameter count**: total and trainable, H3's efficiency claim needs it
+- **the paired bootstrap against `baseline_cnn`**: not the two point estimates
 
 And three things that are not in the JSON and must be recorded by hand:
 
@@ -368,7 +368,7 @@ And three things that are not in the JSON and must be recorded by hand:
 
 ---
 
-## Afternoon — the GPU work
+## Afternoon, the GPU work
 
 Budget roughly **three hours** for this block on this card. Do not try to run the full 2×3
 factorial with training today; at these settings that is six pretrain runs plus
@@ -387,7 +387,7 @@ python -m ggssvt.cli pretrain --epochs 120 --workers 8 --batch-size 2 --device c
 python -m ggssvt.cli pretrain --epochs 120 --workers 8 --batch-size 2 --device cuda --cache-dir work_dirs/ggssvt/cache_sam3d --out work_dirs/ggssvt/checkpoints/sam_cnn.pt
 ```
 
-The full 120 epochs, not the 60 the 8 GB plan called for — on this card you can
+The full 120 epochs, not the 60 the 8 GB plan called for, on this card you can
 afford the config default, so there is no deviation to justify in the methods
 section. That is worth more than it sounds: one fewer "reduced for compute
 reasons" caveat in the write-up.
@@ -404,7 +404,7 @@ python -m ggssvt.cli loocv --checkpoint work_dirs/ggssvt/checkpoints/geo_cnn.pt 
 60 fine-tune epochs rather than 25. Still well short of the 200 default, and that
 is defensible on more than time: the biomass head is initialised as an exact
 physical model (density × volume, zero residual), so it starts near a sensible
-solution rather than at random. Check the fold errors have actually flattened —
+solution rather than at random. Check the fold errors have actually flattened,
 if they are still falling at 60, raise it, because you now have the headroom.
 
 Time this. It sets whether step 6 fits before you go home.
@@ -417,7 +417,7 @@ python -m ggssvt.cli factorial --train --backbones cnn dinov2 --variant base --e
 
 Four cells: geometric×cnn, geometric×dinov2, sam3d×cnn, sam3d×dinov2. It prints
 the same paired-effect table as the frozen probe, so the two are directly
-comparable — **and that comparison is itself a result.** If the trained factorial
+comparable, **and that comparison is itself a result.** If the trained factorial
 reproduces the probe's sign flip (SAM3D alone hurts, SAM3D given DINO helps), the
 finding survives moving from pooled descriptors to the full model. If it does
 not, the probe was measuring an artefact of pooling.
@@ -426,14 +426,14 @@ Add `dinov3` to `--backbones` only if you have both the access and the hours.
 
 ---
 
-## Pose-free reconstruction — the registration check
+## Pose-free reconstruction, the registration check
 
 > **Read [POSEFREE.md](POSEFREE.md) first.** All three backends are installed and
 > their APIs verified against the real code; the install instructions that were
 > here before were wrong for two of the three (DUSt3R and MASt3R ship no
 > `setup.py`, so `pip install -e .` fails). That document has the working
 > dependency set, the Python 3.11 constraint that `open3d` imposes, and the run
-> order — Fast3R first, because it is twenty times cheaper and exercises the same
+> order, Fast3R first, because it is twenty times cheaper and exercises the same
 > comparison code.
 
 ```bash
@@ -456,7 +456,7 @@ python -m ggssvt.cli posefree --methods mast3r --device cuda
 
 **Run this for the poses, not for the biomass.** Every camera pose in the project
 is estimated from depth, and the azimuth refinement saturates its ±8° search
-bound on almost every specimen — so the registration is the least verified
+bound on almost every specimen, so the registration is the least verified
 assumption in the pipeline, and nothing inside the pipeline can test it. A
 pose-free method shares no failure mode with a depth-based registration, so the
 residual after similarity alignment is a real measurement of how wrong the poses
@@ -469,7 +469,7 @@ makes them only partly independent of the pipeline they are meant to check.
 MASt3R-metric has no such loop.
 
 The adapters are written against each project's documented interface but have
-**not been run against the real weights** — no GPU was available where they were
+**not been run against the real weights**: no GPU was available where they were
 written. The maths they feed is tested; the adapters are not. Watch the first run
 for import errors and convention drift rather than assuming quiet success.
 `sanity_check_result` warns if the cameras stop facing the scene, which is what a
@@ -477,7 +477,7 @@ convention change looks like.
 
 ---
 
-## Evening — Nerfstudio, in the other environment
+## Evening, Nerfstudio, in the other environment
 
 ```bash
 conda activate cropcraft
@@ -491,7 +491,7 @@ of the repository. Install upstream instead:
 pip install nerfstudio
 ```
 
-**Export the poses first — `ns-train` has nothing to read without them.** This
+**Export the poses first, `ns-train` has nothing to read without them.** This
 runs in the `ggssvt` environment, not `cropcraft`, and writes `transforms.json`
 into each specimen directory:
 
@@ -518,7 +518,7 @@ a radiance field recovers canopy the carve missed, or fails the same way.
 **Always pass the camera optimiser**, then diff the optimised poses against the
 exported ones. The azimuth refinement saturates its ±8° bound on almost every
 specimen, so a photometric estimate of the same poses is an independent
-measurement of how wrong the registration is — the single most valuable number
+measurement of how wrong the registration is, the single most valuable number
 available for the price of one training run.
 
 ---
@@ -552,7 +552,7 @@ across the 28 folds of a LOOCV sweep.
 
 ---
 
-## End of day — collect the results
+## End of day, collect the results
 
 ```bash
 python -m ggssvt.cli report --folds work_dirs/ggssvt/reports/folds_geo_cnn.json
@@ -568,7 +568,7 @@ python -m ggssvt.cli visualise --plants M003 E001 E011
 ```
 
 Rig overlays (the world axis projected into every view) and mask overlays. Run
-these if any registration looks suspect — if the red axis is not on the plant
+these if any registration looks suspect, if the red axis is not on the plant
 stem in all twelve frames, every number for that specimen is meaningless.
 
 ---
@@ -577,20 +577,20 @@ stem in all twelve frames, every number for that specimen is meaningless.
 
 | Command | Needs | Roughly |
 |---|---|---|
-| `inspect` | nothing | seconds — dataset audit, no computation |
-| `access` | network | seconds — HuggingFace account and model access |
+| `inspect` | nothing | seconds, dataset audit, no computation |
+| `access` | network | seconds, HuggingFace account and model access |
 | `preprocess` | dataset | 2–3 min per segmenter |
-| `baselines` | cache | seconds — LOOCV baseline table |
+| `baselines` | cache | seconds, LOOCV baseline table |
 | `mesh` | cache, scikit-image | ~1 min including the comparison |
-| `gallery` | cache | ~2 min — contact sheets, PLY, HTML viewer |
+| `gallery` | cache | ~2 min, contact sheets, PLY, HTML viewer |
 | `visualise` | dataset | seconds per specimen |
 | `dino-probe` | cache, network | 5–15 min depending on variant |
 | `factorial` | both caches | ~10 min frozen; hours with `--train` |
 | `pretrain` | cache, **GPU** | ~25 min at 120 epochs |
 | `loocv` | cache, checkpoint, **GPU** | ~40 min at 60 fine-tune epochs |
 | `experiment` | cache, **GPU** | one pretrain + one LOOCV per backbone |
-| `nerfstudio` | dataset | seconds — writes `transforms.json` |
-| `dashboard` | cache, mesh cache | ~1 min — the walkthrough page |
+| `nerfstudio` | dataset | seconds, writes `transforms.json` |
+| `dashboard` | cache, mesh cache | ~1 min, the walkthrough page |
 | `posefree` | cloned repos, **GPU** | minutes per specimen per method |
 | `mesh` | cache, scikit-image | ~1 min including the comparison |
 | `ggssvt.campaign` | cache, **GPU** | 8–15 h depending on plan |

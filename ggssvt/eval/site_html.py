@@ -127,7 +127,7 @@ HERO = """
       <img src="./static/images/contact_sheet.png" alt="Carved reconstructions of every specimen">
       <h2 class="subtitle has-text-centered caption">
         All __N__ specimens that pass the quality gate, carved from twelve RGB-D views each.
-        The V batch &mdash; eight Eucalyptus in 17&ndash;32&nbsp;kg pots &mdash; is the most
+        The V batch, eight Eucalyptus in 17&ndash;32&nbsp;kg pots, is the most
         recent addition and the one that changed the conclusions.
       </h2>
     </div>
@@ -142,8 +142,7 @@ HERO = """
         <h2 class="title is-3">Abstract</h2>
         <div class="content has-text-justified">
           <p>
-            Thirty-eight potted plants &mdash; Eucalyptus saplings and Mango seedlings &mdash;
-            were captured with two Kinect v2 units carried through six positions, giving twelve
+            Thirty-eight potted plants, Eucalyptus saplings and Mango seedlings, were captured with two Kinect v2 units carried through six positions, giving twelve
             registered RGB-D views each. No calibration target was ever recorded, so every camera
             pose here is estimated from the depth data itself. Space carving turns those views
             into a 128&sup3; occupancy field, from which volume, height and shape descriptors are
@@ -155,7 +154,7 @@ HERO = """
             bulk density, which can be checked against physics: fresh plant tissue runs
             300&ndash;900&nbsp;kg/m&sup3;. Only <strong>__PLAUSIBLE__ of __N__</strong> specimens
             land inside a deliberately generous 200&ndash;1000 band. Most fall far below it,
-            because a visual hull encloses the air between leaves and branches &mdash; what is
+            because a visual hull encloses the air between leaves and branches. What is
             being measured is the canopy envelope, not the plant. That single number explains
             why every 3D-derived biomass method here performs no better than regressing on the
             images directly, and it bounds what any hull-based method can achieve at this
@@ -190,13 +189,17 @@ BODY = """
     </p>
 
     <div class="controls">
-      <div class="buttons has-addons" id="segmenter"></div>
-      <div class="buttons has-addons" id="colour">
-        <button class="button is-small" data-mode="segment" aria-pressed="true">Pot vs canopy</button>
-        <button class="button is-small" data-mode="depth" aria-pressed="false">Depth</button>
+      <div id="segmenter"></div>
+      <div class="methodgroup">
+        <span class="grouplabel">Colour</span>
+        <div class="buttons has-addons" id="colour">
+          <button class="button is-small" data-mode="segment" aria-pressed="true">Pot vs canopy</button>
+          <button class="button is-small" data-mode="depth" aria-pressed="false">Depth</button>
+        </div>
       </div>
       <span class="is-size-7 has-text-grey" id="cloudinfo"></span>
     </div>
+    <p class="is-size-7 has-text-grey mb-4" id="methodnote"></p>
 
     <div class="viewer">
       <div>
@@ -207,7 +210,7 @@ BODY = """
         <div class="level is-mobile mt-3 mb-0">
           <div class="level-left">
             <div class="level-item">
-              <h3 class="title is-4 mb-0" id="sid">&mdash;</h3>
+              <h3 class="title is-4 mb-0" id="sid">&nbsp;</h3>
               <span class="tag is-light ml-2" id="sspecies"></span>
             </div>
           </div>
@@ -269,7 +272,7 @@ BODY = """
         <p class="is-size-7 mt-3">
           A visual hull encloses the space <em>between</em> leaves and branches, so for a canopy
           it measures the envelope rather than the plant. That is a property of the method at this
-          resolution, not a fitting problem &mdash; no regressor recovers mass from a volume an
+          resolution, not a fitting problem: no regressor recovers mass from a volume an
           order of magnitude too large.
         </p>
       </div>
@@ -282,8 +285,8 @@ BODY = """
         <p class="is-size-7 mt-3">
           So the comparison partly measures how well a method separates <em>size classes</em>,
           rather than how well it estimates mass among comparable plants. V001&ndash;V008 was
-          captured to break this &mdash; its masses span both existing clusters instead of forming
-          a third &mdash; and it did, though not all the way.
+          captured to break this. Its masses span both existing clusters instead of forming
+          a third, and it did, though not all the way.
         </p>
       </div>
     </article>
@@ -294,7 +297,7 @@ BODY = """
         <p>
           An earlier version of this page reported that 3D features beat image-only regression,
           0.397 against 0.440&nbsp;kg RMSE. Re-tested with a paired bootstrap that difference is
-          <strong>&minus;0.043&nbsp;kg, 95% CI [&minus;0.168, +0.099]</strong> &mdash; never
+          <strong>&minus;0.043&nbsp;kg, 95% CI [&minus;0.168, +0.099]</strong>, never
           resolved. The point estimate now goes the other way and is equally unresolved, and it
           flips again under a different feature-whitening choice. At this sample size the
           comparison cannot be settled by RMSE differences in either direction.
@@ -313,7 +316,7 @@ BODY = """
     <div class="content">
       <p>
         Every camera pose here is estimated from depth, and the azimuth refinement saturates its
-        search bound on almost every specimen &mdash; the least verified assumption in the
+        search bound on almost every specimen, the least verified assumption in the
         pipeline. Two explanations fit the implied-density result and they call for different
         fixes: either the visual hull is the wrong instrument for these species at any pose, or
         the poses are bad enough to inflate the hull.
@@ -376,7 +379,7 @@ def _keyfacts(summary: dict) -> str:
         (str(summary["n_specimens"]), "specimens"),
         (str(summary["n_views"]), "views each"),
         (f"{pl.get('n_plausible', 0)}/{pl.get('n', 0)}", "physically plausible"),
-        (str(summary.get("batch_confound_r2", "—")), "R² from batch alone"),
+        (str(summary.get("batch_confound_r2", ", ")), "R² from batch alone"),
     ]
     return "".join(
         f'<div class="keyfact"><div class="num">{value}</div>'

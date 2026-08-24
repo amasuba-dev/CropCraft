@@ -333,14 +333,72 @@ table.data tr.best td {
 }
 
 /* ------------------------------------------------------------------ *
- * Palette. Read by the canvas code through getComputedStyle, so these
- * are the single source of truth for both CSS and the point-cloud
- * rendering -- changing a colour here changes the viewer with it.
+ * Viridis. Perceptually uniform, monotonic in lightness, and readable
+ * in greyscale or with colour-vision deficiency, which the previous
+ * green-and-brown pairing was not.
+ *
+ * The canvas code reads these through getComputedStyle, so this block is
+ * the single source of truth for the CSS and the point-cloud rendering
+ * alike. The ten stops are the standard viridis anchors; the renderer
+ * interpolates between them.
  * ------------------------------------------------------------------ */
 :root {
-  --canopy: #2f8f4e;   /* above the pot rim */
-  --pot:    #a2795a;   /* pot and soil */
-  --near:   #3273dc;   /* depth ramp, close */
-  --far:    #d5dce8;   /* depth ramp, distant */
+  --v0: #440154;
+  --v1: #482878;
+  --v2: #3e4989;
+  --v3: #31688e;
+  --v4: #26828e;
+  --v5: #1f9e89;
+  --v6: #35b779;
+  --v7: #6ece58;
+  --v8: #b5de2b;
+  --v9: #fde725;
+
+  /* Categorical roles, taken from the same ramp so the page stays one family.
+     Sequential colour cannot encode a two-way split on its own, so these are
+     picked far enough apart to read as distinct rather than as an ordering. */
+  --pot:    var(--v1);
+  --canopy: var(--v7);
   --ink-3:  #b5b5b5;
+}
+
+/* The verdict dots stay outside viridis on purpose: green/amber/red is a
+   status convention readers already have, and borrowing the data palette for
+   it would suggest the three verdicts sit on a continuum. They do not. */
+
+/* Method toggle. Grouped by what actually differs between the entries: the
+   mask, the number of views, or the pose estimate. */
+#segmenter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+}
+
+.methodgroup {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.methodgroup .grouplabel {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9a9a9a;
+}
+
+.methodgroup .button {
+  margin-bottom: 0;
+}
+
+.methodgroup .buttons {
+  margin-bottom: 0;
+}
+
+/* The depth legend is a continuous ramp, so it gets a bar rather than a swatch. */
+.legend i.ramp {
+  width: 60px;
+  height: 8px;
+  border-radius: 2px;
+  margin: 0 4px;
 }

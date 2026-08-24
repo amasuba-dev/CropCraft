@@ -9,7 +9,7 @@ improves parameter efficiency **especially as relates to positional encodings fo
 3D spectral features**."* That mechanism is already in the model:
 `FourierFeatures` builds a geometric ladder of frequency bands and both the token
 embedding and the occupancy decoder position themselves with it. What was never
-implemented is a *separate wavelet branch* — the WaveFormer-style component. I
+implemented is a *separate wavelet branch*, the WaveFormer-style component. I
 conflated the two.
 
 Once measured rather than assumed, H3 turns out to be **the best-evidenced
@@ -23,12 +23,12 @@ on collected data, and the two that are not need one GPU run each.
 The reference papers point at two different meanings of "frequency", and both
 are live in this work.
 
-**Spectral frequency** — the Fourier content of the plant's geometry, and the
+**Spectral frequency**, the Fourier content of the plant's geometry, and the
 bandwidth of the encoding that represents it. This is the survey's territory
 (*Frequency-Informed Vision and Learning*, and the Frequency Principle) and the
 SFAE paper's.
 
-**Angular sampling frequency** — how densely viewpoints are sampled around the
+**Angular sampling frequency**, how densely viewpoints are sampled around the
 plant. This is Bresolin et al.'s question in *J. Dairy Sci.* 106:664–675, where
 the finding was that the optimal image-acquisition frequency is
 **phenotype-specific**, not universal. The direct analogue here is the view-count
@@ -42,8 +42,8 @@ result below is that **they are independent**.
 
 ## H3 restated
 
-> Frequency grounding acts on two independent axes — the spectral bandwidth of
-> the positional encoding, and the angular sampling rate of acquisition — and the
+> Frequency grounding acts on two independent axes, the spectral bandwidth of
+> the positional encoding, and the angular sampling rate of acquisition, and the
 > requirement on each is **structure-specific rather than universal**. Matching
 > the encoding to the representable bandwidth improves parameter efficiency at no
 > cost in reconstruction quality.
@@ -52,7 +52,7 @@ Six sub-claims, each a separate measurement.
 
 ---
 
-## H3a — Plant occupancy spectra are structure-specific ✅ **established**
+## H3a, Plant occupancy spectra are structure-specific ✅ **established**
 
 Radial power spectrum of each carved 128³ volume, 28 specimens.
 
@@ -68,7 +68,7 @@ branching ones. A pot is a smooth solid of revolution and lives at low
 frequency; a canopy of thin leaves does not. The spectrum measures exactly the
 structural difference that the rest of this project keeps running into.
 
-## H3b — The encoding is over-provisioned for the grid ✅ **established**
+## H3b. The encoding is over-provisioned for the grid ✅ **established**
 
 Over the working extent (128 voxels × 12 mm = 1.536 m):
 
@@ -76,7 +76,7 @@ Over the working extent (128 voxels × 12 mm = 1.536 m):
 |---|---|---|---|
 | 16 bands @ 2¹⁰ | 333.3 cycles/m | 99 | 19,340,578 |
 | **10 bands @ 2⁸ (current)** | **83.3 cycles/m** | **63** | **19,326,754** |
-| 8 bands @ 2⁷ | **41.7 — the grid Nyquist exactly** | 51 | 19,322,146 |
+| 8 bands @ 2⁷ | **41.7, the grid Nyquist exactly** | 51 | 19,322,146 |
 | 6 bands @ 2⁶ | 20.8 cycles/m | 39 | 19,317,538 |
 | voxel grid Nyquist (12 mm) | 41.7 cycles/m | — | — |
 
@@ -85,19 +85,19 @@ represent.** Everything above 41.7 cycles/m is spent describing detail the
 occupancy field cannot carry, and 2⁷ is the exact match.
 
 **But state the efficiency claim honestly.** Trimming 10 bands to 6 removes 24
-encoding dimensions and **9,216 parameters out of 19.3 million — 0.05%**. As a
+encoding dimensions and **9,216 parameters out of 19.3 million, 0.05%**. As a
 parameter count that is nothing, because the encoding feeds an MLP whose width
 dominates the budget. The defensible version of H3's "parameter efficiency" is
 therefore not *fewer weights* but *representational allocation*: whether the
 capacity spent on unrepresentable octaves buys anything. H3e measures that, and a
-null result there is itself the finding — it would say the encoding's reach is
+null result there is itself the finding. It would say the encoding's reach is
 not what limits this model, which is worth knowing precisely because the proposal
 assumed otherwise.
 
-## H3c — Half the dataset saturates the grid Nyquist ✅ **established**
+## H3c, Half the dataset saturates the grid Nyquist ✅ **established**
 
 Every Mango specimen **and every V specimen** reports a 95% bandwidth of
-**41.7 ± 0.0** cycles/m — exactly the Nyquist limit. Not near the ceiling, *at*
+**41.7 ± 0.0** cycles/m, exactly the Nyquist limit. Not near the ceiling, *at*
 it, for all eighteen.
 
 **The voxel resolution, not the method, is the binding constraint for half the
@@ -106,14 +106,14 @@ No architectural change recovers detail the grid cannot hold; only a finer grid
 can, and that is a directly testable prediction.
 
 The V batch strengthened this from a Mango quirk into a general property of the
-morphologies here — and it arrives alongside the finding that these same
+morphologies here, and it arrives alongside the finding that these same
 reconstructions are canopy envelopes rather than plants
 ([RERUN_V_BATCH.md](RERUN_V_BATCH.md) §3). Both point at resolution: a grid too
 coarse to resolve a leaf cannot do anything but enclose the space around it.
 **Of everything in this project, halving the voxel size is the change with the
 clearest predicted effect.**
 
-## H3d — The two axes are independent ✅ **established, and counter-intuitive**
+## H3d. The two axes are independent ✅ **established, and counter-intuitive**
 
 Reconstruction versus angular sampling, by structural group:
 
@@ -125,7 +125,7 @@ Reconstruction versus angular sampling, by structural group:
 
 *(multi-view agreement; usable fraction under the quality gate)*
 
-**The optimal angular sampling rate is structure-specific** — Bresolin et al.'s
+**The optimal angular sampling rate is structure-specific**, Bresolin et al.'s
 phenotype-specific finding, reproduced in a completely different modality.
 
 And the direction is the opposite of what the spectra would predict. Mango has
@@ -140,7 +140,7 @@ gives every view plenty of evidence; a small tuft on a large pot gives very litt
 per view and needs many of them. **Bandwidth does not predict view requirement**,
 and that non-obviousness is what makes the pair worth reporting together.
 
-## H3e — Where the encoding's reach should sit ⏳ **needs training**
+## H3e, Where the encoding's reach should sit ⏳ **needs training**
 
 The prediction from H3b. Three runs bracket the grid Nyquist against
 `baseline_cnn`'s 2⁸:
@@ -160,22 +160,22 @@ paired bootstrap against baseline. The shape of the curve is the result: flat
 from 2¹⁰ down to 2⁷ and dropping at 2⁶ confirms the grid Nyquist is the right
 place to set the encoding, and that the mechanism is band-limiting rather than
 capacity. A curve that is flat *everywhere*, 2⁶ included, says the encoding's
-reach is not a binding constraint on this model at all — also a result, and one
+reach is not a binding constraint on this model at all, also a result, and one
 that redirects the efficiency argument away from the encoding.
 
 Do not report this as a parameter saving. It is 0.05% of the weights.
 
-## H3f — The Frequency Principle governs what converges ⏳ **needs training**
+## H3f, The Frequency Principle governs what converges ⏳ **needs training**
 
 The F-Principle predicts a network fits low frequencies first. For a branching
 plant the low frequencies are the pot and the trunk; the high frequencies are the
-branches — the structures this project keeps failing to recover.
+branches. The structures this project keeps failing to recover.
 
 `eval/frequency.band_error` decomposes reconstruction error by radial frequency
 band. Logging it per epoch during pretraining tests the prediction directly, and
 if the high-band error plateaus while the low bands converge, that is a
 *mechanistic* explanation for the thin-structure problem rather than an
-observation of it — and it connects the spectral argument to Paper 1's
+observation of it, and it connects the spectral argument to Paper 1's
 F-score-versus-IoU gap.
 
 Cheap to add: call `band_error` on a held-out specimen every ten epochs.
@@ -186,7 +186,7 @@ Cheap to add: call `band_error` on a held-out specimen every ten epochs.
 
 H3 was the weakest hypothesis on paper and is now among the strongest in
 evidence. Four sub-claims are established on collected data, two need one GPU run
-each, and one of them — H3d — is a genuinely counter-intuitive finding with a
+each, and one of them, H3d, is a genuinely counter-intuitive finding with a
 published precedent in a different field to cite against.
 
 It also earns its place in the argument rather than sitting beside it:

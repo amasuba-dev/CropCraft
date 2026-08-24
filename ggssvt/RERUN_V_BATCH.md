@@ -31,7 +31,7 @@ The useful part is that the error is systematic:
 > **pot estimated / pot measured = 0.891, sd 0.018** across all eight.
 
 A consistent 10.9% under-estimate of pot mass with almost no scatter. That is a
-calibration, not a bias to be lamented — it puts an error bar on the E and M net
+calibration, not a bias to be lamented. It puts an error bar on the E and M net
 masses, which are **still estimates**:
 
 | group | net as recorded | if the same −10.9% bias applies |
@@ -42,7 +42,7 @@ masses, which are **still estimates**:
 
 E001–E010 is worst affected because the pot is most of the total. Carry this as a
 stated uncertainty on every result involving those batches, and weigh the pots
-directly on the next capture — it is a scale and ten minutes.
+directly on the next capture. It is a scale and ten minutes.
 
 ---
 
@@ -54,7 +54,7 @@ of above-ground volume for a 1.0 kg shoot, an implied density of 65 kg/m³ where
 fresh tissue is 300–900.
 
 `ggssvt/geometry/pot.py` now estimates the rim per specimen from the occupancy
-profile. A rim is a **step**, not a slope, so the test is local — the median
+profile. A rim is a **step**, not a slope, so the test is local, the median
 cross-section just below a candidate height against the median just above.
 
 **It refuses more often than it answers, and that is the useful part.**
@@ -66,14 +66,14 @@ cross-section just below a candidate height against the median just above.
 | Mango | 10 | 8 | 0.468 ± 0.055 m |
 | V001–V008 | 8 | 8 | 0.354 ± 0.036 m |
 
-E001–E010 carve as single cones — 645 voxels at the floor decaying evenly to 140
+E001–E010 carve as single cones, 645 voxels at the floor decaying evenly to 140
 and then stopping, with no pot/plant boundary anywhere. Nine of ten now return
 `confident=False` and fall back to the constant. That is the truthful answer:
 **those reconstructions do not separate plant from pot at all**, which has been
 suspected throughout and is now measured.
 
 An earlier version of this estimator thresholded against the widest slice and
-returned three different confident rims — 0.432, 0.336, 0.432 m — for three
+returned three different confident rims (0.432, 0.336, 0.432 m) for three
 specimens of the same batch. Worth remembering as a caution: a detector that
 always answers is not the same as a detector that works.
 
@@ -96,7 +96,7 @@ above-ground tissue is roughly 300–900 kg/m³.
 **Only 8 of 36 reconstructions are the right size to weigh what the plant
 weighs.** Twenty-five are envelopes: the visual hull has enclosed the air between
 leaves and branches, so the quantity being regressed is the canopy envelope and
-not the plant. Every Mango specimen sits at 26–77 kg/m³ — one to two orders of
+not the plant. Every Mango specimen sits at 26–77 kg/m³, one to two orders of
 magnitude short, which no regressor repairs. Three imply *more* than plausible,
 meaning thin stems were never carved; E019 implies 22,569 kg/m³ because
 essentially none of it was reconstructed.
@@ -114,7 +114,7 @@ object, by this factor, for these species".
 ### It was never resolved, in either direction
 
 The proposal's third research question was answered at n=28 with "reconstruction
-beats pixels" — 0.397 kg RMSE against 0.440. Re-tested with a paired bootstrap on
+beats pixels", 0.397 kg RMSE against 0.440. Re-tested with a paired bootstrap on
 exactly that condition:
 
 > **dRMSE −0.043 kg, 95% CI [−0.168, +0.099]. Not resolved.**
@@ -135,7 +135,7 @@ Adding V flips the point estimate, and it stays unresolved:
 
 The DINO probe whitens by rotating onto principal components before
 standardising; the baselines table standardises the raw features. On seven
-features PCA keeps all seven, so this is a pure rotation — same data, same ridge
+features PCA keeps all seven, so this is a pure rotation, same data, same ridge
 penalty, different regulariser. Run both feature sets through both protocols:
 
 | protocol | 3D RMSE / R² | 2D RMSE / R² | ahead |
@@ -152,7 +152,7 @@ Paired bootstrap, 20,000 resamples, dRMSE = 3D − 2D:
 
 **Neither direction is resolved, and the winner changes with a preprocessing
 choice that has no principled justification either way.** The honest statement is
-that **at n=36 this comparison cannot be settled by RMSE differences at all** —
+that **at n=36 this comparison cannot be settled by RMSE differences at all**,
 not that 3D lost.
 
 This also means the two tables in this project are not comparable: the probe's
@@ -169,8 +169,8 @@ RQ3 should be answered with.
 
 ### Within species, where the confound is weakest, 3D fails outright
 
-The pooled comparison mixes species. Restricting to Eucalyptus — now 26
-specimens including V, the least confounded set this project has — is the
+The pooled comparison mixes species. Restricting to Eucalyptus, now 26
+specimens including V, the least confounded set this project has, is the
 sharpest available test:
 
 | method | RMSE | R² |
@@ -186,11 +186,11 @@ the same story, at R² −1.971 against the mean's −0.235.
 An R² below the mean-predictor floor is a different kind of statement from losing
 a head-to-head: it says the feature carries no usable signal about mass at this
 resolution, rather than less signal than a rival. It is also exactly what §3
-predicts — a volume that is an envelope has nothing to regress against — and it
+predicts, a volume that is an envelope has nothing to regress against, and it
 is consistent across both species. **This, not the pooled ordering, is the
 result worth reporting.**
 
-### The batch confound weakened — because V was designed to break it
+### The batch confound weakened, because V was designed to break it
 
 | set | batch-only R² |
 |---|---|
@@ -231,8 +231,8 @@ gate's E012/E016):
 | SAM3D given DINO | +0.005 | [−0.007, +0.019] | no effect |
 
 **The hand-crafted descriptors are fragile to the segmentation; the learned
-features are not.** SAM3D alone drives the geometric descriptors to R² −0.967 —
-far below the mean-predictor floor — while DINO moves 0.385 to 0.390, an effect
+features are not.** SAM3D alone drives the geometric descriptors to R² −0.967,
+far below the mean-predictor floor, while DINO moves 0.385 to 0.390, an effect
 of 5 grams.
 
 That follows directly from §3. Those descriptors summarise a volume that is a
@@ -245,7 +245,7 @@ so bad, so it evidences descriptor fragility more than it evidences DINO's value
 DINO against neither is still unresolved.
 
 At n=26 all four cells sat within 0.295–0.317 kg with nothing resolved. Adding a
-batch that does not share the others' size structure blew the spread wide open —
+batch that does not share the others' size structure blew the spread wide open,
 which is what happens to features that were reading size.
 
 ---
@@ -261,7 +261,7 @@ V re-run through the spectral characterisation:
 | Mango | 10 | **41.7 ± 0.0** | 0.273 ± 0.020 |
 | **V001–V008** | 8 | **41.7 ± 0.0** | 0.257 ± 0.025 |
 
-Grid Nyquist is 41.7 cycles/m. **H3c now covers 18 of 36 specimens, not 10** —
+Grid Nyquist is 41.7 cycles/m. **H3c now covers 18 of 36 specimens, not 10**,
 both Mango and V saturate the grid exactly. Resolution, not method, is the
 binding constraint for half the dataset. The 12 mm voxel is now the most
 defensible thing to change next.
@@ -278,7 +278,7 @@ defensible thing to change next.
 | **12** | **36/38** | **0.608** | **10.4 L** | **8/36** | **116.8** |
 
 **At four views, zero of twenty-five reconstructions are physically capable of
-weighing what the plant weighs.** Median implied bulk density 9.2 kg/m³ —
+weighing what the plant weighs.** Median implied bulk density 9.2 kg/m³,
 lighter than expanded polystyrene, thirty to ninety times below plant tissue, and
 hulls averaging 126 L for plants of at most 2.35 kg.
 
@@ -287,7 +287,7 @@ the opposite, and every unsampled azimuth leaves a prism of empty space uncarved
 
 So the sampling question has a physical answer rather than a judgement call: **no,
 four images will not do**, and the agreement score alone would never have said so
-that clearly — it degrades gently from 0.608 to 0.424 while the reconstructions
+that clearly. It degrades gently from 0.608 to 0.424 while the reconstructions
 stop being reconstructions.
 
 ---
@@ -302,22 +302,22 @@ throughout: 2 views, one specimen, a species of its own.
 ## What to do with this
 
 **Report readily.** The pot-weight bias calibration (§1). The plausibility
-diagnostic and the 8-of-36 result (§3) — this is a genuine methodological
+diagnostic and the 8-of-36 result (§3). This is a genuine methodological
 contribution, not a negative result to bury. The confound weakening (§4).
 
-**Reframe.** Drop "3D reconstruction improves biomass estimation" — it was never
+**Reframe.** Drop "3D reconstruction improves biomass estimation". It was never
 resolved and the point estimate is not stable. Replace it with what the data does
 support: *visual-hull reconstruction of these species recovers the canopy
 envelope rather than the plant, with implied bulk densities one to two orders of
 magnitude below plant tissue, so its volume cannot carry mass information.* That
 is a stronger chapter, because it rests on a physical measurement instead of a
-difference in means at small n — and it explains the weak RMSE numbers rather
+difference in means at small n, and it explains the weak RMSE numbers rather
 than merely reporting them.
 
 **Do next, in order.**
 1. Weigh pots directly for any future capture. Ten minutes, removes the largest
    single uncertainty in the ground truth.
-2. Re-run the campaign on the GPU against the corrected targets — every trained
+2. Re-run the campaign on the GPU against the corrected targets, every trained
    number in `RESEARCH_STATUS.md` predates this correction.
 3. Test the resolution prediction from §5: a finer voxel grid on the 18
    Nyquist-saturated specimens.

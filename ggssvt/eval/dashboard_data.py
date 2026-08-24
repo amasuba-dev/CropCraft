@@ -95,16 +95,13 @@ def build_payload(
     """Collect specimens, reconstructions, mesh metrics and biomass results."""
     from ..data.preprocess import load_cached, load_quality, usable_plant_ids
     from .baselines import load_features
-    from .factorial import CACHE_DIRS
     from .mesh_baseline import evaluate_with_mesh
+    from .methods import UNSUPPORTED, describe
+    from .methods import cache_dirs as available_cache_dirs
     from .metrics import paired_bootstrap_difference
     from .plausibility import classify, summarise
 
-    cache_dirs = cache_dirs or {
-        name: path
-        for name, path in CACHE_DIRS.items()
-        if (path / "quality.json").exists()
-    }
+    cache_dirs = cache_dirs or available_cache_dirs()
     if "geometric" not in cache_dirs:
         raise RuntimeError("the geometric cache is required; run preprocess first")
 
@@ -133,7 +130,12 @@ def build_payload(
                 cached = load_cached(plant_id, path)
             except FileNotFoundError:
                 continue
-            entry["clouds"][name] = _quantise(cached.occupancy)
+            # The sparse-view hulls balloon to fifteen times the volume, so they
+            # carry many more occupied voxels and compress worse. They are on the
+            # page to show that ballooning, which reads fine at a third of the
+            # point budget, and the full budget would quadruple the page weight.
+            budget = 18000 if name in ("geometric", "sam3d") else 6000
+            entry["clouds"][name] = _quantise(cached.occupancy, max_points=budget)
             entry.setdefault("species", cached.species)
             entry.setdefault("target_kg", round(float(cached.target_kg), 3))
             # Per-specimen rim, so the pot/canopy split drawn in the viewer is
@@ -224,7 +226,10 @@ def build_payload(
     summary = {
         "n_specimens": len(plant_ids),
         "n_views": 12,
-        "segmenters": sorted(cache_dirs),
+        "methods_available": [k for k in describe() if k in cache_dirs],
+        "method_info": {k: v for k, v in describe().items() if k in cache_dirs},
+        "methods_excluded": UNSUPPORTED,
+        "segmenters": sorted(cache_dirs),   # kept: older readers of this payload
         "species": sorted({s["species"] for s in specimens}),
         "mass_range_kg": [round(float(targets.min()), 2), round(float(targets.max()), 2)],
         "pot_height_m": POT_HEIGHT_M,   # fallback only; specimens carry their own

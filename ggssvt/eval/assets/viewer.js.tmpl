@@ -1,13 +1,29 @@
 const D = __PAYLOAD__;
 const S = D.specimens, byId = new Map(S.map(s => [s.id, s]));
-let current = S[0].id, segmenter = D.summary.segmenters[0], colourMode = "segment";
+let current = S[0].id, colourMode = "segment";
+// Registry order, so the geometric carve is the default rather than whatever
+// sorts first alphabetically.
+let segmenter = (D.summary.methods_available || D.summary.segmenters)[0];
 let yaw = 0.62, pitch = 0.2, zoom = 0.9;
 
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const hex = h => { h=h.replace("#",""); if(h.length===3) h=h.split("").map(c=>c+c).join("");
   return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]; };
 const mix = (a,b,t) => Math.round(a+(b-a)*t);
-const f = (v,d=2) => (v===null||v===undefined||Number.isNaN(v)) ? "—" : Number(v).toFixed(d);
+
+/* Viridis, read from the ten CSS stops and interpolated. Sampled once at load
+   rather than per point: getComputedStyle inside the draw loop would dominate
+   the frame time for a 20,000-point cloud. */
+const VIRIDIS = Array.from({length:10}, (_,i) => hex(css("--v"+i)));
+function viridis(t){
+  t = t < 0 ? 0 : (t > 1 ? 1 : t);
+  const x = t * (VIRIDIS.length - 1);
+  const i = Math.min(VIRIDIS.length - 2, Math.floor(x)), k = x - i;
+  const a = VIRIDIS[i], b = VIRIDIS[i+1];
+  return [mix(a[0],b[0],k), mix(a[1],b[1],k), mix(a[2],b[2],k)];
+}
+const rgb = c => `rgb(${c[0]},${c[1]},${c[2]})`;
+const f = (v,d=2) => (v===null||v===undefined||Number.isNaN(v)) ? ", " : Number(v).toFixed(d);
 
 async function inflate(b64){
   const bin = Uint8Array.from(atob(b64), c=>c.charCodeAt(0));
@@ -73,7 +89,6 @@ function draw(canvas, c, {dot=3, mode=colourMode, yawL=yaw, pitchL=pitch, zoomL=
   let dmin=Infinity,dmax=-Infinity;
   for(let i=0;i<c.n;i++){const d=P[i*3+2]; if(d<dmin)dmin=d; if(d>dmax)dmax=d;}
   const dspan = Math.max(1e-6,dmax-dmin);
-  const nc=hex(css("--near")), fc=hex(css("--far"));
   const cc=hex(css("--canopy")), pc=hex(css("--pot"));
   const pot = potHeight(c);
 
@@ -86,7 +101,7 @@ function draw(canvas, c, {dot=3, mode=colourMode, yawL=yaw, pitchL=pitch, zoomL=
       const k = 0.55+0.45*t;
       col = `rgb(${Math.round(base[0]*k)},${Math.round(base[1]*k)},${Math.round(base[2]*k)})`;
     } else {
-      col = `rgb(${mix(fc[0],nc[0],t)},${mix(fc[1],nc[1],t)},${mix(fc[2],nc[2],t)})`;
+      col = rgb(viridis(t));
     }
     ctx.fillStyle=col; ctx.fillRect(sx,sv,dot,dot);
   }
@@ -108,8 +123,9 @@ function drawSlices(c){
     const ctx=cv.getContext("2d");
     ctx.fillStyle="#f5f5f5"; ctx.fillRect(0,0,180,180);
     const isCanopy = lo >= pot;
-    const base = hex(isCanopy ? css("--canopy") : css("--pot"));
-    ctx.fillStyle = `rgb(${base[0]},${base[1]},${base[2]})`;
+    // Position along the ramp, so the strip reads bottom-to-top as one gradient
+    // and the pot/canopy boundary still shows through the marker below.
+    ctx.fillStyle = rgb(viridis(hmax > 0 ? (lo + hi) / 2 / hmax : 0));
     let count=0;
     for(let i=0;i<c.n;i++){
       if(c.h[i]<lo||c.h[i]>=hi) continue;
@@ -143,7 +159,7 @@ function methodTable(){
     const cell = m.name===ref ? '<span class="has-text-grey">reference</span>'
       : v ? `${v.difference>0?"+":""}${f(v.difference,3)}
              <span class="tag is-small ${v.resolved?"is-success":"is-light"}">${v.resolved?"resolved":"not resolved"}</span>`
-          : "—";
+          : ", ";
     return `<tr class="${i===0?"best":""}"><td>${m.name}</td>
       <td>${f(m.rmse_kg,3)}</td><td>${f(m.mae_kg,3)}</td>
       <td>${f(m.mare_pct,1)}</td><td>${f(m.r2,3)}</td>
@@ -167,7 +183,7 @@ function honesty(){
   const s=D.summary;
   document.getElementById("confound").innerHTML =
     `Across the Eucalyptus specimens, knowing only which capture batch a plant came from
-     explains <strong>R² = ${s.batch_confound_r2}</strong> of the mass variance &mdash;
+     explains <strong>R² = ${s.batch_confound_r2}</strong> of the mass variance,
      more than any method in the table above achieves. The batches average
      ${Object.entries(s.batch_means_kg).map(([k,v])=>`<strong>${v} kg</strong> (${k})`).join(", ")}.
      It was R² = 0.887 on the two original batches alone.`;
@@ -178,7 +194,7 @@ function honesty(){
      <strong>${pl.n_plausible} of ${pl.n}</strong> specimens land inside a generous
      ${pl.band_kg_m3[0]}&ndash;${pl.band_kg_m3[1]} band; the median is
      <strong>${pl.median_density_kg_m3} kg/m³</strong>.
-     ${pl.verdicts.envelope || 0} imply less &mdash; the hull enclosing air &mdash; and
+     ${pl.verdicts.envelope || 0} imply less, the hull enclosing air, and
      ${pl.verdicts.missing || 0} imply more, meaning they were barely reconstructed.`;
   document.getElementById("notes").innerHTML =
     "<ul>" + Object.values(D.notes).map(t=>`<li>${t}</li>`).join("") + "</ul>";
@@ -211,7 +227,8 @@ function scatter(){
   ctx.fillText("predicted mass (kg)",0,0); ctx.restore();
 
   const palette={};
-  D.summary.species.forEach((sp,i)=>{ palette[sp] = i===0 ? css("--canopy") : css("--near"); });
+  const n = Math.max(1, D.summary.species.length - 1);
+  D.summary.species.forEach((sp,i)=>{ palette[sp] = rgb(viridis(0.15 + 0.7*i/n)); });
   for(const p of pts){
     ctx.fillStyle=palette[p.sp]||"#4a4a4a"; ctx.globalAlpha=.8;
     ctx.beginPath(); ctx.arc(sx(p.x),sy(p.y),6,0,7); ctx.fill(); ctx.globalAlpha=1;
@@ -235,26 +252,52 @@ function scatter(){
   };
 }
 
-function segButtons(){
-  document.getElementById("segmenter").innerHTML = D.summary.segmenters.map((s,i)=>
-    `<button class="button is-small" data-seg="${s}" aria-pressed="${i===0}">${s==="sam3d"?"SAM3D":"Geometric"}</button>`).join("");
-  syncPressed(document.getElementById("segmenter"));
+/* The toggle selects where the occupancy field came from, not merely which
+   segmenter ran, so the buttons are grouped by what actually differs: the mask,
+   the number of views, or the pose estimate. */
+const GROUPS = [
+  ["segmentation", "Segmentation"],
+  ["sampling", "Fewer views"],
+  ["pose-free", "Pose-free"],
+];
+
+function methodButtons(){
+  const info = D.summary.method_info || {};
+  const keys = D.summary.methods_available || D.summary.segmenters;
+  const host = document.getElementById("segmenter");
+  host.innerHTML = GROUPS.map(([group, title]) => {
+    const inGroup = keys.filter(k => (info[k] || {}).group === group);
+    if (!inGroup.length) return "";
+    return `<div class="methodgroup"><span class="grouplabel">${title}</span>` +
+      inGroup.map(k =>
+        `<button class="button is-small" data-seg="${k}"
+                 aria-pressed="${k === segmenter}">${(info[k] || {}).label || k}</button>`
+      ).join("") + `</div>`;
+  }).join("");
+  syncPressed(host);
   syncPressed(document.getElementById("colour"));
+  methodNote();
+}
+
+function methodNote(){
+  const info = (D.summary.method_info || {})[segmenter];
+  const el = document.getElementById("methodnote");
+  if (el) el.textContent = info ? info.note : "";
 }
 
 /* Bulma has no aria-pressed styling of its own, so the selected button is given
    is-dark to match the template's link buttons. */
-function syncPressed(group){
-  [...group.children].forEach(b =>
+function syncPressed(root){
+  root.querySelectorAll("button").forEach(b =>
     b.classList.toggle("is-dark", b.getAttribute("aria-pressed") === "true"));
 }
 
 function legend(){
+  const ramp = `linear-gradient(to right, ${VIRIDIS.map(rgb).join(",")})`;
   document.getElementById("legend").innerHTML = colourMode==="segment"
     ? `<i style="background:var(--canopy)"></i>above pot rim
        &nbsp;<i style="background:var(--pot)"></i>pot and below`
-    : `<i style="background:var(--near)"></i>nearer
-       &nbsp;<i style="background:var(--far)"></i>further`;
+    : `far <i class="ramp" style="background:${ramp}"></i> near`;
 }
 
 async function buildList(){
@@ -282,8 +325,8 @@ async function render(){
 
 function facts(){
   const s=byId.get(current), q=s.quality[segmenter]||{}, m=s.mesh||{};
-  const density = s.density_kg_m3 == null ? "—" : `${Math.round(s.density_kg_m3)}`;
-  const rim = s.pot_height_m == null ? "—"
+  const density = s.density_kg_m3 == null ? ", " : `${Math.round(s.density_kg_m3)}`;
+  const rim = s.pot_height_m == null ? ", "
     : `${f(s.pot_height_m)}${s.pot_confident === false ? "*" : ""}`;
   // above_rim_l is cut at this specimen's own rim, which is what the implied
   // density divides by. quality.above_ground_l uses the global constant and
@@ -324,17 +367,19 @@ function attach(){
   document.getElementById("segmenter").onclick=async e=>{
     const b=e.target.closest("button"); if(!b)return;
     segmenter=b.dataset.seg;
-    [...e.currentTarget.children].forEach(x=>x.setAttribute("aria-pressed",String(x===b)));
-    syncPressed(e.currentTarget);
+    e.currentTarget.querySelectorAll("button").forEach(
+      x=>x.setAttribute("aria-pressed",String(x===b)));
+    syncPressed(e.currentTarget); methodNote();
     await buildList(); facts(); await render(); };
   document.getElementById("colour").onclick=async e=>{
     const b=e.target.closest("button"); if(!b)return;
     colourMode=b.dataset.mode;
-    [...e.currentTarget.children].forEach(x=>x.setAttribute("aria-pressed",String(x===b)));
+    e.currentTarget.querySelectorAll("button").forEach(
+      x=>x.setAttribute("aria-pressed",String(x===b)));
     syncPressed(e.currentTarget);
     await render(); };
   addEventListener("resize",()=>cloud(current,segmenter).then(c=>draw(document.getElementById("stage"),c)));
 }
 
-pipeline(); methodTable(); nextTable(); honesty(); scatter(); segButtons();
+pipeline(); methodTable(); nextTable(); honesty(); scatter(); methodButtons();
 buildList().then(attach).then(()=>select(current));
