@@ -452,6 +452,70 @@ which operate on pixels rather than 42 mm patches.
 
 ---
 
+## 7e. Does a stronger regressor help? Only while the input is bad
+
+Asked because a previous student used R-squared and RMSE with a ridge-style fit,
+and random forests and networks are the obvious alternatives. Measured rather
+than argued: the same seven features, the same leave-one-out, only the regressor
+changing.
+
+| regressor | carved | fused |
+|---|---|---|
+| ridge | 0.544 / +0.030 | **0.335 / +0.632** |
+| random forest | **0.406 / +0.459** | 0.393 / +0.493 |
+| gradient boosting | 0.406 / +0.459 | 0.395 / +0.490 |
+| MLP 32-16 | 0.506 / +0.160 | 0.403 / +0.469 |
+| mean predictor | 0.552 | 0.552 |
+
+Paired bootstrap against ridge on the same features:
+
+| | difference | 95% interval | |
+|---|---|---|---|
+| carved, random forest | −0.138 | [−0.281, −0.026] | **resolved** |
+| carved, gradient boosting | −0.138 | [−0.288, −0.001] | **resolved** |
+| carved, MLP | −0.038 | [−0.114, +0.029] | not resolved |
+| fused, random forest | +0.058 | [−0.003, +0.121] | not resolved |
+| fused, gradient boosting | +0.059 | [−0.007, +0.127] | not resolved |
+| fused, MLP | +0.068 | [+0.007, +0.129] | **resolved, worse** |
+
+**The pattern is the finding.** A nonlinear regressor rescues the carve, resolving
+a 0.138 kg improvement, and then stops helping once the reconstruction is fixed.
+On the fused features ridge wins and the MLP is resolvably *worse*.
+
+That reads as exactly what it looks like. Hull volume is an envelope whose
+relationship to mass is distorted differently for a bushy Mango than for a thin
+Eucalyptus, and a forest can carve that space with thresholds where a linear fit
+cannot. Once the volumes are no longer envelopes the relationship is closer to
+linear, and at n=36 the extra capacity costs more in variance than it buys in
+bias. **A stronger model was compensating for a broken input.**
+
+The decision it poses, and the honest answer:
+
+| | RMSE |
+|---|---|
+| carved + ridge | 0.544 |
+| carved + random forest | 0.406 |
+| **fused + ridge** | **0.335** |
+
+Fixing the reconstruction beats strengthening the model, and is also the cheaper
+claim to defend. But **fused+ridge against carved+RF is −0.071 [−0.175, +0.028],
+not resolved**, so the two routes cannot be separated on this data. What can be
+said is that fixing the input beats the mean predictor by more, keeps the model
+interpretable, and does not spend capacity at a sample size that cannot afford it.
+
+Two cautions. Six comparisons were run and two resolved at 95 per cent, which is
+close to what chance alone would produce, so no single row above should be
+quoted without that context. And a random forest at n=36 is fitting 35 samples
+per fold, which is not where forests are at their best.
+
+**F1 does not apply.** It is a classification metric and above-ground mass is
+continuous. Reaching for it would mean binning mass into classes, discarding the
+resolution of a ground truth that was obtained destructively, and inventing
+boundaries that carry no agronomic meaning. R-squared and RMSE are the right
+family; what was missing was never the metric but the interval around it.
+
+---
+
 ## 8. Bugs found and fixed
 
 Several would have produced confident wrong numbers rather than errors.
