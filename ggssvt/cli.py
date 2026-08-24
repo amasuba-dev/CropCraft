@@ -303,6 +303,59 @@ def cmd_fuse(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_gate(args: argparse.Namespace) -> int:
+    """Run the acceptance checks and exit non-zero if anything is blocked."""
+    import csv as _csv
+    import json as _json
+
+    from .config import GROUND_TRUTH_CSV
+    from .data.preprocess import load_cached, usable_plant_ids
+    from .eval.gates import check_reconstruction, check_segmentation, summarise
+
+    plant_ids = args.plants or usable_plant_ids(args.cache_dir)
+    masses = {
+        row["plant_id"]: float(row["net_weight_g"]) / 1000.0
+        for row in _csv.DictReader(
+            GROUND_TRUTH_CSV.open(newline="", encoding="utf-8")
+        )
+    }
+
+    reports = []
+    for plant_id in plant_ids:
+        cached = load_cached(plant_id, args.cache_dir)
+        for report in (
+            check_segmentation(cached),
+            check_reconstruction(cached, mass_kg=masses.get(plant_id)),
+        ):
+            reports.append(report)
+            for failure in (c for c in report.checks if not c.passed):
+                mark = "BLOCK" if failure.blocking else "note "
+                detail = ""
+                if failure.value is not None and failure.threshold is not None:
+                    detail = f"  ({failure.value:.4g} vs {failure.threshold:.4g})"
+                print(f"  {mark} {plant_id}  {failure.name}{detail}")
+                if failure.blocking and failure.message:
+                    print(f"        {failure.message}")
+
+    summary = summarise(reports)
+    print(
+        f"\n{summary['checks_run']} checks over {len(plant_ids)} specimens: "
+        f"{summary['blocked']} blocked, {summary['advisories']} advisories"
+    )
+    if summary["blocked_subjects"]:
+        print("blocked: " + ", ".join(sorted(set(summary["blocked_subjects"]))))
+
+    if args.out:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(
+            _json.dumps([r.as_dict() for r in reports], indent=2), encoding="utf-8"
+        )
+        print(f"Saved to {args.out}")
+
+    # Non-zero on a blocking failure so this can sit in front of a long run.
+    return 1 if summary["blocked"] else 0
+
+
 def cmd_dino_segment(args: argparse.Namespace) -> int:
     """Lift DINOv2 features onto the carved points and cluster them."""
     import json as _json
@@ -884,6 +937,16 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     fuse.set_defaults(func=cmd_fuse)
+
+    gate = sub.add_parser(
+        "gate", help="acceptance checks; exits non-zero if anything is blocked"
+    )
+    _add_common(gate)
+    gate.add_argument("--plants", nargs="*")
+    gate.add_argument(
+        "--out", type=Path, default=WORK_DIR / "reports" / "gates.json"
+    )
+    gate.set_defaults(func=cmd_gate)
 
     dino_seg = sub.add_parser(
         "dino-segment",

@@ -191,7 +191,7 @@ class RunResult:
 
     name: str
     question: str
-    status: str                       # done | failed | skipped
+    status: str                       # done | blocked | failed | skipped
     seconds: float = 0.0
     metrics: dict = field(default_factory=dict)
     config: dict = field(default_factory=dict)
@@ -331,10 +331,27 @@ def execute(
             "n_trainable": model.n_parameters(True),
             "checkpoint": str(checkpoint),
             "predictions": predicted.tolist(),
+            "targets": target.tolist(),
             "plant_ids": list(plant_ids),
         }
+
+        # A run that collapsed onto the training mean finishes, records a
+        # respectable RMSE and looks exactly like one that worked. Eight hours of
+        # GPU time should not end that way unnoticed, so the acceptance checks
+        # run here and their verdict is recorded beside the metrics.
+        from .eval.gates import check_training
+
+        mean_rmse = float(np.sqrt(((target - target.mean()) ** 2).mean()))
+        gate = check_training(result.metrics, subject=run.name, mean_rmse=mean_rmse)
+        result.metrics["gate"] = gate.as_dict()
+
         result.dataset = dataset_fingerprint(cache_dir)
-        result.status = "done"
+        result.status = "blocked" if gate.blocked else "done"
+
+        if gate.blocked and verbose:
+            print("  GATE FAILED, this run is not a result:")
+            for failure in (c for c in gate.checks if c.failed_blocking):
+                print(f"    {failure.name}: {failure.message}")
 
         if verbose:
             print(f"  {metrics}")
@@ -432,6 +449,15 @@ def run_campaign(
     return results
 
 
+def _gate_reason(metrics: dict) -> str:
+    """The first blocking check, for the summary line."""
+    gate = metrics.get("gate") or {}
+    for failure in gate.get("failures", []):
+        if failure.get("blocking"):
+            return failure["name"]
+    return "gate failed"
+
+
 def _write_summary(results: list[RunResult], out_dir: Path) -> None:
     """A single table of everything, for pasting into the write-up."""
     lines = [
@@ -440,13 +466,17 @@ def _write_summary(results: list[RunResult], out_dir: Path) -> None:
     ]
     for result in results:
         m = result.metrics
-        if result.status == "done":
+        # A blocked run still shows its numbers. Seeing how badly it failed is
+        # most of the diagnosis, and hiding them behind the status turns a
+        # useful line into a blank one.
+        if result.status in {"done", "blocked"}:
             lines.append(
                 f"{result.name:22s} {result.status:8s} "
                 f"{m.get('rmse_kg', float('nan')):7.3f} "
                 f"{max(m.get('r2', float('nan')), -999.0):7.3f} "
                 f"{m.get('occupancy_ap', float('nan')):7.3f} "
                 f"{result.seconds / 60:6.0f}"
+                + ("   " + _gate_reason(m) if result.status == "blocked" else "")
             )
         else:
             lines.append(

@@ -91,6 +91,18 @@ give it `--sam-device cuda` or start it before something else.
 ### 4, the fusion. CPU, 11 minutes
 
 ```bash
+python -m ggssvt.cli gate
+```
+
+Run this after the caches and again after anything that rebuilds them. It is
+324 acceptance checks over the 36 specimens and it **exits non-zero when
+something is blocked**, so it can sit in front of a long run. Two severities:
+blocking means the output is unusable and whatever consumes it will produce
+nonsense; advisory means it is usable but worth knowing. Expect **0 blocked
+and 39 advisories**, the advisories being the 28 envelope specimens and the
+rim fallbacks, both of which are findings rather than faults.
+
+```bash
 python -m ggssvt.cli fuse --write-cache
 ```
 
@@ -166,7 +178,13 @@ and the resume before a night is committed to them. Then:
 python -m ggssvt.campaign --plan core --device cuda --workers 8 --batch-size 2
 ```
 
-Seven runs. Safe to interrupt: the same command resumes, and a run whose targets
+Seven runs, each gated. A run that collapses onto the training mean, never
+beats the mean predictor, leaves occupancy at chance or whose loss never moves
+is marked `blocked` rather than `done`, with the failing check named in the
+summary line and its numbers still shown so you can see how bad it was. That
+matters most overnight, when nobody is watching the loss.
+
+Safe to interrupt: the same command resumes, and a run whose targets
 no longer match its fingerprint is re-run rather than reused.
 
 ### 13, the independent check. GPU, about 2 hours
@@ -804,6 +822,7 @@ stem in all twelve frames, every number for that specimen is meaningless.
 | `dino-segment` | cache, network | ~9 min, DITR-style feature lifting |
 | `fuse --write-cache` | cache | ~11 min, TSDF fusion plus the fused cache |
 | `views` | the view caches | seconds, scores whichever exist |
+| `gate` | cache | seconds, acceptance checks; non-zero exit when blocked |
 | `architecture` | nothing | seconds, one SVG per methodology |
 | `factorial` | both caches | ~10 min frozen; hours with `--train` |
 | `pretrain` | cache, **GPU** | ~25 min at 120 epochs |
