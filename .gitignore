@@ -176,3 +176,8 @@ cython_debug/
 # rather than being pip-installed; see ggssvt/POSEFREE.md.
 /third_party/
 /.venv-posefree/
+
+# Paper build: node_modules only. The generator scripts are tracked.
+/paper/node_modules/
+/paper/package-lock.json
+/paper/package.json
