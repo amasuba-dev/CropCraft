@@ -1,6 +1,12 @@
-# One day on the RTX 4080
+# Running the programme on the RTX 4080
 
 Everything in order, with what it costs.
+
+**Start at [Everything, from an empty work directory](#everything-from-an-empty-work-directory).**
+That is the sequence: thirteen numbered steps, about twelve hours end to end,
+and the only place step numbers are defined. Everything after it is detail
+keyed to those numbers, or reference. Nothing later introduces a step the
+sequence does not already contain.
 
 > **⚠ The targets changed on 2026-08-22. Every trained number predates it.**
 >
@@ -10,10 +16,11 @@ Everything in order, with what it costs.
 > fitted against the old targets and cannot be compared with anything produced
 > after it.
 >
-> **Rebuild both caches before running anything**, then re-run the whole
-> campaign. The campaign's resume logic skips runs marked `done`, so delete
-> `work_dirs/ggssvt/campaign/` first, or it will happily skip every stale run
-> you are trying to replace. See [RERUN_V_BATCH.md](RERUN_V_BATCH.md).
+> **Rebuild the caches before running anything**, then re-run the campaign.
+> The campaign fingerprints the targets each run was fitted against and
+> re-runs on a mismatch rather than reusing it, so clearing
+> `work_dirs/ggssvt/campaign/` is belt and braces rather than required.
+> See [RERUN_V_BATCH.md](RERUN_V_BATCH.md).
 
 **Hardware note.** This was first written for an RTX 4060 (8 GB). The lab card is
 an **RTX 4080: 16 GB and roughly three times the compute**. Same Ada
@@ -22,7 +29,7 @@ that shaped the original settings is gone, and the epoch counts below are raised
 accordingly.
 
 **Read this first:** the default `--finetune-epochs 200` in a leave-one-out sweep
-is 28 folds × 200 epochs × 27 specimens. Even on this card that is most of a day
+is 36 folds × 200 epochs × 35 specimens. Even on this card that is most of a day
 per condition. Every command below overrides it. If you copy a command from the
 README instead of from here, you will start a multi-day run by accident.
 
@@ -36,7 +43,7 @@ faster card buys nothing while it waits on numpy.
 
 ## Everything, from an empty work directory
 
-The whole programme in order. Twelve steps, of which four need the GPU. Total is
+The whole programme in order. Thirteen steps, of which five need the GPU. Total is
 about twelve hours, nearly all of it step 11. Each step writes an artefact, and
 the **Experiment log** on the project page is generated from those artefacts, so
 the page tracks progress on its own: run something, rebuild the page, and the row
@@ -60,7 +67,7 @@ Confirms 39 specimens and reports the empty `dataset/calib`. If the target range
 is not 0.20 to 2.35 kg, the ground truth is not the corrected one and every
 number downstream will be wrong.
 
-### 1 to 3, the caches. CPU, about 25 minutes
+### 1 to 3, the caches. About 15 minutes, plus SAM3D
 
 ```bash
 python -m ggssvt.cli preprocess
@@ -76,6 +83,11 @@ for v in 3 4 6; do python -m ggssvt.cli preprocess --views $v --cache-dir work_d
 
 Expect 36 of 38 usable on the geometric cache and 33 on SAM3D.
 
+Measured: geometric is about 6 minutes for 38 specimens and each view count
+about 5. **SAM3D is the one to watch.** It is roughly 4 minutes on the GPU and
+close to an hour on CPU, because it runs SAM over 12 views per specimen, so
+give it `--sam-device cuda` or start it before something else.
+
 ### 4, the fusion. CPU, 11 minutes
 
 ```bash
@@ -85,7 +97,7 @@ python -m ggssvt.cli fuse --write-cache
 Expect 31 of 36 plausible against the carve's 8. This must run before step 11,
 because `baseline_fused` reads the cache it writes.
 
-### 5 to 8, the classical arm. CPU and GPU, about 30 minutes
+### 5 to 9, the classical arm. About 40 minutes
 
 ```bash
 python -m ggssvt.cli baselines
@@ -107,10 +119,20 @@ python -m ggssvt.cli dino-probe
 python -m ggssvt.cli factorial
 ```
 
+```bash
+python -m ggssvt.cli dino-segment
+```
+
 `baselines` should print `2D + profile` at 0.457 and `fused geometry` at 0.465.
 If `fused geometry` is missing, step 4 did not complete for every specimen.
 
-### 9 and 10, look at it
+`dino-segment` is the DITR-style lifting, about 9 minutes on CPU. It is a
+reported negative: DINOv2 patch features reproduce the pot boundary where the
+geometric method already finds it (Mango, 0.969 agreement) and do not rescue
+E001-E010, where one patch spans 42 mm against a 5 to 15 mm stem. Run it so the
+result is on record, not because it is expected to help.
+
+### 10 and 11, look at it
 
 ```bash
 python -m ggssvt.cli gallery
@@ -120,10 +142,18 @@ python -m ggssvt.cli gallery
 python -m ggssvt.cli report
 ```
 
+```bash
+python -m ggssvt.cli architecture
+```
+
+`architecture` writes one SVG per methodology from the pipeline's own
+constants, so the figures in the paper and on the page cannot drift out of
+date. Seconds.
+
 Open `work_dirs/ggssvt/reports/gallery/reconstructions.html` and actually look.
 Visual inspection has caught things in this project that no metric did.
 
-### 11, the training campaign. GPU, 8 to 10 hours
+### 12, the training campaign. GPU, 8 to 10 hours
 
 ```bash
 python -m ggssvt.campaign --plan smoke --device cuda
@@ -139,7 +169,7 @@ python -m ggssvt.campaign --plan core --device cuda --workers 8 --batch-size 2
 Seven runs. Safe to interrupt: the same command resumes, and a run whose targets
 no longer match its fingerprint is re-run rather than reused.
 
-### 12, the independent check. GPU, about 2 hours
+### 13, the independent check. GPU, about 2 hours
 
 ```bash
 python -m ggssvt.cli posefree --check-only
@@ -291,9 +321,13 @@ Everything runs without either model; the DINOv3 cells simply report as skipped.
 
 ---
 
-## Morning, cheap, and it unblocks the afternoon
+## Notes on the classical steps
 
-### 1. Build both caches (~4 min geometric, ~3 min SAM3D on GPU)
+Detail for the CPU steps above: what each one is for, what to watch, and
+what the output should look like. The sequence itself is the section above;
+nothing here introduces a step that is not already in it.
+
+### The caches (steps 1 to 3)
 
 `work_dirs/` is not in the repository, so on a fresh machine there is no cache at
 all and everything downstream (baselines, probes, factorial, training) has
@@ -338,7 +372,7 @@ both. Then re-run the tests; the seven skipped ones should join in:
 python -m pytest tests/ -q
 ```
 
-### 2. Time one epoch before committing to anything (~2 min)
+### Time one epoch before committing to anything
 
 ```bash
 python -m ggssvt.cli pretrain --epochs 3 --workers 8 --batch-size 2 --device cuda --out /tmp/timing.pt
@@ -350,7 +384,7 @@ dataloader-bound and should raise `--workers` before anything else. Scale every
 duration below by whatever ratio you actually measure, do not trust these
 numbers over your own stopwatch.
 
-### 3. Full frozen-feature factorial (~10 min on GPU)
+### The frozen-feature factorial (step 8)
 
 ```bash
 python -m ggssvt.cli factorial --variant base --backbones cnn dinov2 dinov3
@@ -361,7 +395,7 @@ DINOv2-base was the best cell, but nothing was statistically resolved at n=26.
 Re-running adds the DINOv3 row if your access came through. Descriptors are
 cached, so the DINOv2 cells return instantly.
 
-### 3b. DINOv2-large, the best use of the extra VRAM (~15 min)
+### DINOv2-large, the best use of the extra VRAM
 
 ```bash
 python -m ggssvt.cli dino-probe --variant large --backbones dinov2
@@ -375,7 +409,7 @@ It is evidence the backbone is doing something rather than that one run got
 lucky. ViT-L/14 is 300M frozen parameters; it did not fit comfortably in 8 GB and
 fits easily in 16.
 
-### 3b-bis. View-count ablation (~20 min CPU, run once)
+### View-count ablation (steps 3 and 7)
 
 Answers "would four images do?" with a physical criterion rather than a quality
 score. Build the reduced caches, then score them:
@@ -393,7 +427,7 @@ median implied density of 9.2 kg/m³, lighter than polystyrene. Agreement only
 falls from 0.608 to 0.424 over the same range, which is why it is worth printing
 both.
 
-### 3b-ter. TSDF depth fusion (~11 min CPU, run once)
+### TSDF depth fusion (step 4)
 
 The carve cannot be improved past the visual hull, which is why 25 of 36
 specimens imply a bulk density one to two orders of magnitude below plant
@@ -416,7 +450,7 @@ project page shows TSDF in its method toggle only when `cache_tsdf` exists. Do
 not run `fuse --plants ...` on a subset and then expect either: a partial report
 is treated as no report, deliberately.
 
-### 3c. Mesh arm and reconstruction gallery (~5 min, CPU)
+### Mesh arm and reconstruction gallery (steps 6 and 10)
 
 ```bash
 python -m ggssvt.cli mesh --export work_dirs/ggssvt/meshes
@@ -549,13 +583,13 @@ And three things that are not in the JSON and must be recorded by hand:
 
 ---
 
-## Afternoon, the GPU work
+## Notes on the GPU steps
 
 Budget roughly **three hours** for this block on this card. Do not try to run the full 2×3
 factorial with training today; at these settings that is six pretrain runs plus
 six LOOCV sweeps.
 
-### 4. Pretrain the four factorial cells (~25 min each, ~1.5 h total)
+### Pretraining a single cell, by hand
 
 Stage 1 is self-supervised and uses no mass labels, so one pretrain per cell
 serves that cell's whole LOOCV sweep.
@@ -576,7 +610,7 @@ reasons" caveat in the write-up.
 For the DINO cells, edit `backbone` in `ggssvt/config.py` to `"dinov2"`, or run
 the combined command in step 6 which handles it.
 
-### 5. One LOOCV sweep to calibrate the cost (~40 min)
+### One LOOCV sweep, to calibrate the cost
 
 ```bash
 python -m ggssvt.cli loocv --checkpoint work_dirs/ggssvt/checkpoints/geo_cnn.pt --finetune-epochs 60 --workers 8 --device cuda --out work_dirs/ggssvt/reports/folds_geo_cnn.json
@@ -590,7 +624,7 @@ if they are still falling at 60, raise it, because you now have the headroom.
 
 Time this. It sets whether step 6 fits before you go home.
 
-### 6. The trained factorial (~2.5–3 h with these settings)
+### The trained factorial, by hand
 
 ```bash
 python -m ggssvt.cli factorial --train --backbones cnn dinov2 --variant base --epochs 120 --finetune-epochs 60 --workers 8 --batch-size 2 --device cuda
@@ -760,20 +794,24 @@ stem in all twelve frames, every number for that specimen is meaningless.
 |---|---|---|
 | `inspect` | nothing | seconds, dataset audit, no computation |
 | `access` | network | seconds, HuggingFace account and model access |
-| `preprocess` | dataset | 2–3 min per segmenter |
+| `preprocess` | dataset | ~6 min geometric; SAM3D is ~4 min on GPU, ~1 h on CPU |
+| `preprocess --views N` | dataset | ~5 min per view count |
 | `baselines` | cache | seconds, LOOCV baseline table |
 | `mesh` | cache, scikit-image | ~1 min including the comparison |
 | `gallery` | cache | ~2 min, contact sheets, PLY, HTML viewer |
 | `visualise` | dataset | seconds per specimen |
 | `dino-probe` | cache, network | 5–15 min depending on variant |
+| `dino-segment` | cache, network | ~9 min, DITR-style feature lifting |
+| `fuse --write-cache` | cache | ~11 min, TSDF fusion plus the fused cache |
+| `views` | the view caches | seconds, scores whichever exist |
+| `architecture` | nothing | seconds, one SVG per methodology |
 | `factorial` | both caches | ~10 min frozen; hours with `--train` |
 | `pretrain` | cache, **GPU** | ~25 min at 120 epochs |
 | `loocv` | cache, checkpoint, **GPU** | ~40 min at 60 fine-tune epochs |
-| `experiment` | cache, **GPU** | one pretrain + one LOOCV per backbone |
+| `experiment` | cache, **GPU** | one pretrain + one LOOCV per backbone; superseded by `ggssvt.campaign` |
 | `nerfstudio` | dataset | seconds, writes `transforms.json` |
 | `dashboard` | cache, mesh cache | ~1 min, the walkthrough page |
 | `posefree` | cloned repos, **GPU** | minutes per specimen per method |
-| `mesh` | cache, scikit-image | ~1 min including the comparison |
 | `ggssvt.campaign` | cache, **GPU** | 8–15 h depending on plan |
 | `report` | cache | seconds |
 
