@@ -303,6 +303,22 @@ def cmd_fuse(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_architecture(args: argparse.Namespace) -> int:
+    """Render one architecture diagram per methodology."""
+    from .eval.architecture import write_all
+
+    paths = write_all(args.out_dir)
+    print(f"Wrote {len(paths)} diagrams to {args.out_dir}\n")
+    for path in paths:
+        print(f"  {path.name:34s} {path.stat().st_size / 1024:6.1f} KB")
+    print(
+        "\nDrawn from config and from measured results, so they cannot drift "
+        "out of\ndate the way a hand-made figure does. SVG: selectable text, "
+        "sharp at any size."
+    )
+    return 0
+
+
 def cmd_views(args: argparse.Namespace) -> int:
     from .eval.view_ablation import format_table, run_ablation
 
@@ -849,6 +865,16 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     fuse.set_defaults(func=cmd_fuse)
+
+    architecture = sub.add_parser(
+        "architecture", help="architecture diagram per methodology, as SVG"
+    )
+    architecture.add_argument(
+        "--out-dir",
+        type=Path,
+        default=WORK_DIR / "reports" / "architecture",
+    )
+    architecture.set_defaults(func=cmd_architecture)
 
     views = sub.add_parser(
         "views", help="view-count ablation across the per-view caches"
