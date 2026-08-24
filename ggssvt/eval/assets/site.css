@@ -402,3 +402,15 @@ table.data tr.best td {
   border-radius: 2px;
   margin: 0 4px;
 }
+
+/* Experiment log. Pending rows are dimmed so the eye lands on what has run,
+   while stale rows keep full contrast because they are the ones to act on. */
+#progress td { vertical-align: top; text-align: left; }
+#progress tr.pending td { opacity: 0.62; }
+#progress code {
+  background: #f5f5f5;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  word-break: break-all;
+  white-space: normal;
+}

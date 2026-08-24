@@ -388,3 +388,47 @@ function attach(){
 
 pipeline(); methodTable(); nextTable(); honesty(); scatter(); methodButtons();
 buildList().then(attach).then(()=>select(current));
+
+/* The experiment log. Read straight from the payload, which read it from the
+   work directory, so the page cannot claim an experiment ran when its artefact
+   is absent. */
+function progressTable(){
+  const rows = D.summary.progress || [];
+  const host = document.getElementById("progress");
+  if (!host || !rows.length) return;
+
+  const stageLabel = {
+    data: "Data", reconstruction: "Reconstruction", classical: "Classical",
+    learned: "Learned", check: "Check",
+  };
+
+  host.innerHTML =
+    `<thead><tr><th>Experiment</th><th>Stage</th><th>Status</th><th>Ran</th>
+     <th>Result</th></tr></thead><tbody>` +
+    rows.map(r => {
+      const tag = r.stale
+        ? '<span class="tag is-small is-danger">stale</span>'
+        : r.done
+          ? '<span class="tag is-small is-success">done</span>'
+          : `<span class="tag is-small is-light">pending${r.needs_gpu ? ", GPU" : ""}</span>`;
+      return `<tr${r.done && !r.stale ? "" : ' class="pending"'}>
+        <td><strong>${r.label}</strong><br>
+            <span class="is-size-7 has-text-grey">${r.why}</span><br>
+            <code class="is-size-7">${r.command}</code></td>
+        <td>${stageLabel[r.stage] || r.stage}</td>
+        <td>${tag}</td>
+        <td>${r.ran_at || "n/a"}</td>
+        <td>${r.headline || ""}</td></tr>`;
+    }).join("") + "</tbody>";
+
+  const s = D.summary.progress_summary || {};
+  document.getElementById("progressfacts").innerHTML = [
+    [`${s.done}/${s.total}`, "experiments run"],
+    [String(s.pending_gpu || 0), "waiting on a GPU"],
+    [String(s.stale || 0), "stale results"],
+  ].map(([n, l]) =>
+    `<div class="keyfact"><div class="num">${n}</div><div class="lab">${l}</div></div>`
+  ).join("");
+}
+
+progressTable();

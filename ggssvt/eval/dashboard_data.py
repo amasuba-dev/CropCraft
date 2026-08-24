@@ -100,6 +100,8 @@ def build_payload(
     from .methods import cache_dirs as available_cache_dirs
     from .metrics import paired_bootstrap_difference
     from .plausibility import classify, summarise
+    from .progress import summarise as summarise_progress
+    from .progress import survey
 
     cache_dirs = cache_dirs or available_cache_dirs()
     if "geometric" not in cache_dirs:
@@ -260,6 +262,8 @@ def build_payload(
             k: round(float(np.mean(v)), 3) for k, v in batches.items() if v
         },
         "reference_method": reference,
+        "progress": [s.as_dict() for s in survey()],
+        "progress_summary": summarise_progress(survey()),
     }
 
     notes = {

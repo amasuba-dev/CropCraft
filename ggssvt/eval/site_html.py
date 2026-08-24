@@ -79,7 +79,7 @@ HEAD = """<!DOCTYPE html>
   <meta name="description" content="Reconstructing above-ground plant biomass from
         twelve-view RGB-D capture, and measuring where the reconstruction fails.">
   <meta name="keywords" content="plant phenotyping, biomass, visual hull, RGB-D, GG-SSVT">
-  <title>Reconstructing Plant Biomass</title>
+  <title>Automated Biomass Estimation</title>
 
   <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro"
         rel="stylesheet">
@@ -96,14 +96,21 @@ HERO = """
     <div class="container is-max-desktop">
       <div class="columns is-centered">
         <div class="column has-text-centered">
-          <h1 class="title is-2 publication-title">Reconstructing Plant Biomass<br>from Twelve-View RGB-D Capture</h1>
+          <h1 class="title is-2 publication-title">Automated Biomass Estimation<br>Using Self-Supervised Vision Transformers</h1>
           <div class="is-size-5 publication-authors">
-            <span class="author-block">Aaron Masuba<sup>1</sup></span>
+            <span class="author-block">Aaron Masuba</span>
           </div>
-          <div class="is-size-6 publication-authors">
-            <span class="author-block"><sup>1</sup>University of Pretoria</span>
+          <div class="is-size-6 publication-authors mt-2">
+            <span class="author-block">Supervisor: Prof. Herman Myburgh</span><br>
+            <span class="author-block">Co-supervisors: Prof. Allan De Freitas
+              &middot; Dr Kealeboga Mokise</span>
           </div>
-          <p class="publication-venue mt-2">MEng dissertation &middot; work in progress</p>
+          <div class="is-size-6 publication-authors mt-3">
+            <span class="author-block">Smart Sensing and Intelligent Systems Group</span><br>
+            <span class="author-block">Department of Electrical, Electronic and Computer
+              Engineering, University of Pretoria</span>
+          </div>
+          <p class="publication-venue mt-3">MEng dissertation &middot; work in progress</p>
 
           <div class="column has-text-centered">
             <div class="publication-links">
@@ -141,6 +148,13 @@ HERO = """
       <div class="column is-four-fifths">
         <h2 class="title is-3">Abstract</h2>
         <div class="content has-text-justified">
+          <p>
+            The question is whether the <em>3R</em> family of feed-forward reconstruction
+            models, DUSt3R, MASt3R and Fast3R, improves both the accuracy of biomass
+            estimation and what can be said about plant morphology from it. Answering that
+            needs a reconstruction baseline to measure against, and most of what follows is
+            the finding that the obvious baseline, space carving, is the wrong instrument.
+          </p>
           <p>
             Thirty-eight potted plants, Eucalyptus saplings and Mango seedlings, were captured with two Kinect v2 units carried through six positions, giving twelve
             registered RGB-D views each. No calibration target was ever recorded, so every camera
@@ -374,6 +388,21 @@ BODY = """
       </p>
     </div>
     <div class="tablewrap"><table class="data" id="next"></table></div>
+  </div>
+</section>
+
+
+<section class="section">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3">Experiment log</h2>
+    <p class="mb-4 has-text-grey">
+      Generated from the work directory on every page build, so it records what has
+      actually run rather than what was intended. A row marked stale produced its numbers
+      before the specimen cache it was fitted to, which is worse than a missing row
+      because it looks finished.
+    </p>
+    <div class="keyfacts mb-5" id="progressfacts"></div>
+    <div class="tablewrap"><table class="data" id="progress"></table></div>
   </div>
 </section>
 

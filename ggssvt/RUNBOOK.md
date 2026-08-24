@@ -34,6 +34,160 @@ faster card buys nothing while it waits on numpy.
 
 ---
 
+## Everything, from an empty work directory
+
+The whole programme in order. Twelve steps, of which four need the GPU. Total is
+about twelve hours, nearly all of it step 11. Each step writes an artefact, and
+the **Experiment log** on the project page is generated from those artefacts, so
+the page tracks progress on its own: run something, rebuild the page, and the row
+turns from pending to done.
+
+Run these from the repository root with the conda environment active.
+
+### Before anything
+
+```bash
+python -m pytest tests/ -q
+```
+
+Seven skips before preprocessing is correct. Zero failures is not optional.
+
+```bash
+python -m ggssvt.cli inspect
+```
+
+Confirms 39 specimens and reports the empty `dataset/calib`. If the target range
+is not 0.20 to 2.35 kg, the ground truth is not the corrected one and every
+number downstream will be wrong.
+
+### 1 to 3, the caches. CPU, about 25 minutes
+
+```bash
+python -m ggssvt.cli preprocess
+```
+
+```bash
+python -m ggssvt.cli preprocess --segmenter sam3d --cache-dir work_dirs/ggssvt/cache_sam3d --sam-device cuda
+```
+
+```bash
+for v in 3 4 6; do python -m ggssvt.cli preprocess --views $v --cache-dir work_dirs/ggssvt/cache_v$v; done
+```
+
+Expect 36 of 38 usable on the geometric cache and 33 on SAM3D.
+
+### 4, the fusion. CPU, 11 minutes
+
+```bash
+python -m ggssvt.cli fuse --write-cache
+```
+
+Expect 31 of 36 plausible against the carve's 8. This must run before step 11,
+because `baseline_fused` reads the cache it writes.
+
+### 5 to 8, the classical arm. CPU and GPU, about 30 minutes
+
+```bash
+python -m ggssvt.cli baselines
+```
+
+```bash
+python -m ggssvt.cli mesh
+```
+
+```bash
+python -m ggssvt.cli views
+```
+
+```bash
+python -m ggssvt.cli dino-probe
+```
+
+```bash
+python -m ggssvt.cli factorial
+```
+
+`baselines` should print `2D + profile` at 0.457 and `fused geometry` at 0.465.
+If `fused geometry` is missing, step 4 did not complete for every specimen.
+
+### 9 and 10, look at it
+
+```bash
+python -m ggssvt.cli gallery
+```
+
+```bash
+python -m ggssvt.cli report
+```
+
+Open `work_dirs/ggssvt/reports/gallery/reconstructions.html` and actually look.
+Visual inspection has caught things in this project that no metric did.
+
+### 11, the training campaign. GPU, 8 to 10 hours
+
+```bash
+python -m ggssvt.campaign --plan smoke --device cuda
+```
+
+Five minutes, four specimens, two epochs. It proves the loop, the checkpointing
+and the resume before a night is committed to them. Then:
+
+```bash
+python -m ggssvt.campaign --plan core --device cuda --workers 8 --batch-size 2
+```
+
+Seven runs. Safe to interrupt: the same command resumes, and a run whose targets
+no longer match its fingerprint is re-run rather than reused.
+
+### 12, the independent check. GPU, about 2 hours
+
+```bash
+python -m ggssvt.cli posefree --check-only
+```
+
+```bash
+python -m ggssvt.cli posefree --methods fast3r --plants M001 --device cuda
+```
+
+Fast3R first on one specimen, because it is twenty times cheaper than DUSt3R and
+exercises the same comparison code. Watch the `sanity_check_result` warnings on
+that first specimen: they catch a camera-convention flip before it becomes a
+plausible-looking reconstruction that is inside out. Then the full sweep.
+
+See [POSEFREE.md](POSEFREE.md) for the install, which is not the one the old
+instructions described.
+
+---
+
+## Keeping the page current
+
+The page is generated, never edited. Two commands rebuild everything it shows:
+
+```bash
+python -m ggssvt.cli report && python -m ggssvt.cli dashboard
+```
+
+`dashboard` re-surveys the work directory, so the Experiment log, the method
+toggle, the biomass table and the specimen browser all follow whatever has
+actually run. A method with no cache does not appear; an experiment with no
+artefact stays pending.
+
+Run that after any step above, then publish:
+
+```bash
+cd work_dirs/ggssvt/site && git init -b main && git add . && git commit -m "results" && git remote add origin git@github.com:<you>/<you>.github.io.git && git push -u origin main
+```
+
+After the first push, `git add . && git commit && git push` from that directory
+is enough.
+
+**The one thing to watch.** If the ground truth or the caches change, previously
+generated results predate them. The Experiment log flags those rows red as
+`stale`, and the campaign refuses to reuse a run whose target fingerprint no
+longer matches. Trust those two rather than memory.
+
+---
+
 ## Two environments, not one
 
 They cannot be merged. Nerfstudio pins torch 2.0.1+cu118, tiny-cuda-nn and
