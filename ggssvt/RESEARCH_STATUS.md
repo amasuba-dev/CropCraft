@@ -327,12 +327,30 @@ per epoch.
 
 **Status: the sparse-sampling clause is answered. The others are not.**
 
-**Sparse sampling — answered, negatively.** Reconstruction degrades monotonically
-as views are removed, and below twelve views the carve is uselessly loose:
-130–250 L of above-ground hull for plants weighing at most 2.35 kg. Four views at
-90° is the classic visual-hull minimum for a *convex* object, and a plant is the
-opposite of convex. The 12-view protocol is justified; the predecessor project's
-4-view protocol was under-sampling.
+**Sparse sampling — answered, negatively, and now with a physical criterion.**
+
+| views | usable | agreement | mean above-ground hull | **plausible** | median kg/m³ |
+|---|---|---|---|---|---|
+| 3 | 23/38 | 0.360 | 99.3 L | **1/23** | 9.8 |
+| 4 | 25/38 | 0.424 | 126.5 L | **0/25** | 9.2 |
+| 6 | 34/38 | 0.521 | 150.4 L | **2/34** | 15.4 |
+| **12** | **36/38** | **0.608** | **10.4 L** | **8/36** | **116.8** |
+
+**At four views, zero of twenty-five reconstructions can physically weigh what
+the plant weighs** — a median implied bulk density of 9.2 kg/m³, lighter than
+expanded polystyrene and thirty to ninety times below plant tissue, from hulls
+averaging 126 L for plants of at most 2.35 kg.
+
+Four views at 90° is the visual-hull minimum for a *convex* object, and a plant
+is the opposite of convex: every unsampled azimuth leaves a prism of empty space
+uncarved. The 12-view protocol is justified, and the predecessor project's
+4-view protocol was not merely under-sampling but reconstructing something other
+than the plant.
+
+Note that the agreement score would never have shown this. It degrades gently,
+0.608 to 0.424, while the reconstructions stop being reconstructions — which is
+an argument for reporting the plausibility check alongside any geometric quality
+metric.
 
 **Occlusion — not measured**, though the pipeline is built around it (depth
 carving treats occluded space as unobserved rather than empty, per Laurentini's

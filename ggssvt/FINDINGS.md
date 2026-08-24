@@ -247,21 +247,36 @@ size.)*
 
 ## 7. View-count ablation
 
-| views | usable | agreement | mean above-ground hull |
-|---|---|---|---|
-| 3 | 17/30 | 0.372 | 133.9 L |
-| 4 | 18/30 | 0.447 | 159.3 L |
-| 6 | 26/30 | 0.550 | 250.3 L |
-| **12** | **28/30** | **0.635** | **19.3 L** |
+| views | usable | agreement | mean above-ground hull | **physically plausible** | median kg/m³ |
+|---|---|---|---|---|---|
+| 3 | 23/38 | 0.360 | 99.3 L | **1/23** | 9.8 |
+| 4 | 25/38 | 0.424 | 126.5 L | **0/25** | 9.2 |
+| 6 | 34/38 | 0.521 | 150.4 L | **2/34** | 15.4 |
+| **12** | **36/38** | **0.608** | **10.4 L** | **8/36** | **116.8** |
 
-Usable count and agreement improve monotonically — the 12-view protocol is
-justified on its own. **Below twelve views the carve is uselessly loose:**
-130–250 L of above-ground hull for plants weighing at most 2.35 kg. Four views at
-90° is the visual-hull minimum for a *convex* object; a plant is the opposite.
+Usable count and agreement improve monotonically, so the 12-view protocol is
+justified on its own. But the plausibility column settles it far more sharply
+than the agreement column ever could.
 
-The biomass comparison across view counts is **uninformative** — only 15
-specimens pass under every count, most R² are negative, and 12-vs-4 views is
-ΔRMSE −0.000 kg with an interval spanning zero. Do not read the ordering.
+**At four views, zero of twenty-five reconstructions are physically capable of
+weighing what the plant weighs.** The median implied bulk density is 9.2 kg/m³ —
+lighter than expanded polystyrene, and thirty to ninety times below fresh plant
+tissue. The hulls average 126 L for plants of at most 2.35 kg. These are not
+poor reconstructions, they are not reconstructions of the plant at all.
+
+Four views at 90° is the visual-hull minimum for a *convex* object. A plant is
+the opposite of convex, and every unsampled azimuth leaves a prism of empty space
+uncarved. Twelve views is where the number becomes non-absurd — 10.4 L and 117
+kg/m³ — and even there only 8 of 36 clear the bar.
+
+**This is the answer to "could we get away with four images?"** No, and the
+reason is measurable rather than a matter of taste. It also disposes of the
+biomass comparison across view counts, which was uninformative for a better
+reason than small n: below twelve views there is nothing to regress against.
+
+*(Previous figures, n=30 with a fixed 0.28 m pot cut: 17/30, 18/30, 26/30, 28/30
+usable and 133.9 / 159.3 / 250.3 / 19.3 L. The hull volumes fall throughout
+because each specimen's pot is now cut at its own rim.)*
 
 ---
 

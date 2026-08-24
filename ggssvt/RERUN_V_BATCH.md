@@ -268,6 +268,30 @@ defensible thing to change next.
 
 ---
 
+## 5b. The four-view question, answered
+
+| views | usable | agreement | mean above-ground hull | **plausible** | median kg/m³ |
+|---|---|---|---|---|---|
+| 3 | 23/38 | 0.360 | 99.3 L | **1/23** | 9.8 |
+| 4 | 25/38 | 0.424 | 126.5 L | **0/25** | 9.2 |
+| 6 | 34/38 | 0.521 | 150.4 L | **2/34** | 15.4 |
+| **12** | **36/38** | **0.608** | **10.4 L** | **8/36** | **116.8** |
+
+**At four views, zero of twenty-five reconstructions are physically capable of
+weighing what the plant weighs.** Median implied bulk density 9.2 kg/m³ —
+lighter than expanded polystyrene, thirty to ninety times below plant tissue, and
+hulls averaging 126 L for plants of at most 2.35 kg.
+
+Four views at 90° is the visual-hull minimum for a *convex* object; a plant is
+the opposite, and every unsampled azimuth leaves a prism of empty space uncarved.
+
+So the sampling question has a physical answer rather than a judgement call: **no,
+four images will not do**, and the agreement score alone would never have said so
+that clearly — it degrades gently from 0.608 to 0.424 while the reconstructions
+stop being reconstructions.
+
+---
+
 ## 6. Quality gate
 
 **36 of 38 pass, up from 28 of 30.** All eight V specimens pass. X001 is excluded
