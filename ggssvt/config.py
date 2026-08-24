@@ -207,15 +207,23 @@ SPECIES_COLUMN = "species_breed"
 EXCLUDED_PLANTS: tuple[str, ...] = ("X001",)   # 2 views only, single specimen
 
 
-def voxel_grid_centres() -> np.ndarray:
+def voxel_grid_centres(
+    resolution: int = VOXEL_RESOLUTION, voxel_size_m: float = VOXEL_SIZE_M
+) -> np.ndarray:
     """Return the (R, R, R, 3) world-frame centre of every voxel.
 
     The grid is centred on the plant axis in x/y and starts at the floor in z.
+
+    The arguments exist so a finer grid can cover the *same extent* as the
+    default one. TSDF fusion runs at 6 mm and 256^3, which is 1.536 m either way,
+    and keeping the extent identical is what makes a volume computed on one grid
+    comparable with a volume computed on the other.
     """
-    r = VOXEL_RESOLUTION
-    half = VOLUME_EXTENT_M / 2.0
-    xs = np.linspace(-half + VOXEL_SIZE_M / 2, half - VOXEL_SIZE_M / 2, r)
-    ys = np.linspace(-half + VOXEL_SIZE_M / 2, half - VOXEL_SIZE_M / 2, r)
-    zs = np.linspace(VOXEL_SIZE_M / 2, VOLUME_EXTENT_M - VOXEL_SIZE_M / 2, r)
+    r = resolution
+    extent = resolution * voxel_size_m
+    half = extent / 2.0
+    xs = np.linspace(-half + voxel_size_m / 2, half - voxel_size_m / 2, r)
+    ys = np.linspace(-half + voxel_size_m / 2, half - voxel_size_m / 2, r)
+    zs = np.linspace(voxel_size_m / 2, extent - voxel_size_m / 2, r)
     gx, gy, gz = np.meshgrid(xs, ys, zs, indexing="ij")
     return np.stack([gx, gy, gz], axis=-1)

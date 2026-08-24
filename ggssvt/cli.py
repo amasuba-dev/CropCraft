@@ -20,6 +20,7 @@ from pathlib import Path
 import numpy as np
 
 from .config import MODEL, TRAIN, WORK_DIR
+from .geometry.fusion import FUSION_RESOLUTION, FUSION_VOXEL_M
 
 
 def _add_common(parser: argparse.ArgumentParser) -> None:
@@ -148,7 +149,7 @@ def cmd_access(args: argparse.Namespace) -> int:
     wrong is almost never the token itself -- it is being logged in as a
     different account than the one that was approved.
     """
-    from .geometry.sam3d import SAM3D_OBJECTS_REPO, SAM3_REPO, SAM_REPOS
+    from .geometry.sam3d import SAM3_REPO, SAM3D_OBJECTS_REPO, SAM_REPOS
     from .models.backbones import DINOV2_REPOS, DINOV3_REPOS, repo_access
 
     try:
@@ -237,6 +238,62 @@ def cmd_preprocess(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_fuse(args: argparse.Namespace) -> int:
+    """TSDF-fuse every specimen and score the result against the carve."""
+    import time
+
+    from .config import voxel_grid_centres
+    from .data.preprocess import load_cached, usable_plant_ids
+    from .eval.fusion_features import fusion_features
+    from .eval.plausibility import classify, summarise
+
+    plant_ids = args.plants or usable_plant_ids(args.cache_dir)
+    heights = voxel_grid_centres()[..., 2]
+
+    print(f"Fusing {len(plant_ids)} specimens at {args.voxel * 1000:.0f} mm")
+    print("This is slow: the field is evaluated once per view over the whole grid.\n")
+
+    table, started = {}, time.time()
+    for index, plant_id in enumerate(plant_ids, start=1):
+        cached = load_cached(plant_id, args.cache_dir)
+        features = fusion_features(
+            cached, resolution=args.resolution, voxel_size_m=args.voxel
+        )
+        carved = float(
+            (cached.occupancy & (heights > cached.pot_height_m)).sum()
+        ) * cached.voxel_size_m ** 3
+        features["carve_above_rim_m3"] = carved
+        features["mass_kg"] = float(cached.target_kg)
+        table[plant_id] = features
+
+        print(
+            f"  [{index:2d}/{len(plant_ids)}] {plant_id}  "
+            f"carve {carved * 1000:7.2f} L   "
+            f"fused {features['tsdf_above_rim_m3'] * 1000:6.2f} L   "
+            f"coverage {features['tsdf_coverage']:.3f}"
+        )
+
+    print(f"\nfused in {(time.time() - started) / 60:.1f} min\n")
+
+    for label, key in [
+        ("carve (visual hull)", "carve_above_rim_m3"),
+        ("TSDF fusion", "tsdf_above_rim_m3"),
+    ]:
+        checks = [
+            classify(pid, row["mass_kg"], row[key]) for pid, row in table.items()
+        ]
+        summary = summarise(checks)
+        print(
+            f"  {label:22s} {summary['n_plausible']:2d}/{summary['n']} plausible, "
+            f"median {summary['median_density_kg_m3']:.1f} kg/m3"
+        )
+
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(json.dumps(table, indent=2), encoding="utf-8")
+    print(f"\nSaved to {args.out}")
+    return 0
+
+
 def cmd_views(args: argparse.Namespace) -> int:
     from .eval.view_ablation import format_table, run_ablation
 
@@ -310,8 +367,9 @@ def cmd_pretrain(args: argparse.Namespace) -> int:
     )
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    from . import __version__
     import torch
+
+    from . import __version__
 
     torch.save(
         {
@@ -756,6 +814,21 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common(baselines)
     baselines.add_argument("--plants", nargs="*")
     baselines.set_defaults(func=cmd_baselines)
+
+    fuse = sub.add_parser(
+        "fuse", help="TSDF depth fusion, an alternative to space carving"
+    )
+    _add_common(fuse)
+    fuse.add_argument("--plants", nargs="*")
+    fuse.add_argument(
+        "--voxel", type=float, default=FUSION_VOXEL_M,
+        help="fusion voxel size in metres; 6 mm is two depth samples across",
+    )
+    fuse.add_argument("--resolution", type=int, default=FUSION_RESOLUTION)
+    fuse.add_argument(
+        "--out", type=Path, default=WORK_DIR / "reports" / "fusion.json"
+    )
+    fuse.set_defaults(func=cmd_fuse)
 
     views = sub.add_parser(
         "views", help="view-count ablation across the per-view caches"

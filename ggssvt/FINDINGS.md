@@ -280,6 +280,69 @@ because each specimen's pot is now cut at its own rim.)*
 
 ---
 
+## 7b. TSDF depth fusion, which escapes the hull
+
+Space carving intersects silhouette cones, and Laurentini's result says the
+visual hull it produces is the maximal solid consistent with those silhouettes.
+That is a ceiling, not a resolution problem. A pot's rim casts no silhouette from
+anywhere on a circle around it, so the carve fills it; the gap between two leaves
+casts none either, so the carve fills that too. Finer voxels give a smoother
+envelope, never a gap.
+
+Depth maps are different evidence. A depth pixel does not say "the subject lies
+somewhere along this ray", it says "a surface is at exactly this distance".
+Integrated as a truncated signed distance field, concavities survive and
+unobserved space stays unknown instead of being filled in. One depth pixel spans
+3.0 mm at the working distance, so 6 mm voxels at 256 cubed are justified by the
+sensor where the 12 mm carving grid was chosen to keep carving tractable.
+
+**The reconstruction result is decisive**, and it is a measurement rather than a
+fitted comparison:
+
+| | plausible | median implied density | verdicts |
+|---|---|---|---|
+| carve, 12 mm hull | 8/36 | 116.8 kg/m³ | 25 envelope, 3 missing |
+| **TSDF, 6 mm fusion** | **31/36** | **529.2 kg/m³** | 1 envelope, 4 missing |
+
+M001 is the clearest case: 25.79 L of hull above the rim for a 0.74 kg shoot,
+against 1.18 L fused. The hull implied 28.7 kg/m³, the fusion 629. Mean coverage
+is 0.12, so roughly one eighth of the working volume was ever measured and the
+rest is honestly absent rather than assumed solid.
+
+**The biomass result is real but unresolved**, which by now is the expected
+outcome at this sample size:
+
+| feature set | all 36 | Eucalyptus only (n=26) |
+|---|---|---|
+| carved geometry (7) | 0.544 / +0.030 | 0.717 / **−0.313** |
+| direct 2D (7) | 0.469 / +0.279 | 0.520 / +0.311 |
+| **TSDF geometry (7)** | **0.465 / +0.290** | **0.494 / +0.377** |
+| TSDF + 2D (14) | **0.429 / +0.396** | |
+| mean predictor | 0.552 | 0.626 |
+
+Paired bootstrap, 20,000 resamples: TSDF against carved geometry is −0.079
+[−0.242, +0.066] on all 36 and −0.223 [−0.498, +0.021] on Eucalyptus, and against
+direct 2D it is −0.004 [−0.134, +0.133]. **Nothing resolves.** Do not report an
+ordering from this table.
+
+What is worth reporting is the sign change. **TSDF geometry is the first 3D
+feature set to clear the mean-predictor floor within a species.** Carved geometry
+sits at R² −0.313 against a floor of −0.082, meaning it carries no usable mass
+signal; the fused features sit at +0.377. Crossing the floor is a different
+statement from winning a head-to-head, and it is the one that follows from the
+plausibility result rather than from a difference in means.
+
+**The limits, stated plainly.** Twelve views leave most leaf undersides
+unobserved, so this does not resolve individual leaves and is not a substitute
+for a dense photogrammetric capture. The fused interior is a band one truncation
+width deep behind each observed surface, not a filled solid, so its volume is a
+proxy rather than the plant's volume. And 6 mm is the sensor's limit, not the
+plant's: a Eucalyptus leaf is 0.3 mm thick.
+
+Ten minutes for all 36 on one CPU core. `python -m ggssvt.cli fuse`.
+
+---
+
 ## 8. Bugs found and fixed
 
 Several would have produced confident wrong numbers rather than errors.
