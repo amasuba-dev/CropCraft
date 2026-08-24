@@ -667,13 +667,19 @@ def cmd_mesh(args: argparse.Namespace) -> int:
 def cmd_dashboard(args: argparse.Namespace) -> int:
     """Build the self-contained research walkthrough page."""
     from .eval.dashboard_data import build_payload
-    from .eval.dashboard_html import build_dashboard
+    from .eval.site_html import build_site
 
     payload = build_payload()
-    out = build_dashboard(payload.to_json(), out_path=args.out)
-    size = out.stat().st_size / 1e6
-    print(f"Wrote {out} ({size:.2f} MB, {len(payload.specimens)} specimens)")
-    print("Open it directly in a browser -- it needs no server.")
+    teaser = WORK_DIR / "reports" / "gallery" / "contact_sheet_geometric.png"
+    index = build_site(
+        payload.to_json(), payload.summary, out_dir=args.out, teaser=teaser
+    )
+    size = index.stat().st_size / 1e6
+    print(f"Wrote {index} ({size:.2f} MB, {len(payload.specimens)} specimens)")
+    if not teaser.exists():
+        print(f"  no teaser image at {teaser}; run `cli gallery` to produce it")
+    print("A GitHub Pages layout: index.html plus static/. Open index.html directly,")
+    print("or push the whole directory to a *.github.io repository.")
     return 0
 
 
@@ -921,7 +927,10 @@ def build_parser() -> argparse.ArgumentParser:
         "dashboard", help="build the research walkthrough page"
     )
     dashboard.add_argument(
-        "--out", type=Path, default=WORK_DIR / "reports" / "dashboard.html"
+        "--out",
+        type=Path,
+        default=WORK_DIR / "site",
+        help="site directory to write (index.html plus static/)",
     )
     dashboard.set_defaults(func=cmd_dashboard)
 

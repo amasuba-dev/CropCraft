@@ -1,0 +1,340 @@
+const D = __PAYLOAD__;
+const S = D.specimens, byId = new Map(S.map(s => [s.id, s]));
+let current = S[0].id, segmenter = D.summary.segmenters[0], colourMode = "segment";
+let yaw = 0.62, pitch = 0.2, zoom = 0.9;
+
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const hex = h => { h=h.replace("#",""); if(h.length===3) h=h.split("").map(c=>c+c).join("");
+  return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]; };
+const mix = (a,b,t) => Math.round(a+(b-a)*t);
+const f = (v,d=2) => (v===null||v===undefined||Number.isNaN(v)) ? "—" : Number(v).toFixed(d);
+
+async function inflate(b64){
+  const bin = Uint8Array.from(atob(b64), c=>c.charCodeAt(0));
+  if (typeof DecompressionStream === "undefined") return null;
+  const st = new Blob([bin]).stream().pipeThrough(new DecompressionStream("deflate"));
+  return new Uint8Array(await new Response(st).arrayBuffer());
+}
+
+const cache = new Map();
+async function cloud(id, seg){
+  const key = id+"/"+seg, e = byId.get(id).clouds[seg];
+  if (cache.has(key)) return cache.get(key);
+  if (!e) { cache.set(key,null); return null; }
+  const bytes = await inflate(e.data);
+  let out = null;
+  if (bytes){
+    const n = Math.floor(bytes.length/3);
+    const pts = new Float32Array(n*3), h = new Float32Array(n);
+    let lo=[255,255,255], hi=[0,0,0];
+    for(let i=0;i<n;i++) for(let a=0;a<3;a++){
+      const v=bytes[i*3+a]; if(v<lo[a])lo[a]=v; if(v>hi[a])hi[a]=v; }
+    const span = Math.max(1, hi[0]-lo[0], hi[1]-lo[1], hi[2]-lo[2]);
+    const mid = [(lo[0]+hi[0])/2,(lo[1]+hi[1])/2,(lo[2]+hi[2])/2];
+    // z byte 0..255 maps to 0..(resolution*voxel) metres over the working volume
+    const metresPerByte = (e.resolution * 0.024) / 255;
+    for(let i=0;i<n;i++){
+      pts[i*3]   = (bytes[i*3]  -mid[0])/span;
+      pts[i*3+1] = (bytes[i*3+1]-mid[1])/span;
+      pts[i*3+2] = (bytes[i*3+2]-mid[2])/span + 0.5;
+      h[i] = bytes[i*3+2] * metresPerByte;
+    }
+    out = {pts, h, n, id};
+  }
+  cache.set(key,out); return out;
+}
+
+/* Each specimen's own rim. Pot mass spans 0.7-32 kg across the batches, so one
+   shared cut height puts the pot/canopy boundary in the wrong place for most of
+   them. Falls back to the configured constant where no rim was detectable. */
+function potHeight(c){
+  const s = c ? byId.get(c.id) : null;
+  return (s && s.pot_height_m != null) ? s.pot_height_m : D.summary.pot_height_m;
+}
+
+function draw(canvas, c, {dot=3, mode=colourMode, yawL=yaw, pitchL=pitch, zoomL=zoom}={}){
+  const ctx = canvas.getContext("2d"), dpr = Math.min(devicePixelRatio||1,2);
+  const w = canvas.clientWidth, hgt = canvas.clientHeight;
+  if (!w || !hgt) return;
+  if (canvas.width !== Math.round(w*dpr)){ canvas.width=Math.round(w*dpr); canvas.height=Math.round(hgt*dpr); }
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,hgt);
+  if(!c){ ctx.fillStyle=css("--ink-3"); ctx.font="13px 'Noto Sans',sans-serif";
+    ctx.textAlign="center"; ctx.fillText("not reconstructed",w/2,hgt/2); return; }
+
+  const cy=Math.cos(yawL), sy=Math.sin(yawL), cp=Math.cos(pitchL), sp=Math.sin(pitchL);
+  const P = new Float32Array(c.n*3);
+  for(let i=0;i<c.n;i++){
+    const x=c.pts[i*3], y=c.pts[i*3+1], z=c.pts[i*3+2]-0.5;
+    const rx=x*cy+y*sy, rz=-x*sy+y*cy;
+    P[i*3]=rx; P[i*3+1]=z*cp-rz*sp; P[i*3+2]=z*sp+rz*cp;
+  }
+  const ord = Array.from({length:c.n},(_,i)=>i).sort((a,b)=>P[a*3+2]-P[b*3+2]);
+  const scale = Math.min(w,hgt)*zoomL;
+  let dmin=Infinity,dmax=-Infinity;
+  for(let i=0;i<c.n;i++){const d=P[i*3+2]; if(d<dmin)dmin=d; if(d>dmax)dmax=d;}
+  const dspan = Math.max(1e-6,dmax-dmin);
+  const nc=hex(css("--near")), fc=hex(css("--far"));
+  const cc=hex(css("--canopy")), pc=hex(css("--pot"));
+  const pot = potHeight(c);
+
+  for(const i of ord){
+    const sx=w/2+P[i*3]*scale, sv=hgt/2-P[i*3+1]*scale;
+    const t=(P[i*3+2]-dmin)/dspan;
+    let col;
+    if(mode==="segment"){
+      const base = c.h[i] > pot ? cc : pc;
+      const k = 0.55+0.45*t;
+      col = `rgb(${Math.round(base[0]*k)},${Math.round(base[1]*k)},${Math.round(base[2]*k)})`;
+    } else {
+      col = `rgb(${mix(fc[0],nc[0],t)},${mix(fc[1],nc[1],t)},${mix(fc[2],nc[2],t)})`;
+    }
+    ctx.fillStyle=col; ctx.fillRect(sx,sv,dot,dot);
+  }
+}
+
+function drawSlices(c){
+  const host = document.getElementById("slices"); host.innerHTML="";
+  if(!c) return;
+  const pot = potHeight(c);
+  const hmax = Math.max(...c.h);
+  const bands = 6, step = hmax/bands;
+  for(let b=0;b<bands;b++){
+    const lo=b*step, hi=(b+1)*step;
+    const cell=document.createElement("div"); cell.className="slice";
+    const cv=document.createElement("canvas"); cv.width=180; cv.height=180;
+    const cap=document.createElement("span");
+    cell.appendChild(cv); cell.appendChild(cap); host.appendChild(cell);
+
+    const ctx=cv.getContext("2d");
+    ctx.fillStyle="#f5f5f5"; ctx.fillRect(0,0,180,180);
+    const isCanopy = lo >= pot;
+    const base = hex(isCanopy ? css("--canopy") : css("--pot"));
+    ctx.fillStyle = `rgb(${base[0]},${base[1]},${base[2]})`;
+    let count=0;
+    for(let i=0;i<c.n;i++){
+      if(c.h[i]<lo||c.h[i]>=hi) continue;
+      const x=90+c.pts[i*3]*150, y=90+c.pts[i*3+1]*150;
+      ctx.fillRect(x,y,2,2); count++;
+    }
+    if(!count){ ctx.fillStyle="#b5b5b5"; ctx.font="11px 'Noto Sans',sans-serif";
+      ctx.textAlign="center"; ctx.fillText("empty",90,92); }
+    cap.textContent = `${lo.toFixed(2)}–${hi.toFixed(2)} m · ${isCanopy?"canopy":"pot"}`;
+  }
+}
+
+function pipeline(){
+  const stages=[
+    ["Acquisition","Two Kinect v2 units carried through six positions; twelve registered RGB-D frames per plant."],
+    ["Registration","Floor plane per view gives tilt, roll and height; the subject axis fixes the origin. No calibration target exists."],
+    ["Segmentation","A cylinder about the plant axis, optionally refined by SAM and made consistent across views."],
+    ["Carving","Silhouette and depth carving to a 128³ occupancy field. This is the self-supervision target."],
+    ["Mesh","Marching cubes, then surface area, enclosed volume and solidity."],
+    ["Biomass","Volume and shape read for above-ground mass, scored leave-one-out."]];
+  document.getElementById("pipe").innerHTML = stages.map(([t,d])=>
+    `<div class="stage"><b>${t}</b><span>${d}</span></div>`).join("");
+}
+
+function methodTable(){
+  const ref=D.summary.reference_method;
+  const head=`<thead><tr><th>Method</th><th>RMSE kg</th><th>MAE kg</th><th>MARE %</th>
+    <th>R²</th><th>vs ${ref}</th></tr></thead>`;
+  const rows=D.methods.map((m,i)=>{
+    const v=m.vs_reference;
+    const cell = m.name===ref ? '<span class="has-text-grey">reference</span>'
+      : v ? `${v.difference>0?"+":""}${f(v.difference,3)}
+             <span class="tag is-small ${v.resolved?"is-success":"is-light"}">${v.resolved?"resolved":"not resolved"}</span>`
+          : "—";
+    return `<tr class="${i===0?"best":""}"><td>${m.name}</td>
+      <td>${f(m.rmse_kg,3)}</td><td>${f(m.mae_kg,3)}</td>
+      <td>${f(m.mare_pct,1)}</td><td>${f(m.r2,3)}</td>
+      <td>${cell}</td></tr>`;}).join("");
+  document.getElementById("methods").innerHTML = head+`<tbody>${rows}</tbody>`;
+}
+
+function nextTable(){
+  const rows=[
+    ["DUSt3R","naver/DUSt3R_ViTLarge_BaseDecoder_512_dpt","Pairwise point maps fused by global alignment; 132 forward passes per specimen."],
+    ["MASt3R","naver/MASt3R_ViTLarge_BaseDecoder_512_catmlpdpt_metric","The metric variant returns real scale, which is what a volume needs."],
+    ["Fast3R","jedyang97/Fast3R_ViT_Large_512","All twelve views in one forward pass; twenty times cheaper, so run it first."]];
+  document.getElementById("next").innerHTML =
+    `<thead><tr><th>Method</th><th>Weights</th><th>Why it is worth running</th></tr></thead>`
+    + `<tbody>${rows.map(([a,b,d])=>
+      `<tr><td><strong>${a}</strong></td><td class="is-size-7">${b}</td>
+       <td class="is-size-7">${d}</td></tr>`).join("")}</tbody>`;
+}
+
+function honesty(){
+  const s=D.summary;
+  document.getElementById("confound").innerHTML =
+    `Across the Eucalyptus specimens, knowing only which capture batch a plant came from
+     explains <strong>R² = ${s.batch_confound_r2}</strong> of the mass variance &mdash;
+     more than any method in the table above achieves. The batches average
+     ${Object.entries(s.batch_means_kg).map(([k,v])=>`<strong>${v} kg</strong> (${k})`).join(", ")}.
+     It was R² = 0.887 on the two original batches alone.`;
+  const pl = s.plausibility;
+  document.getElementById("plausibility").innerHTML =
+    `Dividing each weighed mass by its reconstructed above-ground volume gives an implied
+     bulk density. Fresh plant tissue is 300&ndash;900 kg/m³. Only
+     <strong>${pl.n_plausible} of ${pl.n}</strong> specimens land inside a generous
+     ${pl.band_kg_m3[0]}&ndash;${pl.band_kg_m3[1]} band; the median is
+     <strong>${pl.median_density_kg_m3} kg/m³</strong>.
+     ${pl.verdicts.envelope || 0} imply less &mdash; the hull enclosing air &mdash; and
+     ${pl.verdicts.missing || 0} imply more, meaning they were barely reconstructed.`;
+  document.getElementById("notes").innerHTML =
+    "<ul>" + Object.values(D.notes).map(t=>`<li>${t}</li>`).join("") + "</ul>";
+}
+
+function scatter(){
+  const cv=document.getElementById("scatter"), ctx=cv.getContext("2d");
+  const best=D.methods[0].name;
+  const pts=S.map(s=>({x:s.target_kg, y:s.predictions[best], id:s.id, sp:s.species}));
+  const lim=Math.max(...pts.flatMap(p=>[p.x,p.y]))*1.12, pad=54;
+  const sx=v=>pad+(v/lim)*(cv.width-2*pad), sy=v=>cv.height-pad-(v/lim)*(cv.height-2*pad);
+
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.fillStyle="#ffffff"; ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.strokeStyle="#b5b5b5"; ctx.setLineDash([5,5]); ctx.beginPath();
+  ctx.moveTo(sx(0),sy(0)); ctx.lineTo(sx(lim),sy(lim)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle="#4a4a4a"; ctx.beginPath();
+  ctx.moveTo(pad,cv.height-pad); ctx.lineTo(cv.width-pad,cv.height-pad);
+  ctx.moveTo(pad,pad); ctx.lineTo(pad,cv.height-pad); ctx.stroke();
+
+  ctx.fillStyle="#7a7a7a"; ctx.font="12px 'Noto Sans',sans-serif";
+  for(let i=0;i<=4;i++){
+    const v=lim*i/4;
+    ctx.textAlign="center"; ctx.fillText(v.toFixed(1), sx(v), cv.height-pad+18);
+    ctx.textAlign="right";  ctx.fillText(v.toFixed(1), pad-8, sy(v)+4);
+  }
+  ctx.textAlign="center"; ctx.font="13px 'Noto Sans',sans-serif"; ctx.fillStyle="#4a4a4a";
+  ctx.fillText("weighed mass (kg)", cv.width/2, cv.height-14);
+  ctx.save(); ctx.translate(16,cv.height/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText("predicted mass (kg)",0,0); ctx.restore();
+
+  const palette={};
+  D.summary.species.forEach((sp,i)=>{ palette[sp] = i===0 ? css("--canopy") : css("--near"); });
+  for(const p of pts){
+    ctx.fillStyle=palette[p.sp]||"#4a4a4a"; ctx.globalAlpha=.8;
+    ctx.beginPath(); ctx.arc(sx(p.x),sy(p.y),6,0,7); ctx.fill(); ctx.globalAlpha=1;
+  }
+  ctx.font="12px 'Noto Sans',sans-serif"; ctx.textAlign="left";
+  D.summary.species.forEach((sp,i)=>{
+    ctx.fillStyle=palette[sp]; ctx.beginPath(); ctx.arc(pad+12,pad+14+i*20,5,0,7); ctx.fill();
+    ctx.fillStyle="#4a4a4a"; ctx.fillText(sp,pad+24,pad+18+i*20);
+  });
+
+  const idle = `<p class="is-size-7 has-text-grey">Showing <strong>${best}</strong>, the lowest-RMSE method.</p>`;
+  document.getElementById("scatterinfo").innerHTML = idle;
+  cv.onmousemove = e=>{
+    const r=cv.getBoundingClientRect();
+    const mx=(e.clientX-r.left)*cv.width/r.width, my=(e.clientY-r.top)*cv.height/r.height;
+    const hit=pts.find(p=>Math.hypot(sx(p.x)-mx, sy(p.y)-my)<10);
+    document.getElementById("scatterinfo").innerHTML = hit
+      ? `<p class="is-size-7"><strong>${hit.id}</strong> &middot; ${hit.sp}<br>
+         weighed ${f(hit.x)} kg &middot; predicted ${f(hit.y)} kg</p>`
+      : idle;
+  };
+}
+
+function segButtons(){
+  document.getElementById("segmenter").innerHTML = D.summary.segmenters.map((s,i)=>
+    `<button class="button is-small" data-seg="${s}" aria-pressed="${i===0}">${s==="sam3d"?"SAM3D":"Geometric"}</button>`).join("");
+  syncPressed(document.getElementById("segmenter"));
+  syncPressed(document.getElementById("colour"));
+}
+
+/* Bulma has no aria-pressed styling of its own, so the selected button is given
+   is-dark to match the template's link buttons. */
+function syncPressed(group){
+  [...group.children].forEach(b =>
+    b.classList.toggle("is-dark", b.getAttribute("aria-pressed") === "true"));
+}
+
+function legend(){
+  document.getElementById("legend").innerHTML = colourMode==="segment"
+    ? `<i style="background:var(--canopy)"></i>above pot rim
+       &nbsp;<i style="background:var(--pot)"></i>pot and below`
+    : `<i style="background:var(--near)"></i>nearer
+       &nbsp;<i style="background:var(--far)"></i>further`;
+}
+
+async function buildList(){
+  const host=document.getElementById("list"); host.innerHTML="";
+  for(const s of [...S].sort((a,b)=>a.id.localeCompare(b.id))){
+    const b=document.createElement("button"); b.type="button";
+    b.dataset.id = s.id;
+    b.setAttribute("aria-current", String(s.id===current));
+    const verdict = s.density_verdict || "unknown";
+    b.innerHTML=`<span><span class="verdict ${verdict}" title="${verdict}"></span>${s.id}</span>
+      <span class="mass">${f(s.target_kg)} kg</span>`;
+    b.onclick=()=>select(s.id);
+    host.appendChild(b);
+  }
+}
+
+async function render(){
+  const c = await cloud(current, segmenter);
+  draw(document.getElementById("stage"), c);
+  drawSlices(c);
+  document.getElementById("cloudinfo").textContent =
+    c ? `${c.n.toLocaleString()} voxels shown` : "";
+  legend();
+}
+
+function facts(){
+  const s=byId.get(current), q=s.quality[segmenter]||{}, m=s.mesh||{};
+  const density = s.density_kg_m3 == null ? "—" : `${Math.round(s.density_kg_m3)}`;
+  const rim = s.pot_height_m == null ? "—"
+    : `${f(s.pot_height_m)}${s.pot_confident === false ? "*" : ""}`;
+  // above_rim_l is cut at this specimen's own rim, which is what the implied
+  // density divides by. quality.above_ground_l uses the global constant and
+  // would contradict it on screen.
+  const rows=[["Weighed",f(s.target_kg)+" kg"],["Hull",f(q.volume_l,1)+" L"],
+    ["Above rim",f(s.above_rim_l,1)+" L"],["Height",f(q.height_m)+" m"],
+    ["Pot rim",rim+" m"],["Implied density",density+" kg/m³"],
+    ["Canopy area",f(m.canopy_area_m2,2)+" m²"],["Solidity",f(m.solidity,2)]];
+  document.getElementById("sfacts").innerHTML = rows.map(([k,v])=>
+    `<div class="fact"><b>${v}</b><span>${k}</span></div>`).join("");
+}
+
+async function select(id){
+  current=id; const s=byId.get(id);
+  document.getElementById("sid").textContent=id;
+  document.getElementById("sspecies").textContent=s.species;
+  const best=D.methods[0].name;
+  document.getElementById("ssub").textContent =
+    `${best}: ${f(s.predictions[best])} kg predicted`;
+  document.querySelectorAll("#list button").forEach(b=>
+    b.setAttribute("aria-current", String(b.dataset.id===id)));
+  facts(); await render();
+}
+
+function attach(){
+  const cv=document.getElementById("stage");
+  let drag=false, lx=0, ly=0;
+  cv.addEventListener("pointerdown",e=>{drag=true;lx=e.clientX;ly=e.clientY;cv.setPointerCapture(e.pointerId)});
+  cv.addEventListener("pointermove",e=>{ if(!drag)return;
+    yaw+=(e.clientX-lx)*0.01; pitch=Math.max(-1.4,Math.min(1.4,pitch+(e.clientY-ly)*0.01));
+    lx=e.clientX; ly=e.clientY; cloud(current,segmenter).then(c=>draw(cv,c)); });
+  const stop=e=>{drag=false; try{cv.releasePointerCapture(e.pointerId)}catch(_){}};
+  cv.addEventListener("pointerup",stop); cv.addEventListener("pointercancel",stop);
+  cv.addEventListener("wheel",e=>{e.preventDefault();
+    zoom=Math.max(.3,Math.min(2.4,zoom*(e.deltaY>0?.92:1.08)));
+    cloud(current,segmenter).then(c=>draw(cv,c)); },{passive:false});
+
+  document.getElementById("segmenter").onclick=async e=>{
+    const b=e.target.closest("button"); if(!b)return;
+    segmenter=b.dataset.seg;
+    [...e.currentTarget.children].forEach(x=>x.setAttribute("aria-pressed",String(x===b)));
+    syncPressed(e.currentTarget);
+    await buildList(); facts(); await render(); };
+  document.getElementById("colour").onclick=async e=>{
+    const b=e.target.closest("button"); if(!b)return;
+    colourMode=b.dataset.mode;
+    [...e.currentTarget.children].forEach(x=>x.setAttribute("aria-pressed",String(x===b)));
+    syncPressed(e.currentTarget);
+    await render(); };
+  addEventListener("resize",()=>cloud(current,segmenter).then(c=>draw(document.getElementById("stage"),c)));
+}
+
+pipeline(); methodTable(); nextTable(); honesty(); scatter(); segButtons();
+buildList().then(attach).then(()=>select(current));

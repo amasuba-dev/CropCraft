@@ -146,11 +146,9 @@ def build_payload(
             above = cached.occupancy & (
                 voxel_grid_centres()[..., 2] > cached.pot_height_m
             )
-            check = classify(
-                plant_id,
-                float(cached.target_kg),
-                float(above.sum()) * cached.voxel_size_m ** 3,
-            )
+            above_volume = float(above.sum()) * cached.voxel_size_m ** 3
+            entry.setdefault("above_rim_l", round(above_volume * 1000.0, 2))
+            check = classify(plant_id, float(cached.target_kg), above_volume)
             entry.setdefault("density_kg_m3", round(check.density_kg_m3, 1)
                              if np.isfinite(check.density_kg_m3) else None)
             entry.setdefault("density_verdict", check.verdict)
@@ -161,6 +159,9 @@ def build_payload(
                     "coverage": round(q.surface_coverage, 3),
                     "agreement": round(q.multiview_agreement, 3),
                     "volume_l": round(q.volume_m3 * 1000, 2),
+                    # Computed at preprocess time against the global constant.
+                    # `above_rim_l` on the entry is the per-specimen figure, and
+                    # is the one the density is derived from -- do not show both.
                     "above_ground_l": round(q.above_ground_volume_m3 * 1000, 2),
                     "height_m": round(q.height_m, 3),
                     "usable": bool(q.is_usable()),
