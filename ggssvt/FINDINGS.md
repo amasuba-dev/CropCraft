@@ -395,6 +395,63 @@ regressor has.**
 
 ---
 
+## 7d. DITR-style DINO lifting, and why it does not rescue E001-E010
+
+Requested by the supervisor, after Knaebel et al., who observe that 3D
+segmentation largely ignores 2D foundation models even where calibrated images
+sit beside the point cloud. DITR extracts frozen DINOv2 patch features, projects
+the points into each camera to look them up, pools across views, and injects the
+result into a 3D backbone trained with a supervised loss.
+
+The first half transfers directly and is implemented in
+`ggssvt/geometry/dino_lift.py`. The second half does not: DITR trains on
+ScanNet, S3DIS and nuScenes, which supply per-point semantic labels, and this
+dataset supplies none. The supervised head is therefore replaced by k-means over
+the pooled features, which makes the question **can a foundation model separate
+plant from pot where excess-green cannot?**
+
+The success criteria were written down before the run, because otherwise any
+clustering looks like a result. A useful separation puts the clusters at
+different heights, puts most of the volume near the floor in one and most above
+the rim in the other, and does so on the batch where colour fails.
+
+| batch | n | mean height gap | agreement with rim | upper cluster above rim | rim confident |
+|---|---|---|---|---|---|
+| E001-E010 | 10 | 0.212 m | 0.704 | **0.497** | 1/10 |
+| E011-E020 | 8 | 0.472 m | 0.905 | 0.786 | 8/8 |
+| Mango | 10 | 0.620 m | **0.969** | **0.971** | 8/10 |
+| V001-V008 | 8 | 0.365 m | 0.741 | **0.358** | 8/8 |
+
+**The answer is no.** On Mango the lifted clustering recovers essentially the
+same boundary the geometric rim detector found, agreeing on 96.9 per cent of
+points with 97.1 per cent of the upper cluster above the rim, and M001 alone
+reaches 0.998. Two methods sharing no mechanism agreeing that closely is a real
+validation of the rim estimator, and it is the useful half of this result.
+
+But E001-E010, the batch this was run for, gives 0.497: the upper cluster falls
+half above and half below the rim, which is what a split unrelated to the
+pot boundary looks like. V001-V008 gives 0.358 with confident rims, meaning the
+clustering there finds a *different* boundary from the geometric one rather than
+a better one. **DINO features confirm the split where it is already findable and
+do not find it where it is not.**
+
+**The reason is resolution, again.** DINOv2 with patch 14 on a 512 by 416 frame
+gives a 37 by 30 patch grid, so one patch spans 13.8 pixels, which is 42 mm at
+the 1.1 m working distance. A Eucalyptus stem is 5 to 15 mm. Every patch that
+contains stem also contains pot, soil or background, so no pooling of those
+features can separate the two. This is the same argument as the 12 mm voxel and
+it has the same shape: the instrument is coarser than the structure.
+
+Worth being precise about what this does and does not rule out. It rules out
+patch-level DINOv2 at this capture resolution. It does not rule out DITR itself,
+which was never given the labelled 3D data it is built for, nor a
+higher-resolution capture, nor SAM-family masks lifted the way SAMa lifts them,
+which operate on pixels rather than 42 mm patches.
+
+`python -m ggssvt.cli dino-segment`, about 15 seconds a specimen on CPU.
+
+---
+
 ## 8. Bugs found and fixed
 
 Several would have produced confident wrong numbers rather than errors.

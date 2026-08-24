@@ -303,6 +303,25 @@ def cmd_fuse(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_dino_segment(args: argparse.Namespace) -> int:
+    """Lift DINOv2 features onto the carved points and cluster them."""
+    import json as _json
+
+    from .eval.dino_segment import run, summarise
+
+    print("Lifting DINOv2 patch features onto carved points, DITR-style.")
+    print("Unsupervised: this dataset has no per-point labels, so the")
+    print("supervised head is replaced by clustering.\n")
+
+    results = run(
+        args.plants, cache_dir=args.cache_dir, variant=args.variant, out=args.out
+    )
+    print()
+    print(_json.dumps(summarise(results), indent=2))
+    print(f"\nSaved to {args.out}")
+    return 0
+
+
 def cmd_architecture(args: argparse.Namespace) -> int:
     """Render one architecture diagram per methodology."""
     from .eval.architecture import write_all
@@ -865,6 +884,18 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     fuse.set_defaults(func=cmd_fuse)
+
+    dino_seg = sub.add_parser(
+        "dino-segment",
+        help="lift DINOv2 features onto the points and cluster (DITR-style)",
+    )
+    _add_common(dino_seg)
+    dino_seg.add_argument("--plants", nargs="*")
+    dino_seg.add_argument("--variant", default="base", choices=["small", "base", "large"])
+    dino_seg.add_argument(
+        "--out", type=Path, default=WORK_DIR / "reports" / "dino_segment.json"
+    )
+    dino_seg.set_defaults(func=cmd_dino_segment)
 
     architecture = sub.add_parser(
         "architecture", help="architecture diagram per methodology, as SVG"
