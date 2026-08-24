@@ -16,7 +16,37 @@ The four components named in the dissertation scaffold:
 | Biomass head | [`models/head.py`](models/head.py) | Volume integration with a modulated density prior |
 | SAM3D segmentation | [`geometry/sam3d.py`](geometry/sam3d.py) | Promptable masks made 3D-consistent across views |
 
+Built since, and mostly because the carve turned out to be the limiting
+component rather than the model:
+
+| Component | Module | What it does |
+|---|---|---|
+| TSDF depth fusion | [`geometry/fusion.py`](geometry/fusion.py) | Integrates depth instead of intersecting silhouettes, so concavities survive |
+| Per-specimen pot rim | [`geometry/pot.py`](geometry/pot.py) | Finds the rim as a step in the vertical profile, and refuses when there is none |
+| Plausibility diagnostic | [`eval/plausibility.py`](eval/plausibility.py) | Mass over volume against the density of plant tissue |
+| Acceptance gates | [`eval/gates.py`](eval/gates.py) | Blocking and advisory checks per stage, including a collapsed training run |
+| Training campaign | [`campaign.py`](campaign.py) | The whole programme under one command, resumable, target-fingerprinted |
+| Reconstruction registry | [`eval/methods.py`](eval/methods.py) | Which reconstruction sources exist, and why some cannot |
+| DITR-style feature lifting | [`geometry/dino_lift.py`](geometry/dino_lift.py) | DINOv2 patch features projected onto the points, with an occlusion test |
+| View-count ablation | [`eval/view_ablation.py`](eval/view_ablation.py) | Whether four images would have done. They would not |
+| Experiment log | [`eval/progress.py`](eval/progress.py) | What has run, what has not, and what is stale |
+| Project page | [`eval/site_html.py`](eval/site_html.py) | A GitHub Pages site generated from the artefacts |
+| Architecture figures | [`eval/architecture.py`](eval/architecture.py) | One diagram per methodology, drawn from config |
+
 ## Where the research stands
+
+**The headline has changed.** The reconstruction step, not the regressor, was the
+limiting component. Space carving produces the visual hull, which Laurentini
+showed is the maximal solid consistent with the silhouettes, so a pot rim and the
+gap between two leaves are both filled at any resolution. Only 8 of 36 carved
+specimens imply a bulk density inside a generous 200 to 1000 kg/m³ band.
+Integrating the same depth maps as a signed distance field instead raises that to
+25 at the identical grid and 31 at the resolution the sensor supports, and moves
+biomass RMSE from 0.544 to 0.335 kg with a paired bootstrap of −0.209
+[−0.363, −0.066]. That is the first resolved improvement in the project.
+
+**GG-SSVT itself has still never been trained.** Everything above comes from the
+geometry pipeline, frozen features, or classical baselines.
 
 - **[RESEARCH_STATUS.md](RESEARCH_STATUS.md)**: every research question and
   hypothesis from the proposal, what answers it, what is pending, and what to do
@@ -25,6 +55,14 @@ The four components named in the dissertation scaffold:
   into six measurable sub-claims; four are already established.
 - **[FINDINGS.md](FINDINGS.md)**: every experiment run, the deductions, the bugs
   found, and what can be reported today.
+- **[RERUN_V_BATCH.md](RERUN_V_BATCH.md)**: what the measured pot weights
+  changed, including the claim that had to be withdrawn.
+- **[POSEFREE.md](POSEFREE.md)**: DUSt3R, MASt3R and Fast3R. Installed, verified,
+  not yet run, and the install instructions that were wrong before.
+
+The generated project page lives in `work_dirs/ggssvt/site/` after
+`python -m ggssvt.cli dashboard`. Its Experiment log is built by walking the work
+directory, so it records what has actually run rather than what was intended.
 
 ## Setup and today's experiments
 
@@ -35,8 +73,8 @@ worth repeating here:
 - **Two conda environments are required.** Nerfstudio pins torch 2.0.1+cu118 and
   Python 3.8; GG-SSVT needs `transformers >= 4.56`, which will not install there.
   [`environment.yml`](environment.yml) builds the GG-SSVT one.
-- **`--finetune-epochs` defaults to 200**: which in a 28-fold leave-one-out sweep
-  is about 29 GPU-hours per condition. Override it.
+- **`--finetune-epochs` defaults to 200**: which in a 36-fold leave-one-out sweep
+  is well over a day per condition. Override it.
 
 ## Quick start
 
@@ -49,24 +87,43 @@ python -m ggssvt.cli preprocess
 ```
 
 ```bash
+python -m ggssvt.cli gate
+```
+
+```bash
+python -m ggssvt.cli fuse --write-cache
+```
+
+```bash
 python -m ggssvt.cli baselines
 ```
 
 ```bash
-python -m ggssvt.cli pretrain --epochs 120 --out work_dirs/ggssvt/checkpoints/pretrain.pt
-```
-
-```bash
-python -m ggssvt.cli loocv --checkpoint work_dirs/ggssvt/checkpoints/pretrain.pt
-```
-
-```bash
-python -m ggssvt.cli report
+python -m ggssvt.cli report && python -m ggssvt.cli dashboard
 ```
 
 `preprocess` takes roughly nine seconds per specimen and writes a ~4 MB archive
-each; everything after it reads only the cache. Only `pretrain` and `loocv` need
-a GPU.
+each; everything after it reads only the cache. `gate` runs 324 acceptance checks
+and exits non-zero if any is blocking, so it is worth putting in front of
+anything long. `fuse` is eleven minutes and everything downstream reads the cache
+it writes.
+
+For the trained model, do not hand-run `pretrain` and `loocv`: use the campaign,
+which queues the whole programme, resumes after an interruption, refuses to reuse
+a run fitted to different targets, and blocks a run that learned nothing.
+
+```bash
+python -m ggssvt.campaign --plan smoke --device cuda
+```
+
+```bash
+python -m ggssvt.campaign --plan core --device cuda --workers 8 --batch-size 2
+```
+
+Smoke first: five minutes over four specimens, and it proves the loop, the
+checkpointing and the resume before a night is committed to them.
+**[RUNBOOK.md](RUNBOOK.md) has the full thirteen-step sequence**; this is the
+short version.
 
 ## Pipeline
 
@@ -191,18 +248,23 @@ The full comparison: GG-SSVT pretrained and cross-validated once per backbone.
 Needs a GPU. Pretraining is re-run per condition, sharing a checkpoint across
 backbones would be meaningless, since the stems produce different features.
 
-### Probe results: 28 specimens
+### Probe results: 36 specimens
 
-| condition | RMSE | MAE | MARE | R² | dims |
-|---|---|---|---|---|---|
-| no DINO (geometry only) | 0.358 kg | 0.269 | 27.4% | 0.616 | 7 |
-| DINOv2-small | 0.335 kg | 0.260 | 25.8% | 0.663 | 768 |
-| **DINOv2-base** | **0.295 kg** | **0.230** | **22.9%** | **0.738** | 1536 |
-| DINOv2-base + geometry | 0.296 kg | 0.232 | 23.3% | 0.738 | 1543 |
-| DINOv3 | *gated, not run* | | | | |
+| condition | RMSE | R² | dims |
+|---|---|---|---|
+| no DINO (geometry only) | 0.458 kg | +0.312 | 7 |
+| **DINOv2-base** | **0.392 kg** | **+0.495** | 1536 |
+| DINOv2-base + geometry | 0.392 kg | +0.496 | 1543 |
+| DINOv3 | *gated, not run* | | |
 
-Paired bootstrap, DINOv2-base against the control: **ΔRMSE −0.062 kg, 95% CI
-[−0.160, +0.036], p≈0.22, not significant at n=28.**
+Paired bootstrap, DINOv2-base against the control: **ΔRMSE −0.066 kg, 95% CI
+[−0.178, +0.062], p≈0.29, not resolved.** The effect size barely moved between
+n=28 and n=36 and neither did the verdict.
+
+**These numbers are not comparable with the baselines table below.** The probe
+rotates onto principal components before standardising; the baselines standardise
+raw features. On seven features that is a pure rotation, and it changes the
+result: the same geometric features score 0.544 there and 0.458 here.
 
 Three things follow, and the third is the one that matters most:
 
@@ -301,23 +363,35 @@ harness prints the intervals rather than the point estimates alone, because with
 four conditions and a small sample, one arrangement looking good by luck is
 likely, not unlikely.
 
-### Factorial results: 26 specimens, frozen-feature probe
+### Factorial results: 33 specimens, frozen-feature probe
 
 |  | no DINO | DINOv2-base |
 |---|---|---|
-| **no SAM3D** | 0.306 kg / R² 0.712 | 0.302 kg / R² 0.720 |
-| **SAM3D** | 0.317 kg / R² 0.690 | **0.295 kg / R² 0.732** |
+| **no SAM3D** | 0.576 kg / R² −0.080 | **0.385 kg / R² +0.518** |
+| **SAM3D** | **0.778 kg / R² −0.967** | 0.390 kg / R² +0.505 |
 
 Paired effects on RMSE (negative = the addition helps):
 
 | effect | ΔRMSE | 95% CI | resolved? |
 |---|---|---|---|
-| DINO alone | −0.004 kg | [−0.065, +0.065] | no |
-| SAM3D alone | **+0.011 kg** | [−0.010, +0.034] | no |
-| both together | −0.011 kg | [−0.069, +0.056] | no |
-| DINO *given* SAM3D | −0.022 kg | [−0.091, +0.055] | no |
-| SAM3D *given* DINO | −0.007 kg | [−0.017, +0.003] | no |
-| **interaction** | **−0.018 kg** | [−0.037, **+0.000**] | borderline |
+| DINO alone | −0.191 kg | [−0.404, +0.021] | no |
+| SAM3D alone | +0.201 kg | [−0.017, +0.394] | no |
+| **DINO *given* SAM3D** | **−0.387 kg** | **[−0.757, −0.039]** | **yes** |
+| SAM3D *given* DINO | +0.005 kg | [−0.007, +0.019] | no effect |
+| interaction | −0.196 kg | [−0.393, +0.031] | no |
+
+**The finding is the asymmetry, not the resolved cell.** SAM3D alone drives the
+hand-crafted descriptors to R² −0.967, far below the mean-predictor floor, while
+DINO moves 0.385 to 0.390, an effect of five grams. The descriptors are fragile
+to which segmenter produced the hull; the learned features are indifferent to it.
+Read the resolved effect carefully: it is resolved largely *because* SAM3D
+without a learned backbone is so poor, so it evidences descriptor fragility more
+than it evidences DINO's value.
+
+The 33-specimen shared set is not a random subset of the 36. SAM3D fails the gate
+on E015, E019 and V006 on top of the E012/E016 the geometric gate drops, and
+losing V006 matters beyond the count, because V is the batch that breaks the
+mass/batch confound.
 
 **The one result the factorial found that no one-factor ablation could.**
 SAM3D on its own makes things slightly *worse* (+0.011 kg), but SAM3D given DINO
@@ -608,11 +682,14 @@ is also the most promising route past the ceiling this dataset currently hits.
   as-collected weight; every dissertation and proposal draft specifies oven-dry
   above-ground biomass. These are not interchangeable and the distinction has to
   be stated wherever the numbers appear.
-- **Pot masses are estimated, not weighed.** Every row of `ground_truth.csv`
-  carries `pot_weight_source = estimated`, so the target itself has unquantified
-  error. Weighing a sample of empty pots would bound it cheaply.
+- **Pot masses are measured for V001–V008 and estimated for the rest.** Against
+  the measured eight the estimates run 10.9% light with a standard deviation of
+  1.8 points, so the bias is systematic rather than noisy and can be carried as a
+  stated uncertainty: roughly −12% on Mango net mass and −24% on E001–E010, where
+  the pot dominates the total. Weighing every pot on the next capture removes the
+  largest single uncertainty in the ground truth for ten minutes of work.
 - **Two specimens fail the quality gate** (E012, E016) and `X001` has only two
-  views. That leaves 28 usable specimens across two species, enough to fit a
+  views. That leaves 36 usable specimens across two species, enough to fit a
   head, not enough for a strong generalisation claim.
 
 ## Layout
@@ -621,6 +698,7 @@ is also the most promising route past the ceiling this dataset currently hits.
 ggssvt/
   config.py            every camera constant, threshold and hyperparameter
   cli.py               command-line entry point
+  campaign.py          the whole training programme under one command
   data/
     naming.py          the camB convention fix
     io.py              PNG loading, back-projection, projection
@@ -633,6 +711,12 @@ ggssvt/
     segment.py         subject segmentation in the world frame
     sam3d.py           SAM-refined, 3D-consistent subject masks
     carving.py         space carving to occupancy
+    fusion.py          TSDF depth fusion, the operator that escapes the hull
+    pot.py             per-specimen pot rim, and refusal when there is none
+    dino_lift.py       DITR-style 2D-to-3D feature projection
+    pose_free.py       DUSt3R / MASt3R / Fast3R contracts and install help
+    pose_free_backends.py  the adapters themselves
+    mesh.py            marching cubes, surface area, solidity
   models/              PyTorch
     embedding.py       Fourier back-projected positional encoding
     attention.py       3D-distance-biased cross-view attention
@@ -654,6 +738,19 @@ ggssvt/
     factorial.py       SAM3D x DINO factorial and interaction
     render.py          volume renders, contact sheets, PLY export
     gallery_html.py    interactive reconstruction gallery
+    plausibility.py    can the volume physically weigh the mass?
+    gates.py           acceptance checks per stage, blocking and advisory
+    methods.py         which reconstruction sources exist, and why some cannot
+    fusion_features.py TSDF descriptors and the fused cache writer
+    view_ablation.py   how many views the carve actually needs
+    frequency.py       radial power spectra, for the frequency hypothesis
+    progress.py        what has run, what has not, what is stale
+    mesh_baseline.py   marching cubes to biomass
+    architecture.py    one diagram per methodology, SVG and PNG
+    site_html.py       the project page, in the Nerfies layout
+    dashboard_data.py  the payload the page reads
+    dino_segment.py    can DINO separate plant from pot? Reported negative
+    pose_free_experiment.py  the 3R comparison harness
     nerfstudio_export.py  transforms.json from the estimated rig
     report.py          tables and figures
     visualise.py       rig and mask overlays
@@ -665,5 +762,9 @@ ggssvt/
 python -m pytest tests/ -q
 ```
 
-Tests needing the preprocessed cache skip when it is absent, so a fresh clone
-passes without running preprocessing first.
+199 tests. Those needing the preprocessed cache skip when it is absent, so a
+fresh clone passes without running preprocessing first.
+
+The gate tests are worth knowing about: each one constructs the failure its check
+exists for and asserts it is caught, then constructs a healthy case and asserts it
+is not. A check that cannot fail is decoration.

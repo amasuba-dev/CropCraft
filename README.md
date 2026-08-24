@@ -1,3 +1,24 @@
+> ## This fork adds [`ggssvt/`](ggssvt/README.md)
+>
+> **Automated Biomass Estimation Using Self-Supervised Vision Transformers.** An
+> MEng dissertation by Aaron Masuba, supervised by Prof. Herman Myburgh with
+> Prof. Allan De Freitas and Dr Kealeboga Mokise, in the Smart Sensing and
+> Intelligent Systems Group, Department of Electrical, Electronic and Computer
+> Engineering, University of Pretoria.
+>
+> It works from its own dual-Kinect single-plant captures in
+> [`dataset/`](dataset/), not the CropCraft field data, and runs independently of
+> the Nerfstudio pipeline below, needing only NumPy, Pillow and PyTorch. The
+> vendored Nerfstudio is shared and everything upstream is unchanged.
+>
+> ```bash
+> python -m ggssvt.cli inspect
+> ```
+>
+> Start at [`ggssvt/README.md`](ggssvt/README.md).
+
+---
+
 # CropCraft: Complete Structural Characterization of Crop Plants From Images
 
 Albert J. Zhai, Xinlei Wang, Kaiyuan Li, Zhao Jiang, Junxiong Zhou, Sheng Wang, Zhenong Jin, Kaiyu Guan, Shenlong Wang<br/>
@@ -92,18 +113,9 @@ The visualization and evaluation scripts can be executed in any order.
 
 ## GG-SSVT
 
-This repository also contains [`ggssvt/`](ggssvt/), a Geometry-Grounded
-Self-Supervised Vision Transformer for label-efficient volumetric reconstruction
-and biomass estimation from the dual-Kinect single-plant captures in
-[`dataset/`](dataset/). It is independent of the Nerfstudio pipeline above and
-needs only NumPy, Pillow and PyTorch.
-
-```bash
-python -m ggssvt.cli inspect
-```
-
-See [`ggssvt/README.md`](ggssvt/README.md) for the pipeline, the evaluation
-protocol, and the known limitations of the capture set.
+See the note at the top of this file. [`ggssvt/README.md`](ggssvt/README.md) has
+the pipeline, the evaluation protocol, the results and the known limitations of
+the capture set.
 
 ## Citation
 If you find this paper and repository useful, please consider citing:
