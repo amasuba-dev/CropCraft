@@ -149,16 +149,26 @@ HERO = """
             read and regressed against weighed above-ground mass.
           </p>
           <p>
-            The headline result is negative, and it is a measurement rather than a comparison.
-            Dividing each weighed mass by its reconstructed above-ground volume gives an implied
-            bulk density, which can be checked against physics: fresh plant tissue runs
-            300&ndash;900&nbsp;kg/m&sup3;. Only <strong>__PLAUSIBLE__ of __N__</strong> specimens
-            land inside a deliberately generous 200&ndash;1000 band. Most fall far below it,
-            because a visual hull encloses the air between leaves and branches. What is
-            being measured is the canopy envelope, not the plant. That single number explains
-            why every 3D-derived biomass method here performs no better than regressing on the
-            images directly, and it bounds what any hull-based method can achieve at this
-            resolution.
+            The first result is a measurement rather than a comparison. Dividing each weighed
+            mass by its reconstructed above-ground volume gives an implied bulk density, which
+            can be checked against physics: fresh plant tissue runs 300&ndash;900&nbsp;kg/m&sup3;.
+            Only <strong>__PLAUSIBLE__ of __N__</strong> carved specimens land inside a
+            deliberately generous 200&ndash;1000 band. Most fall far below it, because a visual
+            hull encloses the air between leaves and branches. What is being measured is the
+            canopy envelope, not the plant, and that is a property of silhouette carving rather
+            than of resolution: the hull is the maximal solid consistent with the silhouettes,
+            so finer voxels give a smoother envelope and never a gap.
+          </p>
+          <p>
+            The second follows from it. The same twelve depth maps, integrated as a signed
+            distance field instead of intersected as silhouette cones, put <strong>21 of 36</strong>
+            reconstructions inside the band at the identical grid, and 31 at the resolution the
+            sensor actually supports. Holding the features, the protocol, the grid, the views and
+            the masks fixed and changing only that operator moves biomass RMSE from
+            <strong>0.544 to 0.335&nbsp;kg</strong>, R&sup2; from +0.030 to +0.632, with a paired
+            bootstrap of &minus;0.209 [&minus;0.363, &minus;0.066]. It is the first resolved
+            improvement here, and it says the reconstruction was the bottleneck rather than the
+            regressor.
           </p>
         </div>
         <div class="keyfacts">__KEYFACTS__</div>
@@ -243,6 +253,42 @@ BODY = """
       difference in means without one is not a result.
     </p>
     <div class="tablewrap mb-5"><table class="data" id="methods"></table></div>
+
+    <h3 class="title is-5 mt-6">Changing the reconstruction, not the regressor</h3>
+    <p class="is-size-7 has-text-grey mb-3">
+      Identical features, protocol, grid, views and masks. The only difference is whether the
+      occupancy came from intersecting silhouette cones or from integrating depth. Direct 2D
+      touches no reconstruction, so it is the control and must not move.
+    </p>
+    <div class="tablewrap">
+      <table class="data">
+        <thead><tr><th>Method</th><th>carved</th><th>fused</th><th>paired bootstrap</th></tr></thead>
+        <tbody>
+          <tr class="best"><td>geometric features</td><td>0.544 / +0.030</td>
+            <td><strong>0.335 / +0.632</strong></td>
+            <td>&minus;0.209 [&minus;0.363, &minus;0.066]
+              <span class="tag is-small is-success">resolved</span></td></tr>
+          <tr><td>volume allometric</td><td>0.592 / &minus;0.150</td><td>0.469 / +0.278</td>
+            <td>&minus;0.123 [&minus;0.202, &minus;0.034]
+              <span class="tag is-small is-success">resolved</span></td></tr>
+          <tr><td>canopy area allometric</td><td>0.598 / &minus;0.170</td><td>0.494 / +0.201</td>
+            <td class="has-text-grey">clears the mean floor</td></tr>
+          <tr><td>mesh geometry</td><td>0.507 / +0.157</td><td>0.486 / +0.227</td>
+            <td class="has-text-grey"></td></tr>
+          <tr><td>direct 2D</td><td>0.469 / +0.279</td><td>0.469 / +0.279</td>
+            <td class="has-text-grey">control, unchanged</td></tr>
+          <tr><td>mean predictor</td><td>0.568</td><td>0.568</td>
+            <td class="has-text-grey"></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="is-size-7 has-text-grey mt-3">
+      Volume allometry and canopy area both sat below the mean-predictor floor on the hull and
+      clear it on the fusion. A single volume-to-mass law was said to be impossible across
+      morphologies because hull density varied tenfold between a bushy Mango and a thin
+      Eucalyptus; on a fused reconstruction the same law works, because the volumes are no
+      longer envelopes of wildly different emptiness.
+    </p>
 
     <div class="columns is-vcentered">
       <div class="column is-two-thirds">

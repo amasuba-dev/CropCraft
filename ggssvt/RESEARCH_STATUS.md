@@ -25,7 +25,7 @@ stated once here and applies throughout.
 |---|---|---|
 | **RQ1** SSL ViTs learn plant representations | Partial | Needs training; confound caps the label-efficiency claim |
 | **RQ2** grounding and fusion for 3D reconstruction | Partial | Architecture built and validated, never trained |
-| **RQ3** reconstruction → biomass, label-efficiently | **Answered, via the mechanism** | RMSE comparison is unresolved either way; the physical measurement is not |
+| **RQ3** reconstruction → biomass, label-efficiently | **Answered, and now positively** | The carve was the bottleneck; fusing the same depth resolves the first real improvement |
 | **H1** ViT beats CNN; label efficiency | Partial | DINOv2 probe done, not significant at n=28; re-running at n=36 |
 | **H2** geometry grounding → viewpoint consistency | Partial | Ablation implemented, not run |
 | **H3** frequency + geometry grounding | **Best evidenced of the four** | 4 of 6 sub-claims established; see [HYPOTHESIS_3.md](HYPOTHESIS_3.md) |
@@ -169,6 +169,21 @@ imply *less*. The visual hull has enclosed the air between leaves and branches,
 with all ten Mango at 26–77 kg/m³, and three imply more, meaning thin stems were
 never carved. **The reconstructed object is a canopy envelope, not a plant**, so
 its volume cannot carry mass information regardless of what is fitted to it.
+
+**The answer changed on 2026-08-24, and it is worth stating why.** Everything
+below was measured on a space carve, and the carve was the limiting component.
+Replacing silhouette intersection with TSDF depth fusion, holding the features,
+the protocol, the grid, the views and the masks all fixed, moves geometric
+features from 0.544 / +0.030 to **0.335 / +0.632**, with a paired bootstrap of
+−0.209 [−0.363, −0.066]. **Resolved**, and the first resolved biomass improvement
+in the project. Volume allometry moves from −0.150 to +0.278, also resolved.
+Direct 2D is unchanged at 0.469, which is the control it has to be.
+
+So RQ3 has a positive answer after all, but a narrower one than the proposal
+asked for. Reconstructed geometry does predict biomass better than pixels here,
+*provided the reconstruction is not a visual hull*. The hull was never going to
+work, for the reason in the next paragraph, and the fix was to change the
+operator rather than the regressor. See [FINDINGS.md](FINDINGS.md) section 7c.
 
 **Within species the failure is unambiguous.** Restricted to Eucalyptus (n=26,
 the least confounded set available), geometric features score R² **−0.313**,

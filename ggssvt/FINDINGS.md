@@ -343,6 +343,55 @@ Ten minutes for all 36 on one CPU core. `python -m ggssvt.cli fuse`.
 
 ---
 
+## 7c. The reconstruction was the bottleneck, not the regressor
+
+Everything in section 3 and section 7b pointed one way, and this is the test that
+closes it. Take the seven hand-crafted descriptors unchanged, the same
+leave-one-out protocol, the same 12 mm grid, the same twelve views and the same
+masks. Change only the operator that turns them into occupancy.
+
+| | carved | fused | paired bootstrap |
+|---|---|---|---|
+| **geometric features** | 0.544 / +0.030 | **0.335 / +0.632** | −0.209 [−0.363, **−0.066**] **resolved** |
+| volume allometric | 0.592 / −0.150 | 0.469 / +0.278 | −0.123 [−0.202, **−0.034**] **resolved** |
+| canopy area allometric | 0.598 / −0.170 | 0.494 / +0.201 | |
+| mesh geometry | 0.507 / +0.157 | 0.486 / +0.227 | |
+| direct 2D | 0.469 / +0.279 | 0.469 / +0.279 | unchanged, as it must be |
+| mean predictor | 0.568 | 0.568 | |
+
+**These are the first resolved improvements this project has produced on biomass.**
+Everything before them, including the original "reconstruction beats pixels", had
+an interval spanning zero. Direct 2D is identical in both columns, which is the
+control: it touches no reconstruction, so it must not move, and it does not.
+
+Two methods that sat *below* the mean-predictor floor now clear it. Volume
+allometry went from −0.150 to +0.278 and canopy area from −0.170 to +0.201. That
+matters more than the ordering. A single volume-to-mass law was said to be
+impossible across morphologies because hull density varied tenfold between a
+bushy Mango and a thin Eucalyptus; on a fused reconstruction the same law works,
+because the volumes are no longer envelopes of wildly different emptiness.
+
+**The canopy-area hypothesis partially survives.** It was declared dead in
+section 3 on the grounds that a visual hull's surface is envelope area rather
+than leaf area. On a fused surface it clears the floor. The mechanism claimed
+there was right, and it was a statement about the instrument rather than about
+the biology.
+
+On the Eucalyptus subset of those same pooled predictions, geometric features go
+from 0.610 / +0.049 to **0.350 / +0.687** against a floor of 0.626. Note that
+this is the subset of a fit on all 36, not a fit on Eucalyptus alone; the
+fit-within-species numbers quoted elsewhere in this document are a different
+protocol and the two should not be compared.
+
+What this does not do is make the reconstructions good. Coverage is 0.12, most
+leaf undersides were never observed, and 5 of 36 fused specimens still fail the
+plausibility check. The claim is narrow and it is the one the evidence supports:
+**for these species at this resolution, replacing silhouette intersection with
+depth integration improves biomass estimation by more than any change to the
+regressor has.**
+
+---
+
 ## 8. Bugs found and fixed
 
 Several would have produced confident wrong numbers rather than errors.
