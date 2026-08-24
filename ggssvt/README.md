@@ -441,16 +441,33 @@ theorem, solidity (mesh volume over convex hull volume), area-to-volume ratio,
 and height. Validated against an analytic sphere — volume within 0.5%, area
 carrying the known ~8% marching-cubes bias on a binary grid.
 
-### Results, 28 specimens, leave-one-out
+### Results, 36 specimens, leave-one-out
 
 | method | RMSE | MARE | R² |
 |---|---|---|---|
-| **mesh geometry** | **0.359 kg** | **27.7%** | **0.613** |
-| geometric features (voxel) | 0.397 kg | 32.8% | 0.526 |
-| direct 2D | 0.440 kg | 39.9% | 0.419 |
-| mean predictor | 0.598 kg | 62.5% | −0.075 |
-| volume allometric | 0.622 kg | 56.9% | −0.162 |
-| canopy area allometric | 0.642 kg | 52.1% | −0.236 |
+| **direct 2D** | **0.469 kg** | 42.8% | **+0.279** |
+| mesh geometry | 0.507 kg | 37.4% | +0.157 |
+| geometric features (voxel) | 0.544 kg | 43.8% | +0.030 |
+| mean predictor | 0.568 kg | 57.8% | −0.058 |
+| volume allometric | 0.592 kg | 53.0% | −0.150 |
+| canopy area allometric | 0.598 kg | 47.3% | −0.170 |
+
+**Do not read the ordering as a result.** The 3D-versus-2D difference is not
+statistically resolved in either direction — paired bootstrap [−0.051, +0.227] —
+and it flips if features are whitened before the ridge. The same test on the
+earlier n=28 set gives [−0.168, +0.099], so the "reconstruction beats pixels"
+that used to head this table was never resolved either.
+
+**What is resolved is the mechanism.** Measured mass over reconstructed
+above-ground volume gives an implied bulk density, against 300–900 kg/m³ for
+fresh tissue. **Only 8 of 36 specimens** land inside a generous 200–1000 band;
+25 imply less, all ten Mango at 26–77 kg/m³. The hull encloses the air between
+leaves, so it measures the canopy envelope rather than the plant, and its volume
+cannot carry mass information no matter what is fitted to it. Within Eucalyptus
+alone the geometric features score R² −0.313, below the mean-predictor floor.
+
+*(Previous n=28 table, before V001–V008 and the measured pot weights: mesh
+geometry 0.359 / 0.613, geometric 0.397 / 0.526, direct 2D 0.440 / 0.419.)*
 
 **The hypothesis this was built to test failed.** The reasoning was that a leaf's
 mass scales with its area while it encloses almost no volume, so canopy area
@@ -463,9 +480,9 @@ area is envelope area, not leaf area.** Twelve views at 12 mm voxels cannot
 resolve individual leaves, so the mesh measures the outside of the canopy, and
 the outside of a canopy carries no more information than its volume does.
 
-The multi-feature mesh set is nonetheless the best method in the comparison,
-though a paired bootstrap against the voxel features gives −0.038 kg,
-95% CI [−0.099, +0.018] — not resolved. Leave-one-feature-out shows **height**
+The multi-feature mesh set is the best of the 3D methods, though a paired
+bootstrap against the voxel features gives −0.037 kg, 95% CI [−0.128, +0.066] —
+not resolved. Leave-one-feature-out shows **height**
 carrying it (removing height costs 0.051 kg; removing canopy area costs 0.001).
 
 ### The confound that caps every biomass claim here
@@ -479,11 +496,18 @@ The Eucalyptus specimens fall into two batches with almost no overlap in mass:
 |---|---|---|---|
 | E001–E010 | 10 | 0.538 kg | small, reconstruct as mostly pot |
 | E011–E020 | 8 usable | 1.844 kg | tall thin saplings |
+| **V001–V008** | 8 | **1.138 kg** | **spans both; sd 484 g, the widest of any batch** |
 
-**Knowing only which batch a specimen came from explains R² = 0.887 of the
-Eucalyptus mass variance** — more than any method achieves. And within either
-batch, nothing predicts anything: no method clears R² = 0.2 on E001–E010 or
+**Knowing only which batch a specimen came from explained R² = 0.887 of the
+Eucalyptus mass variance** — more than any method achieved. And within either
+batch, nothing predicted anything: no method cleared R² = 0.2 on E001–E010 or
 E011–E020 taken alone, at n=10 and n=8.
+
+**V001–V008 was collected to break this.** Its masses run 500–1800 g, overlapping
+both existing batches rather than forming a third cluster, and it brings the
+batch-only R² down to **0.744** across the three Eucalyptus batches and **0.697**
+across all four. Still high, but the shortcut is no longer free — and the
+apparent 3D advantage went with it, which is the correct trade.
 
 So the models are recovering *which group a plant belongs to* — tall and sparse
 versus short and solid — rather than estimating mass among comparable plants.
