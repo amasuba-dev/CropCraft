@@ -239,6 +239,29 @@ median implied density of 9.2 kg/m³, lighter than polystyrene. Agreement only
 falls from 0.608 to 0.424 over the same range, which is why it is worth printing
 both.
 
+### 3b-ter. TSDF depth fusion (~11 min CPU, run once)
+
+The carve cannot be improved past the visual hull, which is why 25 of 36
+specimens imply a bulk density one to two orders of magnitude below plant
+tissue. Fusing the same depth maps as a signed distance field keeps concavities
+and leaves unobserved space empty.
+
+```bash
+python -m ggssvt.cli fuse --write-cache
+```
+
+Expect **31 of 36 plausible against the carve's 8**, median implied density
+529 kg/m3 against 116.8. `--write-cache` also writes `cache_tsdf` at the carve's
+own 128^3 and 12 mm, which is the control that isolates the operator from the
+grid: 21 of 36 at matched resolution, so the method accounts for most of the gain
+and the finer grid adds the rest.
+
+Two things depend on this having run. `cli baselines` offers the `fused geometry`
+method only when every specimen is present in `reports/fusion.json`, and the
+project page shows TSDF in its method toggle only when `cache_tsdf` exists. Do
+not run `fuse --plants ...` on a subset and then expect either: a partial report
+is treated as no report, deliberately.
+
 ### 3c. Mesh arm and reconstruction gallery (~5 min, CPU)
 
 ```bash

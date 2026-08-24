@@ -65,7 +65,10 @@ async function cloud(id, seg){
    them. Falls back to the configured constant where no rim was detectable. */
 function potHeight(c){
   const s = c ? byId.get(c.id) : null;
-  return (s && s.pot_height_m != null) ? s.pot_height_m : D.summary.pot_height_m;
+  const q = s && s.quality ? s.quality[segmenter] : null;
+  if (q && q.pot_height_m != null) return q.pot_height_m;
+  if (s && s.pot_height_m != null) return s.pot_height_m;
+  return D.summary.pot_height_m;
 }
 
 function draw(canvas, c, {dot=3, mode=colourMode, yawL=yaw, pitchL=pitch, zoomL=zoom}={}){
@@ -257,6 +260,7 @@ function scatter(){
    the number of views, or the pose estimate. */
 const GROUPS = [
   ["segmentation", "Segmentation"],
+  ["reconstruction", "Reconstruction"],
   ["sampling", "Fewer views"],
   ["pose-free", "Pose-free"],
 ];
@@ -306,7 +310,8 @@ async function buildList(){
     const b=document.createElement("button"); b.type="button";
     b.dataset.id = s.id;
     b.setAttribute("aria-current", String(s.id===current));
-    const verdict = s.density_verdict || "unknown";
+    const verdict = ((s.quality || {})[segmenter] || {}).density_verdict
+                    || s.density_verdict || "unknown";
     b.innerHTML=`<span><span class="verdict ${verdict}" title="${verdict}"></span>${s.id}</span>
       <span class="mass">${f(s.target_kg)} kg</span>`;
     b.onclick=()=>select(s.id);
@@ -325,14 +330,14 @@ async function render(){
 
 function facts(){
   const s=byId.get(current), q=s.quality[segmenter]||{}, m=s.mesh||{};
-  const density = s.density_kg_m3 == null ? ", " : `${Math.round(s.density_kg_m3)}`;
-  const rim = s.pot_height_m == null ? ", "
-    : `${f(s.pot_height_m)}${s.pot_confident === false ? "*" : ""}`;
-  // above_rim_l is cut at this specimen's own rim, which is what the implied
-  // density divides by. quality.above_ground_l uses the global constant and
-  // would contradict it on screen.
+  const density = q.density_kg_m3 == null ? "n/a" : `${Math.round(q.density_kg_m3)}`;
+  const rim = q.pot_height_m == null ? "n/a"
+    : `${f(q.pot_height_m)}${q.pot_confident === false ? "*" : ""}`;
+  // Everything here comes from the selected method's own quality block. Rim,
+  // volume and density all change with the reconstruction, and reading them off
+  // the specimen would show the carve's numbers beside the fusion's cloud.
   const rows=[["Weighed",f(s.target_kg)+" kg"],["Hull",f(q.volume_l,1)+" L"],
-    ["Above rim",f(s.above_rim_l,1)+" L"],["Height",f(q.height_m)+" m"],
+    ["Above rim",f(q.above_rim_l,1)+" L"],["Height",f(q.height_m)+" m"],
     ["Pot rim",rim+" m"],["Implied density",density+" kg/m³"],
     ["Canopy area",f(m.canopy_area_m2,2)+" m²"],["Solidity",f(m.solidity,2)]];
   document.getElementById("sfacts").innerHTML = rows.map(([k,v])=>

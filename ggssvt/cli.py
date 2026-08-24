@@ -291,6 +291,15 @@ def cmd_fuse(args: argparse.Namespace) -> int:
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(table, indent=2), encoding="utf-8")
     print(f"\nSaved to {args.out}")
+
+    if args.write_cache:
+        from .eval.fusion_features import write_fused_cache
+
+        print(f"\nWriting a fused cache to {args.write_cache}")
+        print("At 128^3 and 12 mm, matching the carve, so the only variable")
+        print("between the two caches is the reconstruction method.\n")
+        n = write_fused_cache(plant_ids, args.cache_dir, args.write_cache)
+        print(f"\nwrote {n} specimens")
     return 0
 
 
@@ -827,6 +836,17 @@ def build_parser() -> argparse.ArgumentParser:
     fuse.add_argument("--resolution", type=int, default=FUSION_RESOLUTION)
     fuse.add_argument(
         "--out", type=Path, default=WORK_DIR / "reports" / "fusion.json"
+    )
+    fuse.add_argument(
+        "--write-cache",
+        type=Path,
+        nargs="?",
+        const=WORK_DIR / "cache_tsdf",
+        default=None,
+        help=(
+            "also write a cache of fused occupancy at the carve's own "
+            "resolution, so the viewer and every other tool can read it"
+        ),
     )
     fuse.set_defaults(func=cmd_fuse)
 

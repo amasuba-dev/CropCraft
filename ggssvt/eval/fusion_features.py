@@ -88,4 +88,77 @@ def fusion_vector(features: dict) -> np.ndarray:
     return np.array([features[k] for k in FUSION_KEYS], dtype=np.float64)
 
 
-__all__ = ["FUSION_KEYS", "fusion_features", "fusion_vector"]
+def write_fused_cache(
+    plant_ids: list[str],
+    source_cache,
+    target_cache,
+    *,
+    verbose: bool = True,
+) -> int:
+    """Write a cache whose occupancy came from fusion instead of carving.
+
+    Deliberately at the carve's own 128^3 and 12 mm rather than the 6 mm the
+    sensor supports. Two reasons. It drops into every existing tool without a
+    special case, and more importantly it isolates the variable: at identical
+    resolution the only thing that differs between this cache and the geometric
+    one is silhouette intersection versus depth integration. That control is what
+    turns "fusion is better" into "the method is what did it", and it holds:
+    8 of 36 plausible carved against 21 of 36 fused, both at 12 mm, rising to 31
+    only when the finer grid is added on top.
+
+    Everything except the occupancy is copied from the source, so the two caches
+    describe the same views, poses and masks.
+    """
+    import shutil
+
+    import numpy as np
+
+    from ..config import VOXEL_RESOLUTION, VOXEL_SIZE_M
+    from ..data.preprocess import cache_path, load_cached
+    from ..geometry.fusion import fuse_cached
+
+    target_cache.mkdir(parents=True, exist_ok=True)
+    written = 0
+
+    for index, plant_id in enumerate(plant_ids, start=1):
+        cached = load_cached(plant_id, source_cache)
+        fused = fuse_cached(
+            cached, resolution=VOXEL_RESOLUTION, voxel_size_m=VOXEL_SIZE_M
+        )
+        occupancy = fused.interior
+
+        source = cache_path(plant_id, source_cache)
+        with np.load(source, allow_pickle=False) as data:
+            fields = dict(data)
+        fields["occupancy"] = np.packbits(occupancy, axis=None)
+        fields["occupancy_shape"] = np.array(occupancy.shape)
+        # How many views observed each voxel, which is the fused counterpart of
+        # the carve's informative-view count and keeps the field meaningful.
+        fields["n_informative"] = np.clip(fused.weight, 0, 127).astype(np.int8)
+        fields["segmenter"] = "tsdf"
+
+        np.savez_compressed(cache_path(plant_id, target_cache), **fields)
+        written += 1
+        if verbose:
+            print(
+                f"  [{index:2d}/{len(plant_ids)}] {plant_id}  "
+                f"{occupancy.sum() / 1e3:6.1f}k voxels  "
+                f"coverage {fused.coverage():.3f}"
+            )
+
+    quality = source_cache / "quality.json"
+    if quality.exists():
+        # The gate measured segmentation and registration, neither of which the
+        # fusion changed, so the same report applies and copying it keeps
+        # usable_plant_ids working against this cache.
+        shutil.copyfile(quality, target_cache / "quality.json")
+
+    return written
+
+
+__all__ = [
+    "FUSION_KEYS",
+    "fusion_features",
+    "fusion_vector",
+    "write_fused_cache",
+]

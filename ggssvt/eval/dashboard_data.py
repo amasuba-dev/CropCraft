@@ -138,26 +138,36 @@ def build_payload(
             entry["clouds"][name] = _quantise(cached.occupancy, max_points=budget)
             entry.setdefault("species", cached.species)
             entry.setdefault("target_kg", round(float(cached.target_kg), 3))
-            # Per-specimen rim, so the pot/canopy split drawn in the viewer is
-            # this plant's own boundary rather than a constant that is wrong by
-            # 0.14 m on the V batch. `pot_confident` is False where no rim was
-            # detectable and the constant was used after all.
-            entry.setdefault("pot_height_m", round(cached.pot_height_m, 3))
-            entry.setdefault("pot_confident", bool(cached.pot.confident))
-
+            # Rim, volume and implied density all belong to the *method*, not to
+            # the specimen: a fused reconstruction has a different profile, so a
+            # different rim, so a different above-rim volume and density. Keeping
+            # them per specimen showed the carve's numbers beside the fusion's
+            # point cloud, which is the sort of quiet contradiction a reader
+            # notices and cannot resolve.
             above = cached.occupancy & (
                 voxel_grid_centres()[..., 2] > cached.pot_height_m
             )
             above_volume = float(above.sum()) * cached.voxel_size_m ** 3
-            entry.setdefault("above_rim_l", round(above_volume * 1000.0, 2))
             check = classify(plant_id, float(cached.target_kg), above_volume)
-            entry.setdefault("density_kg_m3", round(check.density_kg_m3, 1)
-                             if np.isfinite(check.density_kg_m3) else None)
-            entry.setdefault("density_verdict", check.verdict)
+            per_method = {
+                "pot_height_m": round(cached.pot_height_m, 3),
+                "pot_confident": bool(cached.pot.confident),
+                "above_rim_l": round(above_volume * 1000.0, 2),
+                "density_kg_m3": (
+                    round(check.density_kg_m3, 1)
+                    if np.isfinite(check.density_kg_m3) else None
+                ),
+                "density_verdict": check.verdict,
+            }
+            # The primary method's values stay on the entry as well, because the
+            # summary and the specimen list are not method-specific.
+            if name == "geometric":
+                entry.update(per_method)
 
             q = quality[name].get(plant_id)
             if q is not None:
                 entry["quality"][name] = {
+                    **per_method,
                     "coverage": round(q.surface_coverage, 3),
                     "agreement": round(q.multiview_agreement, 3),
                     "volume_l": round(q.volume_m3 * 1000, 2),

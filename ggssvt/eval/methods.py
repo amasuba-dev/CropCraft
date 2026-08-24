@@ -10,6 +10,10 @@ Three kinds of entry live here.
 **Segmentation variants.** Same twelve views, same carve, different subject mask.
 Geometric and SAM3D.
 
+**Reconstruction operators.** Same views, same masks, a different way of turning
+them into occupancy. TSDF fusion is here, held at the carve's own 128^3 and 12 mm
+precisely so the comparison isolates the operator rather than the grid.
+
 **Sampling variants.** Same carve, fewer views. These are already built by the
 view-count ablation and they belong on the page because the ablation's finding is
 visual before it is numerical: at four views the hull balloons to something the
@@ -64,6 +68,17 @@ METHODS: tuple[ReconstructionMethod, ...] = (
              "they disagree with the rest in 3D. Tighter masks, less coverage: it "
              "drops three specimens the geometric gate keeps.",
         cache=WORK_DIR / "cache_sam3d",
+    ),
+    ReconstructionMethod(
+        key="tsdf",
+        label="TSDF fusion",
+        group="reconstruction",
+        note="The same twelve depth maps integrated as a signed distance field "
+             "instead of intersected as silhouette cones. Concavities survive and "
+             "unobserved space stays empty, so 21 of 36 reconstructions become "
+             "physically capable of weighing their plant, against 8 for the carve "
+             "at this same resolution.",
+        cache=WORK_DIR / "cache_tsdf",
     ),
     ReconstructionMethod(
         key="views6",

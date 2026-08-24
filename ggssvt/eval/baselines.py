@@ -77,6 +77,9 @@ class SpecimenFeatures:
     mean_subject_pixels: float
     mean_subject_depth_m: float
     subject_pixel_height: float
+    # Optional, because they come from work the plain carve does not do.
+    profile: np.ndarray | None = None      # vertical cross-section shape
+    fused: np.ndarray | None = None        # TSDF descriptors, from fusion.json
 
     def geometric_vector(self) -> np.ndarray:
         """Descriptors derived from the 3D reconstruction."""
@@ -93,6 +96,29 @@ class SpecimenFeatures:
             dtype=np.float64,
         )
 
+    def profile_vector(self) -> np.ndarray:
+        """How cross-section is distributed with height, normalised to shape.
+
+        Eight bands above the pot rim plus a taper term, each divided by the
+        total so this describes architecture rather than size. Size is already
+        carried by the volume and height features, and leaving it in here would
+        just duplicate them.
+
+        The reason to have it at all: if the hull's *volume* is an envelope, its
+        *shape* may still be real, and a tall thin sapling differs from a short
+        bushy one in a way that tracks mass. It helps Eucalyptus and hurts Mango,
+        which is what a stem-versus-canopy split predicts.
+        """
+        if self.profile is None:
+            return np.zeros(9, dtype=np.float64)
+        return self.profile
+
+    def fused_vector(self) -> np.ndarray:
+        """Descriptors from the TSDF fusion rather than the carve."""
+        if self.fused is None:
+            return np.zeros(7, dtype=np.float64)
+        return self.fused
+
     def image_vector(self) -> np.ndarray:
         """Descriptors available without any 3D reconstruction."""
         return np.array(
@@ -107,7 +133,32 @@ class SpecimenFeatures:
         )
 
 
-def extract_features(cached: CachedSpecimen) -> SpecimenFeatures:
+def _vertical_profile_shape(cached, pot_height: float, n_bins: int = 8) -> np.ndarray:
+    """Occupied cross-section per height band above the rim, normalised.
+
+    Returns ``n_bins`` shares summing to one, plus a taper term that is positive
+    when the plant is bottom-heavy. Zeros when nothing sits above the rim, which
+    is a real state for the E001-E010 specimens rather than an error.
+    """
+    from ..geometry.pot import vertical_profile
+
+    counts = vertical_profile(cached.occupancy).astype(np.float64)
+    rim = round(pot_height / cached.voxel_size_m)
+    above = counts[rim:]
+    occupied = np.nonzero(above)[0]
+    if occupied.size == 0:
+        return np.zeros(n_bins + 1, dtype=np.float64)
+
+    above = above[: occupied.max() + 1]
+    shares = np.array([band.sum() for band in np.array_split(above, n_bins)])
+    total = shares.sum()
+    shares = shares / total if total > 0 else shares
+    return np.concatenate([shares, [float(shares[0] - shares[-1])]])
+
+
+def extract_features(
+    cached: CachedSpecimen, fused: np.ndarray | None = None
+) -> SpecimenFeatures:
     """Compute baseline features for one preprocessed specimen."""
     centres = voxel_grid_centres()
     occupancy = cached.occupancy
@@ -133,6 +184,8 @@ def extract_features(cached: CachedSpecimen) -> SpecimenFeatures:
     else:
         height = mean_spread = max_spread = above_volume = compactness = 0.0
         footprint = 0.0
+
+    profile = _vertical_profile_shape(cached, pot_height)
 
     subject_pixels = cached.mask.sum(axis=(1, 2)).astype(np.float64)
     depths = [
@@ -161,14 +214,48 @@ def extract_features(cached: CachedSpecimen) -> SpecimenFeatures:
         mean_subject_pixels=float(subject_pixels.mean()),
         mean_subject_depth_m=float(valid_depths.mean()) if valid_depths.size else 0.0,
         subject_pixel_height=float(np.mean(pixel_heights)) if pixel_heights else 0.0,
+        profile=profile,
+        fused=fused,
     )
 
 
+FUSION_REPORT = WORK_DIR / "reports" / "fusion.json"
+
+
+def _load_fusion(path: Path = FUSION_REPORT) -> dict[str, np.ndarray]:
+    """Cached TSDF descriptors, keyed by plant id.
+
+    Read from disk rather than recomputed: fusing 36 specimens takes ten
+    minutes, and a baseline sweep that quietly did that would stop being a thing
+    anyone runs. Missing file means the fused baseline is simply not offered.
+    """
+    if not path.exists():
+        return {}
+
+    import json
+
+    from .fusion_features import FUSION_KEYS
+
+    table = json.loads(path.read_text(encoding="utf-8"))
+    return {
+        plant_id: np.array([row[k] for k in FUSION_KEYS], dtype=np.float64)
+        for plant_id, row in table.items()
+        if all(k in row for k in FUSION_KEYS)
+    }
+
+
 def load_features(
-    plant_ids: list[str], cache_dir: Path = WORK_DIR / "cache"
+    plant_ids: list[str],
+    cache_dir: Path = WORK_DIR / "cache",
+    *,
+    fusion_report: Path = FUSION_REPORT,
 ) -> list[SpecimenFeatures]:
     """Extract baseline features for many specimens."""
-    return [extract_features(load_cached(pid, cache_dir)) for pid in plant_ids]
+    fusion = _load_fusion(fusion_report)
+    return [
+        extract_features(load_cached(pid, cache_dir), fused=fusion.get(pid))
+        for pid in plant_ids
+    ]
 
 
 class Baseline(ABC):
@@ -177,7 +264,7 @@ class Baseline(ABC):
     name: str = "baseline"
 
     @abstractmethod
-    def fit(self, features: list[SpecimenFeatures]) -> "Baseline":
+    def fit(self, features: list[SpecimenFeatures]) -> Baseline:
         ...
 
     @abstractmethod
@@ -199,7 +286,7 @@ class VolumeAllometric(Baseline):
         self.slope = 1.0
         self.intercept = 0.0
 
-    def fit(self, features: list[SpecimenFeatures]) -> "VolumeAllometric":
+    def fit(self, features: list[SpecimenFeatures]) -> VolumeAllometric:
         volume = np.array([max(f.above_ground_volume_m3, self.eps) for f in features])
         mass = np.array([max(f.target_kg, self.eps) for f in features])
         design = np.stack([np.log(volume), np.ones_like(volume)], axis=1)
@@ -225,7 +312,7 @@ class _RidgeBaseline(Baseline):
     def _vector(feature: SpecimenFeatures) -> np.ndarray:
         raise NotImplementedError
 
-    def fit(self, features: list[SpecimenFeatures]) -> "_RidgeBaseline":
+    def fit(self, features: list[SpecimenFeatures]) -> _RidgeBaseline:
         design = np.stack([self._vector(f) for f in features])
         targets = np.array([f.target_kg for f in features])
         self.weights, self.intercept, self.mean, self.scale = _ridge_fit(
@@ -261,6 +348,37 @@ class Direct2D(_RidgeBaseline):
         return feature.image_vector()
 
 
+class FusedGeometry(_RidgeBaseline):
+    """Ridge on descriptors from the TSDF fusion instead of the carve.
+
+    Present only when `cli fuse` has been run, because fusing all 36 specimens
+    costs ten minutes and should not happen inside a baseline sweep.
+    """
+
+    name = "fused geometry"
+
+    @staticmethod
+    def _vector(feature: SpecimenFeatures) -> np.ndarray:
+        return feature.fused_vector()
+
+
+class ProfileAugmented(_RidgeBaseline):
+    """Image statistics plus the vertical cross-section profile.
+
+    The only combination this project has found that improves on its component
+    parts with an interval clear of zero, and only within Eucalyptus: -0.112 kg
+    with a 95% interval of [-0.219, -0.009] against direct 2D alone. On the
+    pooled set it is not resolved, because it helps stems and hurts canopies.
+    Read the species split before quoting it.
+    """
+
+    name = "2D + profile"
+
+    @staticmethod
+    def _vector(feature: SpecimenFeatures) -> np.ndarray:
+        return np.concatenate([feature.image_vector(), feature.profile_vector()])
+
+
 class MeanPredictor(Baseline):
     """Predicts the training mean. The floor any real method must clear."""
 
@@ -269,7 +387,7 @@ class MeanPredictor(Baseline):
     def __init__(self):
         self.value = 0.0
 
-    def fit(self, features: list[SpecimenFeatures]) -> "MeanPredictor":
+    def fit(self, features: list[SpecimenFeatures]) -> MeanPredictor:
         self.value = float(np.mean([f.target_kg for f in features]))
         return self
 
@@ -312,7 +430,15 @@ def evaluate_baselines(
         VolumeAllometric.name: VolumeAllometric,
         GeometricFeatures.name: GeometricFeatures,
         Direct2D.name: Direct2D,
+        ProfileAugmented.name: ProfileAugmented,
     }
+    # Every specimen or none. A partially populated fusion.json -- which is what
+    # `cli fuse --plants ...` leaves behind -- would otherwise put zero vectors in
+    # for the specimens it skipped, and the method would appear in the table
+    # scoring worse than the mean for a reason that has nothing to do with the
+    # method. Silently wrong beats loudly absent only in the wrong direction.
+    if features and all(f.fused is not None for f in features):
+        factories[FusedGeometry.name] = FusedGeometry
 
     results: dict[str, tuple[RegressionMetrics, np.ndarray]] = {}
     for name, factory in factories.items():
