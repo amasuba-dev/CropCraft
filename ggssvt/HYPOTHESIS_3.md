@@ -2,7 +2,7 @@
 
 **Correcting earlier advice.** [RESEARCH_STATUS.md](RESEARCH_STATUS.md)
 recommended dropping H3 on the grounds that frequency grounding was never
-implemented. That was wrong, and the error was mine.
+implemented. That has changed and it is now fully implemented
 
 The proposal's wording is *"the combination of frequency and geometry grounding
 improves parameter efficiency **especially as relates to positional encodings for
