@@ -354,11 +354,15 @@ cut short, what completed is what the write-up needs.
 | run | closes | why |
 |---|---|---|
 | `baseline_cnn` | reference | every comparison below is against this |
+| `baseline_fused` | operator | same model on the fused cache. Classical features gained 0.209 kg there with the operator as the only change; whether a trained model inherits that is untested |
 | `h2_no_geometry` | **H2** | the geometry-grounding ablation; γ frozen at zero, capacity identical |
 | `h1_dinov2` | **H1** | ViT backbone against the CNN stem, inside the trained model |
 | `h3_bands_8_freq7` | **H3** | encoding matched to the grid Nyquist, 41.7 cyc/m |
 | `h3_bands_6_freq6` | **H3** | half the Nyquist, 20.8 cyc/m, expected to hurt |
 | `h3_bands_16_freq10` | **H3** | 8× the Nyquist, 333 cyc/m, expected to add nothing |
+
+**Run `cli fuse --write-cache` before the campaign.** Without `cache_tsdf` the
+`baseline_fused` run has nothing to read and fails rather than being skipped.
 
 **Delete `work_dirs/ggssvt/campaign/` before the first re-run.** Resume works by
 skipping runs whose status is `done`, which is what you want after a crash and
@@ -366,7 +370,7 @@ exactly what you do not want after the targets changed.
 | `sam3d_cnn`, `sam3d_dinov2` | factorial | tests whether the probe's interaction survives training |
 | `h1_dinov3` | H1 | if access has been granted |
 
-`core` is six runs, roughly **8–10 hours** at 120 pretrain and 60 fine-tune
+`core` is seven runs, roughly **8–10 hours** at 120 pretrain and 60 fine-tune
 epochs. `full` is nine, roughly 13–15 hours. Time one epoch first (step 2) and
 scale.
 

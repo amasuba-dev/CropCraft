@@ -27,8 +27,8 @@ is what the write-up needs.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import dataclasses
+import hashlib
 import json
 import time
 import traceback
@@ -38,6 +38,14 @@ from pathlib import Path
 from .config import MODEL, TRAIN, WORK_DIR
 
 CAMPAIGN_DIR = WORK_DIR / "campaign"
+
+# Which directory each `Run.cache` name points at. A module constant rather
+# than a class attribute so the dataclass has no mutable default to argue about.
+CACHE_DIRNAMES = {
+    "geometric": "cache",
+    "sam3d": "cache_sam3d",
+    "tsdf": "cache_tsdf",
+}
 
 
 @dataclass
@@ -58,7 +66,7 @@ class Run:
     max_specimens: int | None = None   # smoke runs only; None uses every usable specimen
 
     def cache_dir(self) -> Path:
-        return WORK_DIR / ("cache_sam3d" if self.cache == "sam3d" else "cache")
+        return WORK_DIR / CACHE_DIRNAMES.get(self.cache, "cache")
 
     def model_config(self):
         return dataclasses.replace(
@@ -79,6 +87,16 @@ def _core_runs() -> list[Run]:
         Run(
             name="baseline_cnn",
             question="reference condition for every comparison below",
+        ),
+        Run(
+            name="baseline_fused",
+            question=(
+                "does the model inherit the fusion's advantage? Classical features "
+                "went 0.544 to 0.335 on this cache with the operator as the only "
+                "change, and whether a trained model does the same is the question "
+                "the campaign cannot answer without running it"
+            ),
+            cache="tsdf",
         ),
         Run(
             name="h2_no_geometry",
