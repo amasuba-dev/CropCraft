@@ -75,7 +75,7 @@ METHODS: tuple[ReconstructionMethod, ...] = (
         group="reconstruction",
         note="The same twelve depth maps integrated as a signed distance field "
              "instead of intersected as silhouette cones. Concavities survive and "
-             "unobserved space stays empty, so 21 of 36 reconstructions become "
+             "unobserved space stays empty, so 25 of 36 reconstructions become "
              "physically capable of weighing their plant, against 8 for the carve "
              "at this same resolution.",
         cache=WORK_DIR / "cache_tsdf",

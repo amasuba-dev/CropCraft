@@ -302,7 +302,10 @@ fitted comparison:
 | | plausible | median implied density | verdicts |
 |---|---|---|---|
 | carve, 12 mm hull | 8/36 | 116.8 kg/m³ | 25 envelope, 3 missing |
+| **TSDF, 12 mm fusion** | **25/36** | 271.9 kg/m³ | the shipped cache |
 | **TSDF, 6 mm fusion** | **31/36** | **529.2 kg/m³** | 1 envelope, 4 missing |
+
+Two counts, because two things improve. Holding the rim fixed at the carve's estimate isolates the occupancy operator and gives **21 of 36**. Letting the rim be re-estimated from the fused profile, which is what the shipped cache does, gives **25 of 36**: a fused vertical profile has a sharper step, so the rim detector refuses less often. Both are at 12 mm; 31 of 36 is the 6 mm figure.
 
 M001 is the clearest case: 25.79 L of hull above the rim for a 0.74 kg shoot,
 against 1.18 L fused. The hull implied 28.7 kg/m³, the fusion 629. Mean coverage

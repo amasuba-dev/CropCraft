@@ -407,7 +407,7 @@ python -m ggssvt.cli fuse --write-cache
 Expect **31 of 36 plausible against the carve's 8**, median implied density
 529 kg/m3 against 116.8. `--write-cache` also writes `cache_tsdf` at the carve's
 own 128^3 and 12 mm, which is the control that isolates the operator from the
-grid: 21 of 36 at matched resolution, so the method accounts for most of the gain
+grid: 25 of 36 at matched resolution, or 21 with the rim also held fixed, so the method accounts for most of the gain
 and the finer grid adds the rest.
 
 Two things depend on this having run. `cli baselines` offers the `fused geometry`

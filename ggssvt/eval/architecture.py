@@ -357,9 +357,11 @@ def fusion() -> Diagram:
             ),
         ],
         outcome=(
-            "31 of 36 plausible against the carve's 8, and 21 of 36 at the "
-            "carve's own resolution, so the operator accounts for most of the "
-            "gain and the finer grid the rest. Against Method A the paired "
+            "25 of 36 plausible against the carve's 8 at this same 12 mm grid, "
+            "and 31 of 36 at the 6 mm the sensor supports. Holding the rim fixed "
+            "at the carve's estimate isolates the occupancy operator alone and "
+            "gives 21 of 36, so the rim estimate improves on a fused profile too. "
+            "Against Method A the paired "
             "bootstrap is -0.209 kg, 95 percent interval -0.363 to -0.066: the "
             "first resolved biomass improvement in the project. Direct 2D is "
             "unchanged at 0.469, which is the control."
@@ -505,4 +507,149 @@ def write_all(out_dir: Path) -> list[Path]:
     return written
 
 
-__all__ = ["DIAGRAMS", "Diagram", "Stage", "render", "write_all"]
+
+
+# ---------------------------------------------------------------------------
+# Raster backend.
+#
+# The SVG is the primary artefact: sharp at any size, selectable text, a few
+# kilobytes. Word will not embed one without a raster fallback, though, and
+# neither will most journal submission systems, so the same Stage and Diagram
+# objects are drawn a second way here rather than rasterised through a
+# dependency that wants a C library Windows does not ship.
+# ---------------------------------------------------------------------------
+
+_FONT_CANDIDATES = {
+    "regular": ("segoeui.ttf", "calibri.ttf", "arial.ttf", "DejaVuSans.ttf"),
+    "bold": ("segoeuib.ttf", "calibrib.ttf", "arialbd.ttf", "DejaVuSans-Bold.ttf"),
+    "mono": ("consola.ttf", "cour.ttf", "DejaVuSansMono.ttf"),
+}
+_FONT_DIRS = ("C:/Windows/Fonts", "/usr/share/fonts/truetype/dejavu",
+              "/System/Library/Fonts")
+
+
+def _font(kind: str, size: int):
+    """A usable face, or PIL's default if the system has none of them."""
+    from PIL import ImageFont
+
+    for directory in _FONT_DIRS:
+        for name in _FONT_CANDIDATES[kind]:
+            path = Path(directory) / name
+            if path.exists():
+                try:
+                    return ImageFont.truetype(str(path), size)
+                except OSError:
+                    continue
+    return ImageFont.load_default()
+
+
+def render_png(diagram: Diagram, scale: int = 2):
+    """The same diagram as a PIL image, at ``scale`` times the SVG geometry."""
+    from PIL import Image, ImageDraw
+
+    s = scale
+    fonts = {
+        "title": _font("bold", 21 * s), "sub": _font("regular", 13 * s),
+        "head": _font("bold", 14 * s), "body": _font("regular", 12 * s),
+        "mono": _font("mono", 11 * s), "num": _font("mono", 15 * s),
+        "small": _font("mono", 11 * s), "out": _font("regular", 13 * s),
+    }
+
+    # Height has to match the SVG's, so the two artefacts stay the same figure.
+    height = 0
+    for stage in diagram.stages:
+        height += stage.height() + GAP
+    height = PAD_TOP + height - GAP
+    if diagram.outcome:
+        height += 30 + 17 * len(textwrap.wrap(diagram.outcome, 72))
+    height += 34
+
+    image = Image.new("RGB", (WIDTH * s, height * s), PAPER)
+    draw = ImageDraw.Draw(image)
+
+    draw.text(((BOX_X - 26) * s, 28 * s), diagram.title, font=fonts["title"], fill=INK)
+    draw.text(((BOX_X - 26) * s, 56 * s), diagram.subtitle, font=fonts["sub"], fill=MUTED)
+
+    y = PAD_TOP
+    for index, stage in enumerate(diagram.stages, start=1):
+        h = stage.height()
+        colour = VIRIDIS[stage.tone]
+
+        draw.text(((BOX_X - 40) * s, (y + 14) * s), f"{index:02d}",
+                  font=fonts["num"], fill=MUTED)
+        draw.rounded_rectangle(
+            [BOX_X * s, y * s, (BOX_X + BOX_W) * s, (y + h) * s],
+            radius=7 * s, fill=PAPER, outline=RULE, width=max(1, s // 2),
+        )
+        draw.rounded_rectangle(
+            [BOX_X * s, y * s, (BOX_X + 4) * s, (y + h) * s],
+            radius=2 * s, fill=colour,
+        )
+
+        ty = y + 13
+        draw.text(((BOX_X + 18) * s, ty * s), stage.title, font=fonts["head"], fill=INK)
+        ty += 18
+        for line in textwrap.wrap(stage.detail, 62) or [""]:
+            draw.text(((BOX_X + 18) * s, ty * s), line, font=fonts["body"], fill=MUTED)
+            ty += 15
+        if stage.module:
+            draw.text(((BOX_X + 18) * s, (ty + 2) * s), stage.module,
+                      font=fonts["mono"], fill=colour)
+
+        if stage.note:
+            ny = y + 12
+            for line in textwrap.wrap(stage.note, 24):
+                draw.text(((BOX_X + BOX_W + 16) * s, ny * s), line,
+                          font=fonts["small"], fill=MUTED)
+                ny += 14
+        if stage.verdict:
+            lines = textwrap.wrap(stage.verdict, 24)
+            vy = y + h - 12 - 14 * (len(lines) - 1)
+            for line in lines:
+                draw.text(((BOX_X + BOX_W + 16) * s, vy * s), line,
+                          font=fonts["small"], fill=VIRIDIS[0])
+                vy += 14
+
+        y += h
+        if index < len(diagram.stages):
+            mid = BOX_X + BOX_W / 2
+            draw.line([mid * s, y * s, mid * s, (y + GAP - 7) * s],
+                      fill=RULE, width=max(1, s))
+            draw.line([(mid - 4) * s, (y + GAP - 11) * s, mid * s, (y + GAP - 4) * s],
+                      fill=RULE, width=max(1, s))
+            draw.line([(mid + 4) * s, (y + GAP - 11) * s, mid * s, (y + GAP - 4) * s],
+                      fill=RULE, width=max(1, s))
+            y += GAP
+
+    if diagram.outcome:
+        y += 30
+        draw.line([BOX_X * s, (y - 16) * s, (BOX_X + BOX_W) * s, (y - 16) * s],
+                  fill=RULE, width=max(1, s // 2))
+        for line in textwrap.wrap(diagram.outcome, 72):
+            draw.text((BOX_X * s, (y - 11) * s), line, font=fonts["out"], fill=INK)
+            y += 17
+
+    return image
+
+
+def write_all_png(out_dir: Path, scale: int = 2) -> list[Path]:
+    """Render every methodology to PNG, for Word and for submission systems."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    written = []
+    for factory in DIAGRAMS:
+        diagram = factory()
+        path = out_dir / f"architecture_{diagram.key}.png"
+        render_png(diagram, scale=scale).save(path, "PNG", optimize=True)
+        written.append(path)
+    return written
+
+
+__all__ = [
+    "DIAGRAMS",
+    "Diagram",
+    "Stage",
+    "render",
+    "render_png",
+    "write_all",
+    "write_all_png",
+]
