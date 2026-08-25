@@ -9,98 +9,13 @@
 
 const fs = require("fs");
 const path = require("path");
-const {
-  Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
-  BorderStyle, PageBreak, LevelFormat, Footer, PageNumber,
-} = require("docx");
+const { Document, Packer, Paragraph, PageBreak, AlignmentType } = require("docx");
+const C = require("./proposal_common");
 
-const INK = "000000", MUTED = "444444";
-const BODY = 22;              // 11pt, as the template stipulates
+const { p, rich, h, bullets } = C;
+const brk = () => new Paragraph({ children: [new PageBreak()] });
 
-const p = (text, o = {}) => new Paragraph({
-  spacing: { after: o.after ?? 120, line: o.line ?? 240 },   // single spacing
-  alignment: o.align ?? AlignmentType.JUSTIFIED,
-  children: [new TextRun({
-    text, size: o.size ?? BODY, bold: o.bold, italics: o.italics,
-    color: o.color ?? INK, font: "Times New Roman",
-  })],
-});
-
-const rich = (parts, o = {}) => new Paragraph({
-  spacing: { after: o.after ?? 120, line: 240 },
-  alignment: o.align ?? AlignmentType.JUSTIFIED,
-  children: parts.map(([t, x = {}]) => new TextRun({
-    text: t, size: x.size ?? BODY, bold: x.bold, italics: x.italics,
-    color: x.color ?? INK, font: "Times New Roman",
-  })),
-});
-
-const h = (text, level = 1) => new Paragraph({
-  heading: level === 1 ? HeadingLevel.HEADING_1 : HeadingLevel.HEADING_2,
-  spacing: { before: level === 1 ? 240 : 180, after: 100 },
-  children: [new TextRun({
-    text, size: level === 1 ? 24 : 22, bold: true, color: INK,
-    font: "Times New Roman",
-  })],
-});
-
-const centre = (text, o = {}) => new Paragraph({
-  spacing: { after: o.after ?? 120 },
-  alignment: AlignmentType.CENTER,
-  children: [new TextRun({
-    text, size: o.size ?? BODY, bold: o.bold, color: o.color ?? INK,
-    font: "Times New Roman",
-  })],
-});
-
-const bullets = (items) => items.map((t) => new Paragraph({
-  numbering: { reference: "b", level: 0 },
-  spacing: { after: 90, line: 240 },
-  children: [new TextRun({ text: t, size: BODY, font: "Times New Roman" })],
-}));
-
-const signature = (role) => [
-  new Paragraph({ spacing: { before: 340, after: 0 },
-    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: INK, space: 2 } },
-    children: [new TextRun({ text: "", size: BODY })] }),
-  new Paragraph({
-    spacing: { after: 60 },
-    children: [new TextRun({ text: "(Signature)", size: 18, font: "Times New Roman" })],
-  }),
-  new Paragraph({
-    spacing: { after: 180 },
-    children: [
-      new TextRun({ text: role, size: BODY, font: "Times New Roman" }),
-      new TextRun({ text: "					Date", size: BODY, font: "Times New Roman" }),
-    ],
-  }),
-];
-
-/* ---------------- title page ---------------- */
-
-const title = [
-  new Paragraph({ spacing: { before: 900, after: 400 }, alignment: AlignmentType.CENTER,
-    children: [new TextRun({
-      text: "AUTOMATED BIOMASS ESTIMATION USING SELF-SUPERVISED VISION TRANSFORMERS",
-      size: 30, bold: true, font: "Times New Roman" })] }),
-  centre("Research proposal: MEng", { after: 500, size: 24 }),
-  centre("Candidate", { bold: true, after: 60 }),
-  centre("A Masuba", { after: 240 }),
-  centre("Student number", { bold: true, after: 60 }),
-  centre("[student number]", { after: 240 }),
-  centre("Department of Electrical, Electronic and Computer Engineering", { after: 60 }),
-  centre("University of Pretoria", { after: 240 }),
-  centre("25 August 2026", { after: 240 }),
-  centre("Supervisor", { bold: true, after: 60 }),
-  centre("Prof. H Myburgh", { after: 240 }),
-  centre("Co-supervisors", { bold: true, after: 60 }),
-  centre("Prof. A De Freitas", { after: 40 }),
-  centre("Dr K Mokise", { after: 200 }),
-  ...signature("Candidate"),
-  ...signature("Supervisor/Promoter"),
-  ...signature("Postgraduate Committee"),
-  new Paragraph({ children: [new PageBreak()] }),
-];
+const title = [...C.titlePage("MEng", "25 August 2026"), brk()];
 
 /* ---------------- summary page (one A4) ---------------- */
 
@@ -124,7 +39,7 @@ const summary = [
         ["Silhouette carving recovers the canopy envelope, not the plant: a physical criterion for validating multi-view reconstruction in biomass phenotyping"]], { after: 80 }),
   rich([["Description: ", { bold: true }],
         ["Reconstruct-then-regress pipelines for non-destructive biomass estimation almost universally adopt silhouette-based reconstruction without testing whether the resulting volume can represent the plant at all. The gap this addresses is the absence of any validation criterion for multi-view plant reconstruction when ground-truth geometry is unavailable, which is the normal case in destructive-harvest studies."]]),
-  new Paragraph({ children: [new PageBreak()] }),
+  brk(),
 ];
 
 /* ---------------- full proposal (two A4) ---------------- */
@@ -133,14 +48,14 @@ const full = [
   h("Full research proposal"),
 
   h("1. Introduction", 2),
-  p("Above-ground biomass is among the most requested traits in plant phenotyping and destructive harvest remains its reference method. Non-destructive estimation from imaging follows a near-universal pattern: reconstruct the plant in three dimensions, summarise the reconstruction with shape descriptors, and regress those descriptors on weighed mass [1]. The reconstruction step is usually treated as solved. Given silhouettes from a ring of viewpoints the natural operator is space carving, whose output Laurentini showed is the visual hull, the maximal object consistent with those silhouettes [2]. For a compact object this is a mild approximation. For a plant, whose above-ground structure is largely the space between leaves, whether it is an approximation at all is an open question that this work tests rather than assumes."),
+  p("Above-ground biomass is among the most requested traits in plant phenotyping and destructive harvest remains its reference method. Non-destructive estimation from imaging follows a near-universal pattern: reconstruct the plant in three dimensions, summarise the reconstruction with shape descriptors, and regress those descriptors on weighed mass [1]. The reconstruction step is usually treated as solved. Given silhouettes from a ring of viewpoints the natural operator is space carving, whose output Laurentini showed is the visual hull, the maximal object consistent with those silhouettes [2]. For a compact object that is a mild approximation. For a plant, whose above-ground structure is largely the space between leaves, whether it is an approximation at all is the open question this work tests rather than assumes."),
 
   h("2. Overview of current literature", 2),
-  p("Reviews of high-throughput phenotyping organise the field by trait, with plant height the most studied geometric quantity and biomass estimated from crop height and surface models, vegetation indices, or their combination, reporting coefficients of determination between 0.55 and 0.79 for field crops [1]. Acquisition frequency has been studied directly in a livestock imaging context, with the finding that the optimal frequency is trait-specific rather than universal [3], a question that has an obvious analogue in the number of viewpoints a plant capture needs. Agronomic work on plant density shows it affects stem biometry more than biomass yield [4], and is a reminder that the agronomic sense of density, plants per unit area, is distinct from the volumetric sense used as a diagnostic here."),
-  p("On the reconstruction side, silhouette methods are bounded above by the visual hull [2], while volumetric range-image integration provides an alternative that accumulates signed distances from depth measurements into a truncated field whose zero crossing is the surface [5], demonstrated in real time with commodity depth sensors [6]. The distinction is evidential: a silhouette constrains the subject to lie somewhere along a ray, whereas a depth sample asserts a surface at a specific distance, and only the second can represent a concavity. Self-supervised vision transformers now supply general-purpose dense features without labels [7], promptable models supply subject masks without per-species training [8], and feed-forward pointmap models estimate cameras and geometry from images alone [9], [10]."),
+  p("Reviews of high-throughput phenotyping organise the field by trait, with plant height the most studied geometric quantity and biomass estimated from crop height and surface models, vegetation indices, or their combination, reporting coefficients of determination between 0.55 and 0.79 for field crops [1]. Acquisition frequency has been studied directly in a livestock imaging context, finding the optimal frequency trait-specific rather than universal [3], which has an analogue in how many viewpoints a plant capture needs. Agronomic work on plant density shows it affects stem biometry more than biomass yield [4], a reminder that the agronomic sense of density is a different quantity from the volumetric sense used as a diagnostic here."),
+  p("On the reconstruction side, silhouette methods are bounded above by the visual hull [2], while volumetric range-image integration accumulates signed distances from depth measurements into a truncated field whose zero crossing is the surface [5], demonstrated in real time on commodity sensors [6]. The distinction is evidential: a silhouette places the subject somewhere along a ray, whereas a depth sample asserts a surface at a specific distance, and only the second can represent a concavity. Self-supervised vision transformers now supply general-purpose dense features without labels [7], promptable models supply subject masks without per-species training [8], and feed-forward pointmap models estimate cameras and geometry from images alone [9], [10]."),
 
   h("3. Motivation", 2),
-  p("Two observations motivate the work. First, biomass phenotyping is label-poor: every training example costs a destroyed plant, so methods that reduce the labelled requirement have direct practical value, which is the case for self-supervised representations. Second, and less obviously, the field validates reconstruction by proxy. Where ground-truth geometry is unavailable, quality is judged by consistency between views, which for a hull is guaranteed by construction rather than earned. A pipeline can therefore pass every geometric check while reconstructing an object that could not physically weigh what the plant weighs, and nothing in the standard protocol would detect it."),
+  p("Two observations motivate the work. First, biomass phenotyping is label-poor: every training example costs a destroyed plant, so methods that reduce the labelled requirement have direct practical value, which is the case for self-supervised representations. Second, and less obviously, the field validates reconstruction by proxy. Without ground-truth geometry, quality is judged by consistency between views, which for a hull is guaranteed by construction rather than earned. A pipeline can therefore pass every geometric check while reconstructing an object that could not physically weigh what the plant weighs, and nothing in the standard protocol detects it."),
 
   h("4. Objective", 2),
   ...bullets([
@@ -151,16 +66,16 @@ const full = [
   ]),
 
   h("5. Proposed research", 2),
-  p("Capture uses two Kinect v2 units carried through six positions thirty degrees apart, giving twelve azimuths per specimen, with colour mapped into the depth frame. Specimens are destructively harvested and the above-ground shoot weighed fresh; pot mass is weighed after shoot removal. Camera extrinsics are estimated from the depth data by fitting a floor plane per view and recovering the subject axis by cross-view agreement, since no calibration target was captured."),
-  p("Reconstruction operators are compared with features, protocol, voxel grid, views and masks all held fixed, so that the only variable is the operator. Validity is assessed by implied bulk density, computed as weighed shoot mass divided by reconstructed above-ground volume and compared against the 300 to 900 kilograms per cubic metre of fresh plant tissue. Reconstruction quality is additionally characterised by re-projection into the captured views, giving silhouette intersection-over-union, depth error and depth peak signal-to-noise ratio, and by cross-operator agreement using Chamfer distance, the ninety-fifth-percentile Hausdorff distance, F-score at a fixed metric tolerance, and voxel intersection-over-union."),
-  p("Biomass is estimated by leave-one-out cross-validation over all usable specimens, with root-mean-square error and the coefficient of determination as the reported metrics and a paired bootstrap over twenty thousand resamples on every difference between methods. Differences whose interval spans zero are reported as unresolved rather than as results. Representation learning is evaluated in two forms: frozen self-supervised features under a linear probe, and a geometry-grounded transformer trained with occupancy supervision derived from the reconstruction, which requires no manual annotation."),
-  p("Angular sampling is studied by rebuilding reconstructions from evenly spaced subsets of three, four, six and twelve views and scoring each under the same validity criterion. Camera pose estimation, the least verified assumption in the pipeline, is checked independently by feed-forward pointmap models that estimate cameras from images alone and therefore share no failure mode with poses estimated from the same depth being reconstructed [9], [10]."),
+  p("Capture uses two Kinect v2 units carried through six positions thirty degrees apart, giving twelve azimuths per specimen, with colour mapped into the depth frame. Specimens are destructively harvested and the above-ground shoot weighed fresh; pot mass is weighed after shoot removal. No calibration target was captured, so extrinsics are estimated from the depth data by fitting a floor plane per view and recovering the subject axis by cross-view agreement."),
+  p("Reconstruction operators are compared with features, protocol, voxel grid, views and masks all held fixed, so that the only variable is the operator. Validity is assessed by implied bulk density, computed as weighed shoot mass divided by reconstructed above-ground volume and compared against the 300 to 900 kilograms per cubic metre of fresh plant tissue. Reconstruction quality is characterised on two axes kept apart: re-projection into the captured views, giving silhouette intersection-over-union, depth error and depth peak signal-to-noise ratio; and cross-operator agreement by Chamfer distance, ninety-fifth-percentile Hausdorff distance, F-score at a fixed tolerance and voxel intersection-over-union."),
+  p("Biomass is estimated by leave-one-out cross-validation over all usable specimens, reporting root-mean-square error and the coefficient of determination, with a paired bootstrap over twenty thousand resamples on every difference between methods. Differences whose interval spans zero are reported as unresolved rather than as results. Representation learning is evaluated in two forms: frozen self-supervised features under a linear probe, and a geometry-grounded transformer trained with occupancy supervision derived from the reconstruction, which requires no manual annotation."),
+  p("Angular sampling is studied by rebuilding reconstructions from evenly spaced subsets of three, four, six and twelve views and scoring each under the same validity criterion. Pose estimation, the least verified assumption in the pipeline, is checked independently by feed-forward pointmap models that estimate cameras from images alone and so share no failure mode with poses derived from the same depth being reconstructed [9], [10]."),
 
   h("6. Contribution", 2),
-  p("The primary contribution is a validation criterion for multi-view plant reconstruction that requires no reference geometry, together with the finding it yields on this data: under space carving only eight of thirty-six specimens produce a reconstruction whose implied bulk density falls inside a deliberately generous band, and all ten Mango specimens land between 26 and 77 kilograms per cubic metre, an order of magnitude below fresh plant tissue. Because the visual hull is the maximal solid consistent with the silhouettes, this is a property of the operator rather than of resolution, and it bounds what any silhouette-based method can achieve on these morphologies."),
+  p("The primary contribution is a validation criterion for multi-view plant reconstruction that requires no reference geometry, together with the finding it yields on this data: under space carving only eight of thirty-six specimens have an implied bulk density inside a deliberately generous band, and all ten Mango specimens land between 26 and 77 kilograms per cubic metre, an order of magnitude below plant tissue. Because the visual hull is the maximal solid consistent with the silhouettes, this is a property of the operator rather than of resolution, and it bounds what any silhouette-based method can achieve."),
   p("The second contribution is the controlled substitution that follows from it. Replacing silhouette intersection with truncated signed distance fusion of the same depth maps, with all other factors fixed, raises the count to twenty-five at the identical grid and moves biomass root-mean-square error from 0.544 to 0.335 kilograms, a paired-bootstrap difference of minus 0.209 with a ninety-five per cent interval of minus 0.363 to minus 0.066. An image-only control is unchanged, which establishes that the reconstruction rather than the regressor was the limiting component."),
-  p("A third contribution is methodological and of wider relevance. Silhouette intersection-over-union, the conventional reconstruction quality measure, ranks the carve above the fusion on this data while physical plausibility and biomass accuracy both rank it below. A metric that measures agreement with the input rather than fidelity to the object will systematically favour whichever method is most consistent with its own evidence, and for a hull that consistency is guaranteed rather than earned. This is a caution the phenotyping literature does not currently carry."),
-  new Paragraph({ children: [new PageBreak()] }),
+  p("A third contribution is methodological. Silhouette intersection-over-union, the conventional quality measure, ranks the carve above the fusion on this data while plausibility and biomass accuracy both rank it below. A metric measuring agreement with the input rather than fidelity to the object systematically favours whichever method is most consistent with its own evidence, and for a hull that consistency is guaranteed rather than earned. This is a caution the phenotyping literature does not carry."),
+  brk(),
 ];
 
 /* ---------------- references and contact ---------------- */
@@ -179,46 +94,18 @@ const refs = [
     "[9] S. Wang, V. Leroy, Y. Cabon, B. Chidlovskii, and J. Revaud, “DUSt3R: geometric 3D vision made easy,” in Proc. IEEE/CVF CVPR, 2024.",
     "[10] V. Leroy, Y. Cabon, and J. Revaud, “Grounding image matching in 3D with MASt3R,” in Proc. ECCV, 2024.",
   ].map((t) => p(t, { align: AlignmentType.LEFT, after: 80 })),
-  new Paragraph({
-    spacing: { before: 200, after: 200 },
-    border: { top: { style: BorderStyle.SINGLE, size: 6, color: "BBBBBB", space: 8 } },
-    children: [new TextRun({
-      text: "Note: bibliographic details should be verified against publisher records before submission. References [1] and [4] were read in full during this work; the remainder were compiled from working notes.",
-      size: 18, italics: true, color: MUTED, font: "Times New Roman" })],
-  }),
-
-  h("Contact Information"),
-  ...[
-    ["Postal address", "Department of Electrical, Electronic and Computer Engineering, University of Pretoria, Private Bag X20, Hatfield, 0028, South Africa"],
-    ["Research group", "Smart Sensing and Intelligent Systems Group"],
-    ["E-mail", "[university e-mail address]"],
-    ["Tel number", ""],
-    ["Fax number", ""],
-    ["Cell number", ""],
-  ].map(([k, v]) => rich([[k + ": ", { bold: true }], [v]], { align: AlignmentType.LEFT, after: 80 })),
+  C.verifyNote(),
+  ...C.contactBlock(),
 ];
 
 const doc = new Document({
-  creator: "A Masuba",
+  creator: C.CANDIDATE.name,
   title: "Research proposal: MEng",
-  numbering: {
-    config: [{
-      reference: "b",
-      levels: [{
-        level: 0, format: LevelFormat.BULLET, text: "•",
-        alignment: AlignmentType.LEFT,
-        style: { paragraph: { indent: { left: 500, hanging: 260 } } },
-      }],
-    }],
-  },
-  styles: { default: { document: { run: { font: "Times New Roman", size: BODY } } } },
+  numbering: C.numbering,
+  styles: C.styles,
   sections: [{
-    properties: { page: { margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } } },
-    footers: {
-      default: new Footer({ children: [new Paragraph({
-        alignment: AlignmentType.CENTER,
-        children: [new TextRun({ children: [PageNumber.CURRENT], size: 18 })] })] }),
-    },
+    properties: C.margins,
+    footers: { default: C.pageFooter() },
     children: [...title, ...summary, ...full, ...refs],
   }],
 });

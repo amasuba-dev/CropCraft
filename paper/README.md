@@ -32,22 +32,67 @@ first if those are stale.
 
 Both documents land next to their generators, in this directory.
 
-## The research proposal
+## The two research proposals
 
-`proposal.js` is separate and has no figure dependency, so it builds on its own:
+Both build on their own, with no figure dependency:
 
 ```bash
 node paper/proposal.js
 ```
 
-It follows the department's MEng/PhD proposal template: title page with the three
-signature blocks, a one-page summary, then the full proposal capped at two A4 for
-a master's, then references and contact details. The current draft runs 378 words
-in the summary and 1,154 in the body, which leaves a little room in both.
+```bash
+node paper/proposal_phd.js
+```
 
-Three fields are deliberately left as `[student number]` and
-`[university e-mail address]` placeholders, along with the three telephone lines,
-because inventing them would be worse than leaving them visibly blank.
+They share `proposal_common.js`, which holds the title page, the three signature
+blocks, the 11-point single-spaced body style and the contact block, so the two
+documents cannot drift apart on formatting or on the candidate's details. Those
+details come from the approved 2025 proposal rather than being invented.
+
+The department's template covers both degrees and differs in three places, which
+is the whole difference between the two scripts:
+
+| | MEng | PhD |
+|---|---|---|
+| summary page | 1 A4, 11 pt | same |
+| anticipated articles | one, labelled `Description` | two, labelled `Research gap that will be addressed` |
+| faculty requirement | one submitted | one accepted and one submitted |
+| full proposal | 2 A4 | 10 A4 |
+
+Current lengths, against those caps:
+
+| | summary (cap 1 A4) | body |
+|---|---|---|
+| MEng | 0.83 | 1.98 of 2 A4 |
+| PhD | 0.95 | 5.87 of 10 A4 |
+
+Those numbers come from `paper/check_length.py`, which estimates rendered height
+from the XML by counting characters against the 6.27 inch measure and adding
+paragraph spacing, because this machine has no LibreOffice to render with:
+
+```bash
+python paper/check_length.py
+```
+
+It exits non-zero when a section is over its cap, so it works in a pre-send
+check. It is an estimate and a pessimistic one, since justified text fits
+slightly more than it predicts, so treat anything above about 0.95 as needing a
+look in Word rather than as settled.
+
+The MEng body has almost no slack, and the PhD summary has little. Any addition
+to either needs a matching cut. The PhD body has room that is deliberately
+unused: four more pages of padding would read worse than six that earn their
+place.
+
+### Why there are two
+
+The Postgraduate Committee approved the 2025 MEng proposal with a reservation on
+the record, that four hypotheses and three papers "would indicate a study with
+the scope and complexity of a PhD". The MEng document answers that by narrowing
+to what the evidence now supports. The PhD document takes the reservation at face
+value and proposes the study at the size the committee already judged it to be,
+keeping all four hypotheses and restating each with the measurement that decides
+it.
 
 ## What has to be updated by hand
 
