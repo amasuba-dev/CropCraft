@@ -181,3 +181,4 @@ cython_debug/
 /paper/node_modules/
 /paper/package-lock.json
 /paper/package.json
+/paper/*.docx
