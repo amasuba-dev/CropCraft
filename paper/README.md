@@ -1,4 +1,4 @@
-# Regenerating the paper
+# Regenerating the paper and the proposal
 
 The draft is generated, not hand-written, for the same reason the architecture
 diagrams are: results change, and a document that has to be edited by hand to
@@ -30,7 +30,24 @@ architecture diagrams from `work_dirs/ggssvt/reports/architecture` and the
 contact sheet from the gallery, so run `cli architecture` and `cli gallery`
 first if those are stale.
 
-Output lands in `work_dirs/ggssvt/reports/paper/`.
+Both documents land next to their generators, in this directory.
+
+## The research proposal
+
+`proposal.js` is separate and has no figure dependency, so it builds on its own:
+
+```bash
+node paper/proposal.js
+```
+
+It follows the department's MEng/PhD proposal template: title page with the three
+signature blocks, a one-page summary, then the full proposal capped at two A4 for
+a master's, then references and contact details. The current draft runs 378 words
+in the summary and 1,154 in the body, which leaves a little room in both.
+
+Three fields are deliberately left as `[student number]` and
+`[university e-mail address]` placeholders, along with the three telephone lines,
+because inventing them would be worse than leaving them visibly blank.
 
 ## What has to be updated by hand
 
@@ -48,8 +65,8 @@ Two are worth checking against `cli baselines` and `cli fuse` before every send:
 
 ## Before submitting
 
-**Verify every reference.** Only [1] Feng and [3] Amaducci were read directly
-during this work. The rest were written from working notes and their years and
+**Verify every reference.** Only Feng and Amaducci were read directly during
+this work, in either document. The rest were written from working notes and their years and
 page ranges have not been checked against the publisher record. The document says
 so in a note under the reference list; remove that note only once the checking is
 actually done.
