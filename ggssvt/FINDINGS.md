@@ -516,6 +516,84 @@ family; what was missing was never the metric but the interval around it.
 
 ---
 
+## 7f. The reconstruction metrics, and why the good reconstruction scores worse
+
+Chamfer distance, Hausdorff and HD95, F-score and PSNR have been in
+`eval/metrics.py` since early in the project and were never called once. That was
+not an oversight. Those metrics measure distance to a reference, and there is no
+reference: destructive harvest produced a mass, not a geometry, and no laser
+scan, CT or CAD model of any specimen exists.
+
+Two things they can legitimately do, kept apart here because conflating them
+would overstate the result.
+
+**Explanatory power against the captured views.** Project a reconstruction back
+into each camera and score what it predicts against what was measured. No
+reference needed, because the views are the reference.
+
+| operator | silhouette IoU | depth MAE | depth PSNR | subject pixels explained |
+|---|---|---|---|---|
+| space carving | **0.407** | 67.9 mm | **32.70 dB** | **0.456** |
+| TSDF fusion | 0.219 | 67.4 mm | 32.49 dB | 0.233 |
+
+**The carve wins, and that is the finding.** A visual hull is by construction
+consistent with every silhouette it was built from, so a silhouette-agreement
+metric structurally favours it. The fusion scores lower because it has holes: it
+claims only what a camera measured, and roughly one eighth of the working volume
+was ever measured.
+
+Set that beside what the same two operators do on the questions that matter:
+
+| | carve | fusion |
+|---|---|---|
+| silhouette IoU | **0.407** | 0.219 |
+| physically plausible | 8/36 | **25/36** |
+| biomass RMSE | 0.544 kg | **0.335 kg** |
+
+**A metric that looks like "reconstruction quality" ranks the worse
+reconstruction higher.** This is the clearest argument the project has produced
+for the plausibility check: without ground-truth geometry, self-consistency
+metrics measure agreement with the input rather than fidelity to the object, and
+for a hull that agreement is guaranteed rather than earned. Reporting silhouette
+IoU alone would have pointed the whole project in the wrong direction.
+
+Depth error is the honest tie. Where both predict a surface they are equally
+accurate, 67.9 against 67.4 mm and 32.70 against 32.49 dB. The two operators
+differ in how much they claim, not in how well they place what they claim.
+
+**Agreement between the two operators**, which is a real number and is not
+accuracy:
+
+| | value |
+|---|---|
+| voxel IoU | 0.251 |
+| Chamfer distance | 36.6 mm |
+| F-score at 20 mm | 0.691 |
+| HD95 | 224 mm |
+| Hausdorff | 641 mm |
+
+A quarter of the occupied voxels are shared and the worst-case separation is
+0.64 m, which is most of the working volume. The two are describing substantially
+different objects, and the 0.691 F-score says the disagreement is in the bulk
+rather than in a few outliers. Two methods can agree closely and both be wrong;
+these do not even agree.
+
+**PSNR without a radiance field.** The conventional use needs rendered views
+against captured ones and belongs to the splatfacto arm, which has
+`transforms.json` exported for every specimen and has never been trained. The
+figure above is depth PSNR from re-projection, which is a different quantity and
+is labelled as such wherever it appears.
+
+**One caveat that must travel with the re-projection numbers.** These views built
+the reconstruction, so this is self-consistency rather than held-out
+generalisation. A volume that fails to explain the images it was carved from is
+definitely wrong; one that explains them may still be an envelope. Leave-one-view-
+out would be the stronger test and costs twelve carves per specimen.
+
+`python -m ggssvt.cli quality`, about a minute for all 36.
+
+---
+
 ## 8. Bugs found and fixed
 
 Several would have produced confident wrong numbers rather than errors.

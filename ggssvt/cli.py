@@ -303,6 +303,23 @@ def cmd_fuse(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_quality(args: argparse.Namespace) -> int:
+    """Reconstruction metrics: re-projection accuracy and cross-method agreement."""
+    import json as _json
+
+    from .eval.reconstruction_quality import run, summarise
+
+    rows = run(args.plants, carve_dir=args.cache_dir, out=args.out)
+    print()
+    print(_json.dumps(summarise(rows), indent=2))
+    print()
+    print("Read the silhouette IoU carefully. A visual hull is by construction")
+    print("consistent with every silhouette it was built from, so this metric")
+    print("structurally favours the carve, and it does. Physical plausibility and")
+    print("biomass accuracy both favour the fusion. See FINDINGS.md section 7f.")
+    return 0
+
+
 def cmd_gate(args: argparse.Namespace) -> int:
     """Run the acceptance checks and exit non-zero if anything is blocked."""
     import csv as _csv
@@ -937,6 +954,17 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     fuse.set_defaults(func=cmd_fuse)
+
+    quality = sub.add_parser(
+        "quality", help="reconstruction metrics: re-projection and agreement"
+    )
+    _add_common(quality)
+    quality.add_argument("--plants", nargs="*")
+    quality.add_argument(
+        "--out", type=Path,
+        default=WORK_DIR / "reports" / "reconstruction_quality.json",
+    )
+    quality.set_defaults(func=cmd_quality)
 
     gate = sub.add_parser(
         "gate", help="acceptance checks; exits non-zero if anything is blocked"
