@@ -43,7 +43,7 @@ faster card buys nothing while it waits on numpy.
 
 ## Everything, from an empty work directory
 
-The whole programme in order. Thirteen steps, of which five need the GPU. Total is
+The whole programme in order. Fourteen steps, of which five need the GPU. Total is
 about twelve hours, nearly all of it step 11. Each step writes an artefact, and
 the **Experiment log** on the project page is generated from those artefacts, so
 the page tracks progress on its own: run something, rebuild the page, and the row
@@ -108,6 +108,30 @@ python -m ggssvt.cli fuse --write-cache
 
 Expect 31 of 36 plausible against the carve's 8. This must run before step 11,
 because `baseline_fused` reads the cache it writes.
+
+Four plausible counts appear in this project and all four are correct, so check
+which one a number refers to before treating two of them as a contradiction:
+
+| | grid | pot rim | plausible |
+|---|---|---|---|
+| carve | 12 mm | per-specimen | **8/36** |
+| fused, operator-only control | 12 mm | held at the carve's | 21/36 |
+| **fused cache, what ships** | 12 mm | re-estimated on the fused occupancy | **25/36** |
+| fused, native fusion grid | 6 mm | carve's | **31/36** |
+
+`cli fuse` prints the last of these. The biomass numbers are fitted on the third.
+
+```bash
+python -m ggssvt.cli quality
+```
+
+Reconstruction metrics, about 2 minutes on CPU, and it needs both caches so it
+goes here. Re-projection into the captured views for each operator, then Chamfer,
+HD95, F-score and voxel IoU between them. Expect carve to score **higher** on
+silhouette IoU, 0.407 against 0.219, which is the point: a hull is by
+construction consistent with the silhouettes it was carved from, so that metric
+prefers the worse reconstruction. Depth error is a tie at 67.9 against 67.4 mm.
+Do not read the IoU column as a ranking.
 
 ### 5 to 9, the classical arm. About 40 minutes
 
@@ -822,6 +846,7 @@ stem in all twelve frames, every number for that specimen is meaningless.
 | `dino-segment` | cache, network | ~9 min, DITR-style feature lifting |
 | `fuse --write-cache` | cache | ~11 min, TSDF fusion plus the fused cache |
 | `views` | the view caches | seconds, scores whichever exist |
+| `quality` | both caches | ~2 min, re-projection and cross-operator metrics |
 | `gate` | cache | seconds, acceptance checks; non-zero exit when blocked |
 | `architecture` | nothing | seconds, one SVG per methodology |
 | `factorial` | both caches | ~10 min frozen; hours with `--train` |
