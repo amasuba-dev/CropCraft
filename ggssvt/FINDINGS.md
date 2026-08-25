@@ -668,8 +668,10 @@ These stand on evidence already collected, with intervals:
 1. **Calibration-free rig registration** from depth alone, method, diagnostics,
    and the visual-verification failure case. A contribution the proposal did not
    anticipate.
-2. **Reconstruction beats direct 2D regression** (0.397 vs 0.440), RQ3's first
-   half, on own data.
+2. **Depth fusion beats silhouette carving on biomass**, 0.335 against 0.544,
+   paired bootstrap −0.209 [−0.363, −0.066], with direct 2D unchanged as the
+   control. This replaces the withdrawn "reconstruction beats pixels" claim
+   struck through in section 3: that comparison never resolved, this one does.
 3. **Volume allometry fails across morphologies** (R² = −0.162), motivates a
    learned density.
 4. **Surface area does not beat volume, and why**, envelope area is not leaf
