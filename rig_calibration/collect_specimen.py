@@ -236,8 +236,13 @@ class KinectDevice:
 
         undistorted = Frame(DEPTH_WIDTH, DEPTH_HEIGHT, 4)
         registered = Frame(DEPTH_WIDTH, DEPTH_HEIGHT, 4)
+        # enable_filter suppresses libfreenect2's "flying pixel" artifact at
+        # depth discontinuities -- without it, registration leaves the
+        # registered RGB frame speckled with black holes wherever a depth
+        # sample straddles an edge (worse in the greenhouse's bright ambient
+        # IR from sunlight, which already degrades the depth return).
         self.registration.apply(color_frame, depth_frame, undistorted, registered,
-                                 bigdepth=None, color_depth_map=None)
+                                 enable_filter=True, bigdepth=None, color_depth_map=None)
 
         rgb = registered.asarray(dtype=np.uint8)[..., :3].copy()
         depth = undistorted.asarray(dtype=np.float32).astype(np.uint16)

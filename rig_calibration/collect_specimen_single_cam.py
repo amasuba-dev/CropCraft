@@ -56,25 +56,37 @@ def capture_plant_single_cam(plant_id: str):
           f"around the full 360 deg sweep")
     print(f"{'=' * 60}")
 
-    for i, angle in enumerate(FULL_SWEEP_ANGLES_DEG, start=1):
-        label = label_for_angle(angle)
-        print(f"\nStep {i}/12: position the camera at {angle:3d} deg.")
-        input("  Press Enter when the camera is in position ... ")
+    # Open the device once and hold the stream open across all 12 shots,
+    # closing only at the end. Re-opening per shot (12x/plant) was the
+    # actual cause of captures failing partway through -- each open/close
+    # cycle risks leaving the USB device in a degraded state, and the
+    # failure probability compounds with every extra cycle, which is why
+    # it tended to surface late in a plant's sweep rather than on shot 1.
+    cam = cs.KinectDevice(CAMERA_LABEL, CAMERA_SERIAL)
+    print(f"  [{CAMERA_LABEL}] opening...")
+    cam.open()
+    try:
+        for i, angle in enumerate(FULL_SWEEP_ANGLES_DEG, start=1):
+            label = label_for_angle(angle)
+            print(f"\nStep {i}/12: position the camera at {angle:3d} deg.")
+            input("  Press Enter when the camera is in position ... ")
 
-        rgb, depth = cs.capture_single_shot(label, CAMERA_SERIAL)
-        rgb = cs.gamma_correct(rgb)
+            rgb, depth = cam.capture()
+            rgb = cs.gamma_correct(rgb)
 
-        rgb_path = images_dir / f"{label}_{angle:03d}.png"
-        dep_path = depth_dir / f"{label}_{angle:03d}.png"
-        cv2.imwrite(str(rgb_path), rgb)
-        cv2.imwrite(str(dep_path), depth)
+            rgb_path = images_dir / f"{label}_{angle:03d}.png"
+            dep_path = depth_dir / f"{label}_{angle:03d}.png"
+            cv2.imwrite(str(rgb_path), rgb)
+            cv2.imwrite(str(dep_path), depth)
 
-        pos_id = f"{label}_{angle:03d}"
-        frames_manifest[pos_id] = {
-            "rgb": f"images/{rgb_path.name}",
-            "depth": f"depth/{dep_path.name}",
-        }
-        print(f"  Captured {pos_id}  ({i}/12 steps done)")
+            pos_id = f"{label}_{angle:03d}"
+            frames_manifest[pos_id] = {
+                "rgb": f"images/{rgb_path.name}",
+                "depth": f"depth/{dep_path.name}",
+            }
+            print(f"  Captured {pos_id}  ({i}/12 steps done)")
+    finally:
+        cam.close()
 
     manifest_path = plant_dir / "frames_manifest.json"
     manifest_path.write_text(json.dumps(frames_manifest, indent=2))
