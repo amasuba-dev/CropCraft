@@ -84,15 +84,34 @@ const signature = (role) => [
   }),
 ];
 
-/* The candidate's details, as they appear on the approved 2025 proposal. */
+/* The candidate's details.
+ *
+ * This repository is public, so the personal half of the contact block is not
+ * kept here. `candidate.local.json` holds the real student number, e-mail and
+ * telephone number, it is gitignored, and it never leaves the machine that
+ * builds the document. `candidate.example.json` is its tracked shape, and is
+ * what the build falls back to when the local file is absent, so a clone still
+ * produces a correct document with the personal fields left visibly blank
+ * rather than silently wrong. The rest, being departmental, stays in the open.
+ */
+const fs = require("fs");
+const path = require("path");
+
+const loadIdentity = () => {
+  for (const name of ["candidate.local.json", "candidate.example.json"]) {
+    const file = path.join(__dirname, name);
+    if (fs.existsSync(file)) {
+      return JSON.parse(fs.readFileSync(file, "utf8"));
+    }
+  }
+  throw new Error("no candidate.local.json or candidate.example.json in paper/");
+};
+
 const CANDIDATE = {
-  name: "Aaron Masuba",
-  number: "[student number]",
+  ...loadIdentity(),
   title: "AUTOMATED BIOMASS ESTIMATION USING SELF-SUPERVISED VISION TRANSFORMERS",
   supervisor: "Prof Herman Myburgh",
   cosupervisors: ["Prof Allan De Freitas", "Dr Kealeboga Mokise"],
-  email: "[university e-mail address]",
-  tel: "[telephone number]",
   address: "Department of Electrical, Electronic and Computer Engineering, "
     + "University of Pretoria, Private Bag X20, Hatfield, 0028, South Africa",
   group: "Smart Sensing and Intelligent Systems Group",

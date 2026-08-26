@@ -46,8 +46,23 @@ node paper/proposal_phd.js
 
 They share `proposal_common.js`, which holds the title page, the three signature
 blocks, the 11-point single-spaced body style and the contact block, so the two
-documents cannot drift apart on formatting or on the candidate's details. Those
-details come from the approved 2025 proposal rather than being invented.
+documents cannot drift apart on formatting or on the candidate's details.
+
+### Contact details are not in this repository
+
+It is public, so the student number, e-mail and telephone number live in
+`paper/candidate.local.json`, which is gitignored and stays on the machine that
+builds the document. `candidate.example.json` is the tracked shape and the
+fallback: a fresh clone still builds both documents, with those four fields
+showing as `[student number]` and so on rather than being silently wrong. To
+build with the real values, copy the example and fill it in:
+
+```bash
+cp paper/candidate.example.json paper/candidate.local.json
+```
+
+The departmental fields, title, supervisors, address and research group, stay in
+`proposal_common.js` in the open.
 
 The department's template covers both degrees and differs in three places, which
 is the whole difference between the two scripts:
