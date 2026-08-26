@@ -140,6 +140,32 @@ def _programme(work_dir: Path) -> tuple[Experiment, ...]:
             needs_gpu=True,
         ),
         Experiment(
+            "quality", "Reconstruction metrics", "reconstruction",
+            "python -m ggssvt.cli quality",
+            reports / "reconstruction_quality.json",
+            "Re-projection into the captured views, and Chamfer, HD95, F-score "
+            "and voxel IoU between the two operators. Reported because the "
+            "silhouette column ranks the worse reconstruction higher, which is "
+            "the argument for the plausibility check.",
+        ),
+        Experiment(
+            "dino_segment", "DITR-style DINO lifting", "classical",
+            "python -m ggssvt.cli dino-segment",
+            reports / "dino_segment.json",
+            "Lifts DINOv2 patch features onto the points and clusters them, in "
+            "place of DITR's supervised head. A reported negative: it does not "
+            "rescue E001-E010, where one patch spans 42 mm against a 5 to 15 mm "
+            "stem.",
+        ),
+        Experiment(
+            "gate", "Acceptance gates", "check",
+            "python -m ggssvt.cli gate",
+            reports / "gates.json",
+            "Mask area, reconstruction sanity, training loss and prediction "
+            "spread, over every specimen. Blocking failures stop a run rather "
+            "than propagating into a score.",
+        ),
+        Experiment(
             "gallery", "Reconstruction gallery", "check",
             "python -m ggssvt.cli gallery",
             work_dir / "reports" / "gallery" / "reconstructions.html",
@@ -189,6 +215,21 @@ def _headline(key: str, path: Path) -> tuple[str | None, dict]:
     if key == "view_ablation" and isinstance(data, list) and data:
         worst = min(data, key=lambda r: r.get("n_views", 99))
         return f"down to {worst.get('n_views')} views", {}
+    if key == "quality" and isinstance(data, dict):
+        carve = data.get("reprojection", {}).get("carve", [])
+        fused = data.get("reprojection", {}).get("fused", [])
+        if carve and fused:
+            def mean_iou(rows):
+                return sum(r["silhouette_iou"] for r in rows) / len(rows)
+            return (f"silhouette IoU {mean_iou(carve):.3f} carve, "
+                    f"{mean_iou(fused):.3f} fused"), {}
+    if key == "dino_segment" and isinstance(data, list) and data:
+        confident = sum(1 for r in data if r.get("rim_confident"))
+        return f"{confident} of {len(data)} rims confident", {}
+    if key == "gate" and isinstance(data, list) and data:
+        blocked = sum(1 for r in data if r.get("blocked"))
+        advisories = sum(len(r.get("failures", [])) for r in data) - blocked
+        return f"{blocked} blocked, {max(advisories, 0)} advisory", {}
     if key == "factorial" and isinstance(data, dict):
         cells = data.get("cells", {})
         ran = sum(1 for v in cells.values() if isinstance(v, dict) and "rmse_kg" in v)
