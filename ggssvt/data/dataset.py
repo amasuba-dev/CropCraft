@@ -115,28 +115,75 @@ def _normalise_species(raw: str) -> str:
     return raw.strip().strip("'\"").strip()
 
 
+def _text(row: dict, key: str) -> str:
+    """A trimmed string for ``key``, treating a short row as an empty field.
+
+    ``csv.DictReader`` pads a row that has fewer fields than the header with
+    ``None`` rather than with the empty string, so the obvious
+    ``row.get(key, "").strip()`` still returns ``None`` and raises an
+    ``AttributeError`` several frames away from the malformed line.
+    """
+    return (row.get(key) or "").strip()
+
+
 def load_ground_truth(path: Path = GROUND_TRUTH_CSV) -> dict[str, GroundTruth]:
-    """Read ``ground_truth.csv`` keyed by plant id."""
+    """Read ``ground_truth.csv`` keyed by plant id.
+
+    Malformed lines are reported with their line number and content rather than
+    being allowed to fail deep inside a float conversion. This has earned its
+    place: conflict markers were once committed into this file, and the symptom
+    was an ``AttributeError`` on ``None`` that named neither the file nor the
+    line, in a run that had already been queued behind an hour of preprocessing.
+    """
     if not path.exists():
         raise FileNotFoundError(f"ground truth CSV not found at {path}")
 
     rows: dict[str, GroundTruth] = {}
     with path.open(newline="", encoding="utf-8") as handle:
-        for row in csv.DictReader(handle):
-            plant_id = row["plant_id"].strip()
+        reader = csv.DictReader(handle)
+        expected = set(reader.fieldnames or ())
+        for line_no, row in enumerate(reader, start=2):
+            plant_id = _text(row, "plant_id")
             if not plant_id:
                 continue
+
+            # A row that is short, long, or missing a required number is a
+            # damaged file rather than a specimen, and saying so here is worth
+            # far more than the traceback it replaces.
+            if None in row.values() or row.get(None):
+                raise ValueError(
+                    f"{path}:{line_no} has {len(row)} fields against "
+                    f"{len(expected)} in the header. Merge conflict markers or "
+                    f"a truncated write are the usual causes. Line reads: "
+                    f"{plant_id!r}"
+                )
+            try:
+                weights = (
+                    float(row["total_fresh_weight_with_pot_g"]),
+                    float(row["pot_weight_g"]),
+                    float(row[TARGET_COLUMN]),
+                )
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"{path}:{line_no} ({plant_id}) has an unreadable weight: {exc}"
+                ) from exc
+
+            if plant_id in rows:
+                raise ValueError(
+                    f"{path}:{line_no} repeats {plant_id}, which already appeared "
+                    f"earlier in the file. Two rows for one specimen means one of "
+                    f"them is superseded; the file has to say which."
+                )
+
             rows[plant_id] = GroundTruth(
                 plant_id=plant_id,
-                date=row.get("date", "").strip(),
-                species=_normalise_species(row.get(SPECIES_COLUMN, "")),
-                total_fresh_weight_with_pot_g=float(
-                    row["total_fresh_weight_with_pot_g"]
-                ),
-                pot_weight_g=float(row["pot_weight_g"]),
-                net_weight_g=float(row[TARGET_COLUMN]),
-                pot_weight_source=row.get("pot_weight_source", "").strip(),
-                notes=row.get("notes", "").strip(),
+                date=_text(row, "date"),
+                species=_normalise_species(_text(row, SPECIES_COLUMN)),
+                total_fresh_weight_with_pot_g=weights[0],
+                pot_weight_g=weights[1],
+                net_weight_g=weights[2],
+                pot_weight_source=_text(row, "pot_weight_source"),
+                notes=_text(row, "notes"),
             )
     return rows
 

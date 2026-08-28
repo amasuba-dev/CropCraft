@@ -200,3 +200,76 @@ def test_torch_dataset_produces_finite_tensors():
     assert item["query_points"].shape[1] == 3
     # The sampler must return both classes, or the occupancy loss is degenerate.
     assert 0 < float(item["query_labels"].mean()) < 1
+
+
+# --- ground truth file integrity -------------------------------------------
+#
+# Conflict markers were once committed into ground_truth.csv. The symptom was an
+# AttributeError on None, several frames from the malformed line and naming
+# neither the file nor the row, and it took down every CLI entry point at once.
+# These pin the three ways that file can be damaged.
+
+def _write_csv(tmp_path, body: str):
+    from pathlib import Path
+
+    path = Path(tmp_path) / "ground_truth.csv"
+    header = (
+        "plant_id,date,species_breed,total_fresh_weight_with_pot_g,"
+        "pot_weight_g,net_weight_g,pot_weight_source,notes\n"
+    )
+    path.write_text(header + body, encoding="utf-8")
+    return path
+
+
+def test_conflict_markers_are_reported_with_the_line(tmp_path):
+    """A short row must name the file and line, not raise AttributeError."""
+    import pytest
+
+    from ggssvt.data.dataset import load_ground_truth
+
+    path = _write_csv(
+        tmp_path,
+        "A001,2026-01-01,Eucalyptus,1000.0,400.0,600.0,measured,\n"
+        "<<<<<<< HEAD\n"
+        "A002,2026-01-01,Eucalyptus,1200.0,500.0,700.0,measured,\n",
+    )
+    with pytest.raises(ValueError, match="fields against"):
+        load_ground_truth(path)
+
+
+def test_a_repeated_specimen_is_refused(tmp_path):
+    """Two rows for one id means one is superseded; the file has to say which."""
+    import pytest
+
+    from ggssvt.data.dataset import load_ground_truth
+
+    path = _write_csv(
+        tmp_path,
+        "A001,2026-01-01,Eucalyptus,1000.0,400.0,600.0,measured,\n"
+        "A001,2026-01-01,Eucalyptus,1000.0,300.0,700.0,estimated,\n",
+    )
+    with pytest.raises(ValueError, match="repeats A001"):
+        load_ground_truth(path)
+
+
+def test_an_unreadable_weight_names_the_specimen(tmp_path):
+    import pytest
+
+    from ggssvt.data.dataset import load_ground_truth
+
+    path = _write_csv(
+        tmp_path, "A001,2026-01-01,Eucalyptus,1000.0,,600.0,measured,\n"
+    )
+    with pytest.raises(ValueError, match="A001.*unreadable weight"):
+        load_ground_truth(path)
+
+
+def test_a_note_containing_a_comma_survives_the_round_trip(tmp_path):
+    """V011's note has a comma in it, which must be quoted rather than split."""
+    from ggssvt.data.dataset import load_ground_truth
+
+    note = "pot weighed after shoot removal; capture incomplete, 9 of 12 views"
+    path = _write_csv(
+        tmp_path, f'A001,2026-01-01,Eucalyptus,1000.0,400.0,600.0,measured,"{note}"\n'
+    )
+    assert load_ground_truth(path)["A001"].notes == note
