@@ -266,7 +266,7 @@ def load_specimen(
     )
 
 
-def select_views(specimen: "Specimen", n_views: int) -> "Specimen":
+def select_views(specimen: Specimen, n_views: int) -> Specimen:
     """Keep an evenly spaced subset of a specimen's views.
 
     The rig captures 12 azimuths at 30 degree steps, so only divisors of 12 give
