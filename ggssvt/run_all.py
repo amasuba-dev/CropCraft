@@ -82,6 +82,15 @@ def programme(work_dir: Path, *, device: str, plan: str, batch_size: int,
     cli = [sys.executable, "-m", "ggssvt.cli"]
 
     return (
+        Step("preflight", "Pre-flight checks",
+             cli + ["preflight", "--device", device], None, True,
+             note="Seconds, and it is the step that would have caught every "
+                  "environment failure this project has hit: a CPU torch "
+                  "wheel, the wrong HuggingFace account, a missing optional "
+                  "dependency, malformed proxy variables, a damaged ground "
+                  "truth. Required, because each of those makes the rest of "
+                  "the run either wrong or wasted."),
+
         Step("inspect", "Audit the dataset", cli + ["inspect"], None, True,
              note="Cheap, and it catches a damaged ground truth before an "
                   "hour of preprocessing does."),

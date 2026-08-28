@@ -88,6 +88,21 @@ Run these from the repository root with the conda environment active.
 ### Before anything
 
 ```bash
+python -m ggssvt.cli preflight
+```
+
+**Run this first, every time, on every machine.** Seconds, and it is the step
+that would have caught every environment failure this project has hit: a CPU
+torch wheel that runs at a hundredth of the speed without ever erroring, a
+HuggingFace session on the wrong account so every gated cell skips itself,
+scikit-image missing so the mesh arm dies after the caches are built, proxy
+variables holding a malformed URL, conflict markers in the ground truth.
+
+Findings are `fatal` (the run cannot be right, fix before starting), `degraded`
+(it will run but silently do less than you think), or `note`. It exits non-zero
+only on fatal, so it works in front of a long command.
+
+```bash
 python -m pytest tests/ -q
 ```
 

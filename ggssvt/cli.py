@@ -140,6 +140,14 @@ def cmd_inspect(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_preflight(args: argparse.Namespace) -> int:
+    """Check the environment before hours are committed to it."""
+    from .eval.preflight import report, run
+
+    print("Pre-flight\n")
+    return report(run(device=args.device), verbose=not args.quiet)
+
+
 def cmd_access(args: argparse.Namespace) -> int:
     """Report which account is authenticated and what it can actually download.
 
@@ -896,6 +904,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     inspect = sub.add_parser("inspect", help="audit the raw dataset")
     inspect.set_defaults(func=cmd_inspect)
+
+    preflight = sub.add_parser(
+        "preflight",
+        help="check the environment before a long run",
+    )
+    preflight.add_argument("--device", default="cuda")
+    preflight.add_argument("--quiet", action="store_true",
+                           help="only show problems")
+    preflight.set_defaults(func=cmd_preflight)
 
     access = sub.add_parser(
         "access", help="which HuggingFace account is active, and what it can download"
