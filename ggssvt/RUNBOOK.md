@@ -41,6 +41,40 @@ faster card buys nothing while it waits on numpy.
 
 ---
 
+## One command, when you are leaving it alone
+
+For an unattended run, do not type the sequence below. Use:
+
+```bash
+python -m ggssvt.run_all --device cuda
+```
+
+It runs the same steps in the same order, and the difference is what it does
+when one fails. Steps are either **required**, meaning later steps read their
+output and a failure abandons the rest, or **optional**, meaning a failure is
+recorded and the run continues. That distinction is the whole point: the mesh arm
+needs scikit-image and the DINOv3 cells need an access grant Meta approves by
+hand, and neither is a reason to lose the remaining hours of a night.
+
+Each step is timed and teed to `work_dirs/ggssvt/logs/<timestamp>/`, and a table
+at the end says what ran, what did not, and why. Steps whose artefact is already
+newer than `ground_truth.csv` are skipped, so an interrupted night resumes rather
+than restarts.
+
+```bash
+python -m ggssvt.run_all --list
+```
+
+```bash
+python -m ggssvt.run_all --device cuda --skip posefree mesh
+```
+
+`--force` redoes everything, `--only <keys>` runs a subset. Exit status is
+non-zero if anything failed, optional included, so it works under `nohup` or in
+a systemd unit.
+
+---
+
 ## Everything, from an empty work directory
 
 The whole programme in order. Fourteen steps, of which five need the GPU. Total is

@@ -350,7 +350,10 @@ def cmd_gate(args: argparse.Namespace) -> int:
                 detail = ""
                 if failure.value is not None and failure.threshold is not None:
                     detail = f"  ({failure.value:.4g} vs {failure.threshold:.4g})"
-                print(f"  {mark} {plant_id}  {failure.name}{detail}")
+                # Check names are phrased as the condition that should hold, so
+                # printing one bare for a *failed* check reads as though it
+                # passed. Every line here is an unmet condition; say so.
+                print(f"  {mark} {plant_id}  not met: {failure.name}{detail}")
                 if failure.blocking and failure.message:
                     print(f"        {failure.message}")
 
