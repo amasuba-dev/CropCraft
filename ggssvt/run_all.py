@@ -176,11 +176,51 @@ def programme(work_dir: Path, *, device: str, plan: str, batch_size: int,
     )
 
 
+def _records_a_gated_skip(artefact: Path) -> bool:
+    """Did this artefact finish, but with a condition skipped for lack of access?
+
+    The DINOv3 cells write themselves as ``{"skipped": ...}`` rather than
+    failing, which is right: an ungranted access request should not take down a
+    probe whose other conditions are fine. The consequence is that the artefact
+    looks complete afterwards, so a resumable runner would skip the step forever
+    and the grant, when it finally lands, would never be picked up.
+
+    So an artefact carrying a skip is only treated as current while the skip is
+    still true. Re-checking costs one API call, against the alternative of
+    quietly never running the condition the account was approved for.
+    """
+    try:
+        data = json.loads(artefact.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+
+    def skipped(node) -> bool:
+        if isinstance(node, dict):
+            if set(node) == {"skipped"}:
+                return True
+            return any(skipped(v) for v in node.values())
+        return False
+
+    if not skipped(data):
+        return False
+
+    try:
+        from .models.backbones import backbone_is_available
+
+        available, _ = backbone_is_available("dinov3", "base")
+    except Exception:            # noqa: BLE001 - offline is not a reason to re-run
+        return False
+    return available
+
+
 def _fresh(step: Step, newer_than: float) -> bool:
     """Has this step already run against the current inputs?"""
     if step.artefact is None or not step.artefact.exists():
         return False
-    return step.artefact.stat().st_mtime >= newer_than
+    if step.artefact.stat().st_mtime < newer_than:
+        return False
+    return not (step.artefact.suffix == ".json"
+                and _records_a_gated_skip(step.artefact))
 
 
 def run(

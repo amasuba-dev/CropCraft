@@ -91,3 +91,40 @@ def test_the_required_steps_are_the_ones_others_read():
 
 def test_tail_survives_a_missing_log(tmp_path):
     assert _tail(tmp_path / "absent.log") == ""
+
+
+def test_a_gated_skip_reruns_once_access_is_granted(monkeypatch, tmp_path):
+    """The DINOv3 cells write {"skipped": ...} rather than failing.
+
+    That leaves a complete-looking artefact, so without this the step would be
+    skipped forever and an approval that finally lands would never be used.
+    """
+    import ggssvt.run_all as mod
+
+    artefact = tmp_path / "dino_probe.json"
+    artefact.write_text(
+        '{"conditions": {"dinov2": {"rmse_kg": 0.4}, "dinov3": {"skipped": "gated"}}}',
+        encoding="utf-8",
+    )
+    step = Step("dino_probe", "probe", ["true"], artefact, required=False)
+    older = artefact.stat().st_mtime - 1
+
+    monkeypatch.setattr("ggssvt.models.backbones.backbone_is_available",
+                        lambda *a, **k: (False, "still gated"))
+    assert mod._fresh(step, older), "still gated, so do not redo the probe"
+
+    monkeypatch.setattr("ggssvt.models.backbones.backbone_is_available",
+                        lambda *a, **k: (True, ""))
+    assert not mod._fresh(step, older), "access granted, so the probe must rerun"
+
+
+def test_an_artefact_with_no_skip_is_left_alone(monkeypatch, tmp_path):
+    import ggssvt.run_all as mod
+
+    artefact = tmp_path / "metrics.json"
+    artefact.write_text('{"conditions": {"cnn": {"rmse_kg": 0.5}}}', encoding="utf-8")
+    step = Step("baselines", "baselines", ["true"], artefact)
+
+    monkeypatch.setattr("ggssvt.models.backbones.backbone_is_available",
+                        lambda *a, **k: (True, ""))
+    assert mod._fresh(step, artefact.stat().st_mtime - 1)
