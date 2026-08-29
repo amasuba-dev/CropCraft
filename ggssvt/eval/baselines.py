@@ -250,12 +250,34 @@ def load_features(
     *,
     fusion_report: Path = FUSION_REPORT,
 ) -> list[SpecimenFeatures]:
-    """Extract baseline features for many specimens."""
+    """Extract baseline features for many specimens.
+
+    Raises:
+        ValueError: if any specimen has no weighed mass. Unlabelled specimens
+            are legitimate stage-1 pretraining data and are cached with a NaN
+            target, but a NaN reaching a least-squares fit produces NaN
+            coefficients and no error at all, so every score downstream would be
+            NaN with nothing to say why. Refusing here is the only cheap place
+            to catch it.
+    """
+    import numpy as np
+
     fusion = _load_fusion(fusion_report)
-    return [
+    features = [
         extract_features(load_cached(pid, cache_dir), fused=fusion.get(pid))
         for pid in plant_ids
     ]
+
+    unlabelled = [f.plant_id for f in features if not np.isfinite(f.target_kg)]
+    if unlabelled:
+        raise ValueError(
+            f"{len(unlabelled)} specimen(s) have no weighed mass and cannot be "
+            f"regressed: {', '.join(unlabelled[:5])}"
+            f"{' ...' if len(unlabelled) > 5 else ''}. "
+            "usable_plant_ids(labelled=True) is the default and excludes them; "
+            "only stage-1 pretraining should pass labelled=None."
+        )
+    return features
 
 
 class Baseline(ABC):

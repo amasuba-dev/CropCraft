@@ -74,6 +74,12 @@ class CrossViewGeometricAttention(nn.Module):
         """Per-head inverse length scale, ``gamma``, strictly positive."""
         return self.log_distance_scale.exp()
 
+    # Set by `capture_attention`; None the rest of the time, so the check is one
+    # identity comparison per forward and nothing is retained by default. The
+    # weights are (B, heads, N, N) and N is 12 views by however many tokens, so
+    # holding them unconditionally would be a real memory cost.
+    _capture: list | None = None
+
     def forward(
         self,
         tokens: torch.Tensor,
@@ -115,6 +121,11 @@ class CrossViewGeometricAttention(nn.Module):
             )
 
         weights = logits.softmax(dim=-1)
+        # Stash before dropout: dropout is a training regulariser, and what an
+        # interpretability figure should show is what the layer attends to, not
+        # which of those attentions a particular step happened to zero.
+        if self._capture is not None:
+            self._capture.append(weights.detach())
         weights = F.dropout(weights, p=self.dropout, training=self.training)
 
         fused = (weights @ values).transpose(1, 2).reshape(batch, n_tokens, self.embed_dim)

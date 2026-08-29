@@ -280,6 +280,35 @@ instructions described.
 
 ---
 
+## Growing the pretraining set without harvesting anything
+
+Stage 1 fits occupancy against the carve and never reads a mass, so an
+unharvested plant is a valid training example for it. Capture costs twenty
+minutes; a label costs a destroyed specimen. This is the only cheap axis the
+dataset has.
+
+```bash
+python -m ggssvt.cli preprocess --include-unlabelled
+```
+
+Specimens with no row in `ground_truth.csv` are carved and cached with a NaN
+target. `pretrain` picks them up automatically. Every regression keeps the
+labelled-only default, and `load_features` refuses a NaN target by name rather
+than letting it turn a whole score column into NaN silently.
+
+```bash
+python -m ggssvt.cli attention --plant M001
+```
+
+Reads what the fusion stack attends to, once a checkpoint exists. Two numbers
+worth reporting: **neighbour preference**, above 1 when the fusion prefers views
+whose frusta overlap, which is what a model that has learned the rig should do;
+and the mean **distance scale**, which collapsing toward zero would mean the
+geometry bias is inert and this is ordinary self-attention. Both are evidence on
+H2, in either direction.
+
+---
+
 ## Keeping the page current
 
 The page is generated, never edited. Two commands rebuild everything it shows:

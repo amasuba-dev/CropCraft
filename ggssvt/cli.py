@@ -148,6 +148,52 @@ def cmd_preflight(args: argparse.Namespace) -> int:
     return report(run(device=args.device), verbose=not args.quiet)
 
 
+def cmd_attention(args: argparse.Namespace) -> int:
+    """What the fusion stack attends to, for one specimen."""
+    import torch
+    from PIL import Image
+
+    from .data.preprocess import load_cached, usable_plant_ids
+    from .eval.attention import read, render_per_view
+    from .models.ggssvt import GGSSVT
+    from .training.dataset import SpecimenDataset, collate
+
+    if not args.checkpoint.exists():
+        print(
+            f"No checkpoint at {args.checkpoint}. Attention is a property of a "
+            "trained model; run `pretrain` or the campaign first.",
+            file=sys.stderr,
+        )
+        return 2
+
+    plant_id = args.plant or usable_plant_ids(args.cache_dir)[0]
+    dataset = SpecimenDataset([plant_id], cache_dir=args.cache_dir, mode="occupancy")
+    batch = collate([dataset[0]])
+
+    model = GGSSVT(config=_model_config(args))
+    model.load_state_dict(
+        torch.load(args.checkpoint, map_location="cpu")["state_dict"], strict=False
+    )
+
+    reading = read(model, batch)
+    print(f"{plant_id}: {reading.per_view.shape[0]} fusion blocks over "
+          f"{reading.n_views} views")
+    print(f"  neighbour preference  {reading.neighbour_preference():.3f}")
+    print("     above 1 means the fusion prefers views whose frusta overlap,")
+    print("     which is what a model that has learned the rig should do.")
+    print(f"  distance scales       {reading.distance_scales.mean():.4f} mean")
+    print("     near zero means the geometry bias is inert and this is")
+    print("     ordinary self-attention; that would be evidence against H2.")
+
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    Image.fromarray(render_per_view(reading)).save(args.out)
+    args.out.with_suffix(".json").write_text(
+        json.dumps(reading.as_dict(), indent=2), encoding="utf-8"
+    )
+    print(f"\nWrote {args.out} and {args.out.with_suffix('.json')}")
+    return 0
+
+
 def cmd_access(args: argparse.Namespace) -> int:
     """Report which account is authenticated and what it can actually download.
 
@@ -232,6 +278,7 @@ def cmd_preprocess(args: argparse.Namespace) -> int:
         return 2
 
     report = preprocess_dataset(
+        require_ground_truth=not getattr(args, "include_unlabelled", False),
         cache_dir=args.cache_dir,
         plant_ids=args.plants,
         seed=args.seed,
@@ -468,7 +515,14 @@ def cmd_pretrain(args: argparse.Namespace) -> int:
     from .training.dataset import SpecimenDataset
     from .training.trainer import resolve_device, train_stage
 
-    plant_ids = args.plants or usable_plant_ids(args.cache_dir)
+    # labelled=None: stage 1 supervises occupancy against the carve and never
+    # reads target_kg, so an unharvested specimen trains it just as well. Every
+    # downstream regression keeps the labelled-only default.
+    plant_ids = args.plants or usable_plant_ids(args.cache_dir, labelled=None)
+    unlabelled = len(plant_ids) - len(usable_plant_ids(args.cache_dir))
+    if unlabelled:
+        print(f"Pretraining on {len(plant_ids)} specimens, "
+              f"{unlabelled} of them unharvested")
     dataset = SpecimenDataset(plant_ids, cache_dir=args.cache_dir, mode="occupancy")
 
     model = GGSSVT(
@@ -910,6 +964,20 @@ def build_parser() -> argparse.ArgumentParser:
     inspect = sub.add_parser("inspect", help="audit the raw dataset")
     inspect.set_defaults(func=cmd_inspect)
 
+    attention = sub.add_parser(
+        "attention", help="what the fusion stack attends to (needs a checkpoint)"
+    )
+    _add_common(attention)
+    attention.add_argument("--plant", help="specimen id; the first usable one by default")
+    attention.add_argument(
+        "--checkpoint", type=Path, default=WORK_DIR / "checkpoints" / "pretrain.pt"
+    )
+    attention.add_argument(
+        "--out", type=Path,
+        default=WORK_DIR / "reports" / "attention" / "per_view.png",
+    )
+    attention.set_defaults(func=cmd_attention)
+
     preflight = sub.add_parser(
         "preflight",
         help="check the environment before a long run",
@@ -930,6 +998,15 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common(preprocess)
     preprocess.add_argument("--plants", nargs="*", help="specific plant ids")
     preprocess.add_argument("--seed", type=int, default=0)
+    preprocess.add_argument(
+        "--include-unlabelled",
+        action="store_true",
+        help=(
+            "also carve specimens with no row in ground_truth.csv. Stage-1 "
+            "pretraining fits occupancy and never reads the mass, so an "
+            "unharvested plant is a valid training example there"
+        ),
+    )
     preprocess.add_argument(
         "--segmenter",
         default="geometric",

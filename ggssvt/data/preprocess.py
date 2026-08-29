@@ -227,10 +227,22 @@ def preprocess_dataset(
     sam_model: str = "base",
     sam_device: str = "cpu",
     n_views: int | None = None,
+    require_ground_truth: bool = True,
 ) -> list[SpecimenQuality]:
-    """Preprocess every specimen and write a quality report beside the cache."""
+    """Preprocess every specimen and write a quality report beside the cache.
+
+    Args:
+        require_ground_truth: when False, specimens with no row in
+            ``ground_truth.csv`` are carved too, and cached with a NaN target.
+            Stage-1 pretraining fits occupancy against the carve and never reads
+            the mass, so an unharvested plant is a perfectly good training
+            example there. It costs twenty minutes of capture instead of a
+            destroyed specimen, which is the only cheap axis this dataset has.
+    """
     specimens = (
-        [load_specimen(pid) for pid in plant_ids] if plant_ids else load_dataset()
+        [load_specimen(pid) for pid in plant_ids]
+        if plant_ids
+        else load_dataset(require_ground_truth=require_ground_truth)
     )
 
     sam_segmenter = None
@@ -389,10 +401,40 @@ def load_cached(
         )
 
 
-def usable_plant_ids(cache_dir: Path = WORK_DIR / "cache", **thresholds) -> list[str]:
-    """Plant ids whose cached geometry passes the quality gate."""
+def usable_plant_ids(
+    cache_dir: Path = WORK_DIR / "cache",
+    *,
+    labelled: bool | None = True,
+    **thresholds,
+) -> list[str]:
+    """Plant ids whose cached geometry passes the quality gate.
+
+    Args:
+        labelled: True keeps only specimens with a weighed mass, which is the
+            default and what every regression must use -- a NaN target reaching
+            a least-squares fit produces NaN coefficients and no error. False
+            keeps only the unlabelled ones. None keeps both, which is what
+            stage-1 pretraining wants, since it never reads the mass.
+    """
     quality = load_quality(cache_dir)
-    return sorted(pid for pid, q in quality.items() if q.is_usable(**thresholds))
+    ids = sorted(pid for pid, q in quality.items() if q.is_usable(**thresholds))
+    if labelled is None:
+        return ids
+
+    import numpy as np
+
+    keep = []
+    for pid in ids:
+        path = cache_path(pid, cache_dir)
+        if not path.exists():
+            continue
+        # np.load on an npz is lazy per member, so this reads one float rather
+        # than the ~50 MB of views and occupancy that load_cached would.
+        with np.load(path) as data:
+            target = float(data["target_kg"])
+        if np.isfinite(target) == labelled:
+            keep.append(pid)
+    return keep
 
 
 __all__ = [

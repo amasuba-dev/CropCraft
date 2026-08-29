@@ -273,3 +273,41 @@ def test_a_note_containing_a_comma_survives_the_round_trip(tmp_path):
         tmp_path, f'A001,2026-01-01,Eucalyptus,1000.0,400.0,600.0,measured,"{note}"\n'
     )
     assert load_ground_truth(path)["A001"].notes == note
+
+
+# --- unlabelled specimens ---------------------------------------------------
+#
+# Stage 1 fits occupancy against the carve and never reads the mass, so an
+# unharvested plant is a valid pretraining example. The risk is the other
+# direction: a NaN target reaching a least-squares fit produces NaN
+# coefficients and no error at all, so every score downstream would be NaN with
+# nothing to say why.
+
+def test_load_features_refuses_a_specimen_with_no_mass(tmp_path, monkeypatch):
+    import numpy as np
+    import pytest
+
+    from ggssvt.eval import baselines
+
+    class FakeCached:
+        plant_id = "U001"
+        target_kg = float("nan")
+
+    monkeypatch.setattr(baselines, "load_cached", lambda pid, d: FakeCached())
+    monkeypatch.setattr(baselines, "_load_fusion", lambda p: {})
+    monkeypatch.setattr(
+        baselines, "extract_features",
+        lambda cached, fused=None: type("F", (), {
+            "plant_id": cached.plant_id, "target_kg": np.float64("nan")})(),
+    )
+    with pytest.raises(ValueError, match="no weighed mass"):
+        baselines.load_features(["U001"], tmp_path)
+
+
+def test_usable_plant_ids_defaults_to_labelled_only():
+    """Every regression path relies on this default; it must not drift."""
+    import inspect
+
+    from ggssvt.data.preprocess import usable_plant_ids
+
+    assert inspect.signature(usable_plant_ids).parameters["labelled"].default is True
