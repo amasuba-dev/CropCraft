@@ -108,3 +108,36 @@ def test_fingerprint_ignores_specimen_ordering(monkeypatch, tmp_path):
     first = campaign.dataset_fingerprint(tmp_path)
     order = ["B", "A"]
     assert campaign.dataset_fingerprint(tmp_path) == first
+
+
+# --- reproducibility --------------------------------------------------------
+
+def test_seed_everything_makes_initialisation_repeatable():
+    """TrainConfig.seed existed for a long time and nothing consumed it.
+
+    Two runs of the same command gave different weights, different shuffling and
+    different dropout, which for a project reporting a 0.209 kg difference with
+    a bootstrap interval means the headline number cannot be reproduced.
+    """
+    import pytest
+
+    torch = pytest.importorskip("torch")
+    from ggssvt.models.ggssvt import GGSSVT
+    from ggssvt.training.trainer import seed_everything
+
+    def first_weights(seed):
+        seed_everything(seed)
+        return next(iter(GGSSVT().state_dict().values())).flatten()[:8].clone()
+
+    assert torch.allclose(first_weights(0), first_weights(0))
+    assert not torch.allclose(first_weights(0), first_weights(1))
+
+
+def test_the_training_config_seed_is_actually_wired_to_the_cli():
+    """The regression that lets this rot again is the flag quietly going away."""
+    import argparse
+
+    from ggssvt.cli import _training_config
+
+    args = argparse.Namespace(seed=1234)
+    assert _training_config(args).seed == 1234

@@ -303,7 +303,17 @@ def execute(
         )
 
         checkpoint = out_dir / f"{run.name}.pt"
-        torch.save({"state_dict": model.state_dict(), "run": run.as_dict()}, checkpoint)
+        # The seed goes in the checkpoint because a result you cannot reproduce
+        # is a result you cannot defend, and the seed is the only part of that
+        # which is not already in the run config.
+        torch.save(
+            {
+                "state_dict": model.state_dict(),
+                "run": run.as_dict(),
+                "seed": train_config.seed,
+            },
+            checkpoint,
+        )
 
         folds = loocv(
             plant_ids,

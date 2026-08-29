@@ -66,6 +66,15 @@ def _add_training(parser: argparse.ArgumentParser) -> None:
         help="top exponent of the frequency ladder (2^k). Pairs with --fourier-bands",
     )
     parser.add_argument(
+        "--seed",
+        type=int,
+        default=TRAIN.seed,
+        help=(
+            "seeds Python, NumPy and torch. Without it two runs of the same "
+            "command give different weights, shuffling and dropout"
+        ),
+    )
+    parser.add_argument(
         "--batch-size",
         type=int,
         default=TRAIN.batch_size,
@@ -96,6 +105,7 @@ def _training_config(args: argparse.Namespace):
         num_workers=getattr(args, "workers", TRAIN.num_workers),
         finetune_epochs=getattr(args, "finetune_epochs", TRAIN.finetune_epochs),
         batch_size=getattr(args, "batch_size", TRAIN.batch_size),
+        seed=getattr(args, "seed", TRAIN.seed),
     )
 
 

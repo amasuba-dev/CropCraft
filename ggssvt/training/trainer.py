@@ -35,7 +35,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from ..config import MODEL, POT_HEIGHT_M, TRAIN, WORK_DIR, ModelConfig, TrainConfig
+from ..config import MODEL, TRAIN, WORK_DIR, ModelConfig, TrainConfig
 from ..eval.metrics import average_precision, best_threshold_iou
 from ..models.ggssvt import GGSSVT
 from .dataset import SpecimenBatch, SpecimenDataset, collate
@@ -110,6 +110,39 @@ def _learning_rate_factor(epoch: int, total: int, warmup: int) -> float:
     return 0.5 * (1.0 + math.cos(math.pi * progress))
 
 
+def seed_everything(seed: int) -> None:
+    """Seed Python, NumPy and torch, on every device.
+
+    ``TrainConfig.seed`` existed for a long time and nothing ever consumed it,
+    which is worse than having no seed at all: the config advertises
+    reproducibility, so nobody checks, and two runs of the same command produce
+    different weights, different shuffling and different dropout. For a project
+    whose headline result is a 0.209 kg difference with a bootstrap interval,
+    being unable to reproduce your own number is not a small thing.
+
+    Note this does not make CUDA bitwise deterministic. cuDNN picks algorithms by
+    benchmarking and some reductions are atomic, so runs stay close rather than
+    identical. Forcing full determinism costs real speed and is not worth it
+    here; seeding is what removes the large, gratuitous variation.
+    """
+    import random
+
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+
+def _seed_worker(worker_id: int) -> None:
+    """Give each dataloader worker its own deterministic stream."""
+    import random
+
+    worker_seed = torch.initial_seed() % 2 ** 32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
+
+
 def train_stage(
     model: GGSSVT,
     dataset: SpecimenDataset,
@@ -132,7 +165,13 @@ def train_stage(
         The :class:`TrainingRun` record.
     """
     device = device or resolve_device(config.device)
+    seed_everything(config.seed)
     model.to(device).train()
+
+    # A seeded generator, so shuffling is reproducible independently of whatever
+    # else has consumed the global RNG by the time this stage starts.
+    generator = torch.Generator()
+    generator.manual_seed(config.seed)
 
     loader = DataLoader(
         dataset,
@@ -140,6 +179,8 @@ def train_stage(
         shuffle=True,
         num_workers=config.num_workers,
         collate_fn=collate,
+        generator=generator,
+        worker_init_fn=_seed_worker,
     )
     optimiser = _build_optimiser(model, stage, config)
     base_lrs = [group["lr"] for group in optimiser.param_groups]
