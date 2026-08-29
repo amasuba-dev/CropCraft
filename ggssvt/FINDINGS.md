@@ -397,6 +397,19 @@ regressor has.**
 
 ## 7d. DITR-style DINO lifting, and why it does not rescue E001-E010
 
+*This is the project's one experiment on the reciprocity Malik et al. argue for
+in "The three R's of computer vision" (Pattern Recognition Letters 72, 2016):
+that grouping and recognition inform reconstruction and each other. Semantic
+features are used to attempt a **reorganization** (plant against pot) in order to
+repair a **reconstruction**. It fails, for a reason that is measured rather than
+guessed, and a negative result about that interaction is still a result about
+it. The third R, **recognition**, is out of scope for this study: one genus per
+batch and no category task means there is nothing for a recognition claim to be
+tested against. Note also that "the 3Rs" in `POSEFREE.md` refers to the pointmap
+models by their shared suffix, which is a different thing entirely; this document
+uses "pointmap models" for those.*
+
+
 Requested by the supervisor, after Knaebel et al., who observe that 3D
 segmentation largely ignores 2D foundation models even where calibrated images
 sit beside the point cloud. DITR extracts frozen DINOv2 patch features, projects

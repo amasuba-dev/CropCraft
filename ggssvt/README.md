@@ -750,7 +750,7 @@ ggssvt/
     site_html.py       the project page, in the Nerfies layout
     dashboard_data.py  the payload the page reads
     dino_segment.py    can DINO separate plant from pot? Reported negative
-    pose_free_experiment.py  the 3R comparison harness
+    pose_free_experiment.py  the pointmap-model comparison harness
     nerfstudio_export.py  transforms.json from the estimated rig
     report.py          tables and figures
     visualise.py       rig and mask overlays

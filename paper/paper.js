@@ -350,7 +350,7 @@ const appendix = [
     "Method C, TSDF depth fusion. Identical up to stage 03; from stage 04 the same depth maps are integrated rather than intersected, and an additional stage records which space was actually observed."),
   new Paragraph({ children: [new PageBreak()] }),
   ...figure(path.join(ARCH, "architecture_posefree.png"), 400, "Figure 5",
-    "Method D, pose-free reconstruction with the 3R family. No registration stage: cameras and geometry are regressed from images, which is why this is the independent check on a registration estimated from depth."),
+    "Method D, pose-free reconstruction with feed-forward pointmap models. No registration stage: cameras and geometry are regressed from images, which is why this is the independent check on a registration estimated from depth."),
   new Paragraph({ children: [new PageBreak()] }),
   ...figure(path.join(ARCH, "architecture_ggssvt.png"), 400, "Figure 6",
     "Method E, the learned volumetric model. Reconstruction supplies occupancy targets rather than the answer, which is what makes the model self-supervised and also caps what it can learn."),

@@ -149,7 +149,7 @@ HERO = """
         <h2 class="title is-3">Abstract</h2>
         <div class="content has-text-justified">
           <p>
-            The question is whether the <em>3R</em> family of feed-forward reconstruction
+            The question is whether the feed-forward pointmap family of reconstruction
             models, DUSt3R, MASt3R and Fast3R, improves both the accuracy of biomass
             estimation and what can be said about plant morphology from it. Answering that
             needs a reconstruction baseline to measure against, and most of what follows is

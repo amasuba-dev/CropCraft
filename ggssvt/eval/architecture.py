@@ -372,7 +372,7 @@ def fusion() -> Diagram:
 def posefree() -> Diagram:
     return Diagram(
         "posefree",
-        "Method D. Pose-free reconstruction, the 3R family",
+        "Method D. Pose-free reconstruction, feed-forward pointmap models",
         "DUSt3R, MASt3R and Fast3R. Cameras and geometry from images alone, so "
         "no failure mode is shared with the carve.",
         [

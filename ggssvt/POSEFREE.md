@@ -4,6 +4,13 @@ Three pose-free reconstruction methods, against the calibration-free rig
 estimate. All three are installed and their APIs verified; **none has been run
 against real weights**, because that needs the GPU.
 
+**A note on the name.** These are sometimes called "the 3Rs" after the shared
+suffix. This project does not use that name for them, because the thesis framing
+takes "the three R's" from Malik et al., where it means recognition,
+reconstruction and reorganization. Two different things with one name in one
+dissertation is a confusion worth spending three words to avoid, so these are
+the *pointmap models* throughout.
+
 ---
 
 ## Why this experiment matters more than it did last week

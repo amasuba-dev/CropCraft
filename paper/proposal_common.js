@@ -161,8 +161,9 @@ const verifyNote = () => new Paragraph({
   border: { top: { style: BorderStyle.SINGLE, size: 6, color: "BBBBBB", space: 8 } },
   children: [new TextRun({
     text: "Note: bibliographic details should be verified against publisher "
-      + "records before submission. Feng et al. and Amaducci et al. were read in "
-      + "full during this work; the remainder were compiled from working notes.",
+      + "records before submission. Feng et al., Amaducci et al. and Malik et al. "
+      + "were read in full during this work; the remainder were compiled from "
+      + "working notes.",
     size: 18, italics: true, color: MUTED, font: FONT })],
 });
 
