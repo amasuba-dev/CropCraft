@@ -736,6 +736,11 @@ def cmd_gallery(args: argparse.Namespace) -> int:
         write_ply=not args.no_ply,
         write_sheets=not args.no_sheets,
         columns=args.columns,
+        card_size=args.card_size,
+        point_radius=args.point_radius,
+        supersample=args.supersample,
+        max_points=args.max_points,
+        downsample=args.downsample,
     )
     (args.out_dir / "manifest.json").write_text(
         json.dumps(manifest), encoding="utf-8"
@@ -1160,6 +1165,26 @@ def build_parser() -> argparse.ArgumentParser:
         "--out-dir", type=Path, default=WORK_DIR / "reports" / "gallery"
     )
     gallery.add_argument("--columns", type=int, default=4)
+    gallery.add_argument(
+        "--card-size", type=int, default=200,
+        help="pixels per view panel; raise for print figures",
+    )
+    gallery.add_argument(
+        "--point-radius", type=int, default=1,
+        help="half-width of the square drawn per voxel, in output pixels",
+    )
+    gallery.add_argument(
+        "--supersample", type=int, default=3,
+        help="render at this multiple and average down; 1 disables antialiasing",
+    )
+    gallery.add_argument(
+        "--max-points", type=int, default=20000,
+        help="cap on points sent to the interactive viewer",
+    )
+    gallery.add_argument(
+        "--downsample", type=int, default=2,
+        help="voxel stride for the interactive viewer; 1 sends every voxel",
+    )
     gallery.add_argument("--no-ply", action="store_true", help="skip PLY export")
     gallery.add_argument(
         "--no-sheets", action="store_true", help="skip the PNG contact sheets"

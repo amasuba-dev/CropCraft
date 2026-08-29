@@ -83,12 +83,30 @@ def viridis(t: np.ndarray) -> np.ndarray:
     ).astype(np.uint8)
 
 
+def _box_downscale(image: np.ndarray, factor: int) -> np.ndarray:
+    """Average each ``factor`` by ``factor`` block down to one pixel.
+
+    This is the whole antialiasing strategy: render at a multiple of the target
+    size, then average down. A voxel projection is all hard edges, so at 1x every
+    boundary is a staircase; averaging turns each staircase into a gradient at no
+    cost beyond the larger intermediate buffer.
+    """
+    if factor <= 1:
+        return image
+    height, width = image.shape[0] // factor, image.shape[1] // factor
+    trimmed = image[: height * factor, : width * factor].astype(np.float64)
+    blocks = trimmed.reshape(height, factor, width, factor, 3)
+    return blocks.mean(axis=(1, 3)).round().astype(np.uint8)
+
+
 def render_volume(
     occupancy: np.ndarray,
     *,
     view: str = "front",
     size: int = 220,
     background: tuple[int, int, int] = (255, 255, 255),
+    point_radius: int = 1,
+    supersample: int = 3,
 ) -> np.ndarray:
     """Depth-cued orthographic projection of an occupancy grid.
 
@@ -96,25 +114,37 @@ def render_volume(
     reads as a solid shape rather than a flat silhouette while still showing the
     whole extent.
 
+    Args:
+        size: side of the returned image in pixels.
+        point_radius: half-width of the square drawn per voxel, in *output*
+            pixels. 1 gives a 2 by 2 dot. Raise it for a sparse cloud that reads
+            as speckle, lower it for a dense one that reads as a solid blob.
+        supersample: render at this multiple and average down. 1 disables it and
+            restores the original aliased output; 3 is a good default and costs
+            about nine times the intermediate memory, which at these sizes is
+            still under a megabyte.
+
     Returns:
         ``(size, size, 3)`` uint8.
     """
     if view not in AXES:
         raise ValueError(f"unknown view {view!r}; expected one of {sorted(AXES)}")
 
+    scale = max(1, int(supersample))
+    inner = size * scale
     horizontal, vertical, depth_axis = AXES[view]
-    canvas = np.full((size, size, 3), background, dtype=np.uint8)
+    canvas = np.full((inner, inner, 3), background, dtype=np.uint8)
 
     if not occupancy.any():
-        return canvas
+        return _box_downscale(canvas, scale)
 
     index = np.array(np.nonzero(occupancy)).T
     resolution = occupancy.shape[0]
 
-    u = (index[:, horizontal] / resolution * (size - 1)).astype(np.int32)
-    v = index[:, vertical] / resolution * (size - 1)
+    u = (index[:, horizontal] / resolution * (inner - 1)).astype(np.int32)
+    v = index[:, vertical] / resolution * (inner - 1)
     # Image rows grow downward; world z grows upward.
-    v = ((size - 1) - v).astype(np.int32)
+    v = ((inner - 1) - v).astype(np.int32)
     depth = index[:, depth_axis].astype(np.float64)
 
     # Painter's algorithm: draw far voxels first so near ones overwrite them.
@@ -129,10 +159,11 @@ def render_volume(
         position = 1.0 - position
     colours = viridis(position)
 
+    radius = max(1, int(point_radius)) * scale
     for x, y, colour in zip(u, v, colours):
-        canvas[max(0, y - 1) : y + 1, max(0, x - 1) : x + 1] = colour
+        canvas[max(0, y - radius) : y + radius, max(0, x - radius) : x + radius] = colour
 
-    return canvas
+    return _box_downscale(canvas, scale)
 
 
 def _label_strip(text: str, width: int, height: int = 18) -> np.ndarray:
@@ -152,9 +183,15 @@ def specimen_card(
     *,
     size: int = 200,
     views: tuple[str, ...] = ("front", "side", "top"),
+    point_radius: int = 1,
+    supersample: int = 3,
 ) -> np.ndarray:
     """One specimen rendered from several axes, with a caption."""
-    panels = [render_volume(occupancy, view=view, size=size) for view in views]
+    panels = [
+        render_volume(occupancy, view=view, size=size,
+                      point_radius=point_radius, supersample=supersample)
+        for view in views
+    ]
     row = np.concatenate(panels, axis=1)
     divider = np.full((2, row.shape[1], 3), (220, 220, 220), dtype=np.uint8)
     return np.concatenate([_label_strip(label, row.shape[1]), row, divider], axis=0)
@@ -286,6 +323,11 @@ def build_gallery(
     write_ply: bool = True,
     write_sheets: bool = True,
     columns: int = 4,
+    card_size: int = 200,
+    point_radius: int = 1,
+    supersample: int = 3,
+    max_points: int = 20000,
+    downsample: int = 2,
     verbose: bool = True,
 ) -> dict:
     """Render every reconstruction under every available segmenter.
@@ -313,7 +355,10 @@ def build_gallery(
             except FileNotFoundError:
                 continue
 
-            manifest["volumes"].append(volume_payload(cached).as_dict())
+            manifest["volumes"].append(
+                volume_payload(cached, downsample=downsample,
+                               max_points=max_points).as_dict()
+            )
 
             if write_sheets:
                 label = (
@@ -321,7 +366,10 @@ def build_gallery(
                     f"{cached.target_kg:.2f}kg  "
                     f"{cached.occupancy.sum() * cached.voxel_size_m ** 3 * 1000:.1f}L"
                 )
-                cards.append(specimen_card(cached.occupancy, label))
+                cards.append(specimen_card(
+                    cached.occupancy, label, size=card_size,
+                    point_radius=point_radius, supersample=supersample,
+                ))
 
             if write_ply:
                 path = export_ply(

@@ -126,3 +126,53 @@ def test_a_taller_object_reports_a_greater_height():
         mesh_from_occupancy(tall, voxel_size_m=0.01).height_m()
         > mesh_from_occupancy(short, voxel_size_m=0.01).height_m()
     )
+
+
+# --- figure rendering knobs -------------------------------------------------
+
+def test_supersampling_returns_the_requested_size():
+    """The multiple is an internal detail; the caller asked for `size`."""
+    import numpy as np
+
+    from ggssvt.eval.render import render_volume
+
+    occupancy = np.zeros((32, 32, 32), bool)
+    occupancy[10:20, 10:20, 5:25] = True
+    for scale in (1, 2, 3):
+        assert render_volume(occupancy, size=64, supersample=scale).shape == (64, 64, 3)
+
+
+def test_supersampling_adds_intermediate_tones():
+    """Averaging blocks down is what turns a hard edge into a gradient."""
+    import numpy as np
+
+    from ggssvt.eval.render import render_volume
+
+    occupancy = np.zeros((32, 32, 32), bool)
+    occupancy[10:20, 10:20, 5:25] = True
+    aliased = render_volume(occupancy, size=64, supersample=1)
+    smoothed = render_volume(occupancy, size=64, supersample=3)
+    assert (len(np.unique(smoothed.reshape(-1, 3), axis=0))
+            > len(np.unique(aliased.reshape(-1, 3), axis=0)))
+
+
+def test_a_larger_point_radius_covers_more_canvas():
+    import numpy as np
+
+    from ggssvt.eval.render import render_volume
+
+    occupancy = np.zeros((32, 32, 32), bool)
+    occupancy[::4, ::4, ::4] = True          # deliberately sparse
+    def ink(image):
+        return int((image.reshape(-1, 3) != 255).any(axis=1).sum())
+    assert ink(render_volume(occupancy, size=64, point_radius=3)) > \
+           ink(render_volume(occupancy, size=64, point_radius=1))
+
+
+def test_an_empty_grid_still_returns_the_right_shape():
+    import numpy as np
+
+    from ggssvt.eval.render import render_volume
+
+    empty = np.zeros((16, 16, 16), bool)
+    assert render_volume(empty, size=48, supersample=3).shape == (48, 48, 3)
