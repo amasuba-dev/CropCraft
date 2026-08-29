@@ -114,3 +114,57 @@ def test_render_returns_an_image_and_refuses_an_empty_reading():
                              np.zeros((0, 4)), 12, (0, 0))
     with pytest.raises(ValueError, match="no blocks"):
         render_per_view(empty)
+
+
+def test_read_unpacks_the_batch_the_way_the_trainer_does():
+    """GGSSVT.forward takes positional tensors, not the batch object.
+
+    Passing the object type-errors four frames down rather than at the call, so
+    this pins the unpacking against a stand-in with the same forward signature.
+    """
+    from dataclasses import dataclass
+
+    from ggssvt.eval.attention import read
+
+    seen = {}
+
+    class Fusion(CrossViewFusion):
+        pass
+
+    class Fake(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.fusion = Fusion(embed_dim=32, num_heads=4, depth=2)
+
+        def forward(self, rgb, depth, points_world, subject, query_points,
+                    **kwargs):
+            seen["positional"] = 5
+            seen["pot_height_m"] = "pot_height_m" in kwargs
+            n = subject.shape[1] * 4
+            self.fusion(torch.randn(1, n, 32), torch.randn(1, n, 3),
+                        torch.ones(1, n, dtype=torch.bool))
+
+    @dataclass
+    class Batch:
+        rgb: torch.Tensor
+        depth: torch.Tensor
+        points_world: torch.Tensor
+        subject: torch.Tensor
+        query_points: torch.Tensor
+        pot_height_m: torch.Tensor
+
+    one = torch.zeros(1, 1)
+    batch = Batch(one, one, one, torch.zeros(1, 12, 1, 2, 2), one, one)
+    reading = read(Fake(), batch)
+
+    assert seen == {"positional": 5, "pot_height_m": True}
+    assert reading.n_views == 12, "view count must come from the subject mask"
+
+
+def test_normalised_rows_have_no_uninitialised_entries():
+    """np.divide with `where` and no `out` leaves uninitialised memory behind."""
+    from ggssvt.eval.attention import AttentionReading
+
+    reading = AttentionReading(np.zeros((2, 12)), np.zeros((0, 12, 0, 0)),
+                               np.zeros((2, 4)), 12, (4, 4))
+    assert np.isfinite(reading.per_view).all()

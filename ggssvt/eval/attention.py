@@ -109,22 +109,33 @@ def read(model, batch, *, grid: tuple[int, int] | None = None) -> AttentionReadi
 
     Args:
         model: a :class:`~ggssvt.models.ggssvt.GGSSVT`.
-        batch: one collated batch, batch size 1.
+        batch: one collated :class:`~ggssvt.training.dataset.SpecimenBatch`,
+            batch size 1.
         grid: token grid per view as ``(rows, cols)``. Inferred as a square when
             omitted, which is right for the default tokeniser.
     """
     import torch
 
     model.eval()
+    # Unpacked exactly as the trainer does. The forward takes positional
+    # tensors, not the batch object, and passing the object silently type-errors
+    # four frames down rather than at the call.
     with torch.no_grad(), capture_attention(model) as captured:
-        model(batch)
+        model(
+            batch.rgb,
+            batch.depth,
+            batch.points_world,
+            batch.subject,
+            batch.query_points,
+            pot_height_m=batch.pot_height_m,
+        )
 
     if not any(captured.values()):
         raise RuntimeError(
             "no attention was captured; the model ran no CrossViewGeometricAttention"
         )
 
-    n_views = int(batch["mask"].shape[1]) if "mask" in batch else 12
+    n_views = int(batch.subject.shape[1])
     per_view, spatial = [], []
 
     for index in sorted(captured):
@@ -155,7 +166,11 @@ def read(model, batch, *, grid: tuple[int, int] | None = None) -> AttentionReadi
     # Normalise per block so blocks are comparable; the absolute scale is a
     # function of token count, which is not interesting.
     totals = per_view_arr.sum(axis=1, keepdims=True)
-    per_view_arr = np.divide(per_view_arr, totals, where=totals > 0)
+    # out= matters: without it the skipped entries are uninitialised memory
+    # rather than zero, which is a real trap in a figure nobody would check.
+    per_view_arr = np.divide(
+        per_view_arr, totals, out=np.zeros_like(per_view_arr), where=totals > 0
+    )
 
     spatial_arr = (np.stack(spatial) if spatial
                    else np.zeros((0, n_views, 0, 0)))
