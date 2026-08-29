@@ -163,7 +163,7 @@ def cmd_attention(args: argparse.Namespace) -> int:
     import torch
     from PIL import Image
 
-    from .data.preprocess import load_cached, usable_plant_ids
+    from .data.preprocess import usable_plant_ids
     from .eval.attention import read, render_per_view
     from .models.ggssvt import GGSSVT
     from .training.dataset import SpecimenDataset, collate
@@ -201,6 +201,28 @@ def cmd_attention(args: argparse.Namespace) -> int:
         json.dumps(reading.as_dict(), indent=2), encoding="utf-8"
     )
     print(f"\nWrote {args.out} and {args.out.with_suffix('.json')}")
+    return 0
+
+
+def cmd_reciprocity(args: argparse.Namespace) -> int:
+    """Let the reconstruction refine the masks, and see whether that helps."""
+    from .eval.reciprocity import run
+
+    report = run(refine_from=args.refine_from, verbose=not args.quiet)
+    control = report["control"]
+
+    print(f"\nControl: re-carving the unchanged masks drifts from the cache by "
+          f"{control['median_drift']:.2%} median, {control['max_drift']:.2%} worst.")
+    print("A rule that moves the volume by less than that has shown nothing.\n")
+
+    print(f"  {'rule':22s} {'plausible':>10} {'median kg/m3':>13} {'mean vol L':>11}")
+    for rule, row in report["summary"].items():
+        print(f"  {rule:22s} {str(row['plausible']) + '/' + str(row['n']):>10} "
+              f"{row['median_density']:>13} {row['mean_volume_l']:>11}")
+    print("\nThe reconstruction is decided from twelve views at once and each "
+          "mask from one,\nso re-projecting it gives every view a second "
+          "opinion. Which direction should win\nis not obvious in advance, "
+          "which is why all four rules are run rather than argued.")
     return 0
 
 
@@ -987,6 +1009,17 @@ def build_parser() -> argparse.ArgumentParser:
         default=WORK_DIR / "reports" / "attention" / "per_view.png",
     )
     attention.set_defaults(func=cmd_attention)
+
+    reciprocity = sub.add_parser(
+        "reciprocity",
+        help="refine the masks with the reconstruction, and re-carve",
+    )
+    reciprocity.add_argument(
+        "--refine-from", default="fused", choices=("fused", "self"),
+        help="which reconstruction supplies the second opinion",
+    )
+    reciprocity.add_argument("--quiet", action="store_true")
+    reciprocity.set_defaults(func=cmd_reciprocity)
 
     preflight = sub.add_parser(
         "preflight",

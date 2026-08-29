@@ -465,6 +465,55 @@ which operate on pixels rather than 42 mm patches.
 
 ---
 
+## 7g. Closing Malik's loop: the reconstruction refining the segmentation
+
+The pipeline ran one way. A 2D segmenter decided which pixels were plant, those
+masks were carved, and nothing travelled back. Malik et al. argue that is the
+wrong shape, and there is a specific reason to expect it to matter here: each
+mask is decided from **one** view by a colour threshold, while the reconstruction
+is decided from **twelve at once**. Re-projecting the reconstruction into a view
+gives it a second opinion formed from evidence it never saw.
+
+Measured on E001, the two opinions differ in both directions: the carve claims
+1541 pixels excess-green missed, and rejects 3326 it included. So the loop can
+add information, not merely subtract. Four combination rules, all 36 specimens,
+refining against the **fused** reconstruction because it only claims surfaces a
+camera measured:
+
+| rule | plausible | median kg/m³ | mean volume |
+|---|---|---|---|
+| original (no refinement) | 8/36 | 116.8 | 10.40 L |
+| union | 4/36 | 88.8 | 17.38 L |
+| **intersection** | **19/36** | **344.4** | **2.36 L** |
+| reconstruction only | 14/36 | 194.8 | 8.50 L |
+
+**Intersection more than doubles the plausible count, 8 to 19, and brings the
+median implied density inside the 200-1000 band for the first time on the carve.**
+Union goes the other way, 8 down to 4, which is what the direction predicts and
+was written into the module docstring before the run: the hull is already too
+large, so a rule that grows masks makes it worse.
+
+**The control is the important part of this entry.** A re-carve of the
+*unchanged* masks must reproduce the cached volume. The first version of this
+experiment skipped `largest_connected_component`, which preprocess applies after
+carving, and the control then moved E001 from 4.20 L to 1.88 L while all three
+rules landed near 1.8-2.3 L. Every rule looked like it rescued the specimen. It
+was the carver disagreeing with itself. With the step restored the control drifts
+by **0.08% median and 2.6% worst**, against a 77% volume reduction from
+intersection, so the effect is real by a wide margin. The drift is reported per
+specimen in `reciprocity.json` and a rule that moved a volume by less than it
+would have shown nothing.
+
+**What this does not do.** 19/36 is still well below the fused reconstruction's
+32/38. Refining the masks improves the carve substantially; it does not make the
+carve competitive with depth fusion, and the operator finding in 7b and 7c
+stands. What it adds is evidence, on this data, for the specific reciprocity
+Malik argues for, with the direction measured rather than assumed.
+
+`python -m ggssvt.cli reciprocity`. About twelve minutes on one CPU core.
+
+---
+
 ## 7e. Does a stronger regressor help? Only while the input is bad
 
 Asked because a previous student used R-squared and RMSE with a ridge-style fit,
