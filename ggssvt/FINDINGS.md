@@ -656,6 +656,44 @@ out would be the stronger test and costs twelve carves per specimen.
 
 ---
 
+## 7h. The CNN control collapse, diagnosed
+
+At n=36 the frozen-feature probe's control scored RMSE 0.458, R² **+0.312**. At
+n=38 on the lab machine it scored RMSE 2.981, R² **−26.997**. Adding two
+specimens cannot degrade a baseline sixfold, so the number is an artefact, and
+until it is explained **every DINO comparison measured against it is
+unreportable** — including the four conditions that came back "significant" at
+dRMSE −2.54 to −2.56 with intervals barely excluding zero. Four backbones
+agreeing to within 0.02 kg is one broken control subtracted four times.
+
+Reproduced locally, on the archived n=36 features, through the probe's own
+pipeline:
+
+| | RMSE | R² |
+|---|---|---|
+| archived, n=36 | 0.458 | **+0.312** |
+| plus one specimen with a 190 L hull | 1.397 | **−5.215** |
+| plus a *second* large-hull specimen | 0.414 | **+0.459** |
+
+**One extreme specimen destroys it; two repair it.** That is the signature of a
+single leverage point, and PCA fitted in-fold amplifies it: with one outlier the
+leading component is that specimen, with two there is a direction and the fit
+recovers. V010 is the point. Its carve is 190.6 L for a 1.9 kg shoot, an implied
+density of 9.8 kg/m³, forty-two times the median hull in this set.
+
+**The fix is not to patch the probe.** V010 fails C1 by a factor of twenty. A
+specimen whose reconstruction cannot physically weigh its plant is a failed
+reconstruction, not a hard data point, and the criterion that says so was fixed
+before any of this was measured. What the episode shows is that the existing
+quality gate, which passed V010 on coverage and agreement, is blind to the one
+check that mattered.
+
+`eval/metrics.py:leverage_report` now reports whether one specimen carries the
+error, because a score can look catastrophic for a reason that has nothing to do
+with the method under test and no summary statistic says so.
+
+---
+
 ## 8. Bugs found and fixed
 
 Several would have produced confident wrong numbers rather than errors.

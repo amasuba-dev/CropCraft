@@ -430,6 +430,46 @@ def bootstrap_interval(
     return float(np.quantile(values, tail)), float(np.quantile(values, 1.0 - tail))
 
 
+def leverage_report(
+    features: np.ndarray, targets: np.ndarray, predictions: np.ndarray
+) -> dict:
+    """Whether one specimen is carrying the error, and how far out of line it is.
+
+    A least-squares fit on a handful of features has no defence against a single
+    extreme point, and a leave-one-out protocol makes it worse rather than
+    better: the outlier is held out once, predicted badly, and included in every
+    other fold where it drags the fit. Measured on this project's own data, one
+    specimen with a 190 litre hull took a frozen-feature probe from R2 +0.312 to
+    -5.2, while adding a *second* similar specimen brought it back to +0.459,
+    because two points define a direction and one is just leverage.
+
+    That is why this exists. A score can look catastrophic for a reason that has
+    nothing to do with the method under test, and no summary statistic says so.
+
+    Returns:
+        ``worst`` the index contributing most squared error, ``share`` the
+        fraction of total squared error it carries, and ``dominated`` when that
+        share exceeds what a single point out of n should ever carry.
+    """
+    errors = (np.asarray(targets) - np.asarray(predictions)) ** 2
+    total = float(errors.sum())
+    if total <= 0 or errors.size == 0:
+        return {"worst": None, "share": 0.0, "dominated": False, "n": int(errors.size)}
+
+    worst = int(np.argmax(errors))
+    share = float(errors[worst] / total)
+    # A point carrying more than a quarter of the error, when an even split
+    # would give it 1/n, is doing something other than being a hard example.
+    dominated = bool(share > max(0.25, 4.0 / errors.size))
+    return {
+        "worst": worst,
+        "share": round(share, 4),
+        "dominated": dominated,
+        "n": int(errors.size),
+        "even_share": round(1.0 / errors.size, 4),
+    }
+
+
 __all__ = [
     "ReconstructionMetrics",
     "RegressionMetrics",
@@ -437,8 +477,9 @@ __all__ = [
     "best_threshold_iou",
     "bootstrap_interval",
     "hausdorff",
-    "psnr",
+    "leverage_report",
     "paired_bootstrap_difference",
+    "psnr",
     "reconstruction_metrics",
     "regression_metrics",
     "voxel_iou",
