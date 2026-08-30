@@ -238,6 +238,27 @@ def dataset_fingerprint(cache_dir: Path) -> str:
     return digest.hexdigest()[:16]
 
 
+def _report_memory(where: str, device, verbose: bool) -> None:
+    """Print what the card is holding, at the boundaries that matter.
+
+    Every out-of-memory failure in this campaign has been diagnosed by guessing
+    which stage held what, because nothing said. Two lines of output turn that
+    into a reading: if `after pretrain` is already near capacity the training
+    working set is the problem, and if the jump happens at `before folds` the
+    handoff is.
+    """
+    if not verbose or getattr(device, "type", None) != "cuda":
+        return
+
+    import torch
+
+    allocated = torch.cuda.memory_allocated() / 1024 ** 3
+    reserved = torch.cuda.memory_reserved() / 1024 ** 3
+    total = torch.cuda.get_device_properties(0).total_memory / 1024 ** 3
+    print(f"  [gpu] {where:14s} {allocated:5.2f} GiB live, "
+          f"{reserved:5.2f} reserved, of {total:.2f}")
+
+
 def execute(
     run: Run,
     *,
@@ -327,6 +348,8 @@ def execute(
             checkpoint,
         )
 
+        _report_memory("after pretrain", device, verbose)
+
         # Copy the weights to the host and release the pretrained model before
         # the folds start. `model.state_dict()` hands back references to live
         # GPU tensors, and the model itself stayed alive through all 38 folds,
@@ -344,6 +367,8 @@ def execute(
         del model
         if device.type == "cuda":
             torch.cuda.empty_cache()
+
+        _report_memory("before folds", device, verbose)
 
         folds = loocv(
             plant_ids,
