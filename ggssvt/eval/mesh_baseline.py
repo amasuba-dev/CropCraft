@@ -134,7 +134,7 @@ class MeshDerived(Baseline):
     def _design(self, features: list[SpecimenFeatures]) -> np.ndarray:
         return np.stack([mesh_vector(self.table[f.plant_id]) for f in features])
 
-    def fit(self, features: list[SpecimenFeatures]) -> "MeshDerived":
+    def fit(self, features: list[SpecimenFeatures]) -> MeshDerived:
         targets = np.array([f.target_kg for f in features])
         self.weights, self.intercept, self.mean, self.scale = _ridge_fit(
             self._design(features), targets, self.alpha
@@ -170,7 +170,7 @@ class CanopyAreaAllometric(Baseline):
             [max(self.table[f.plant_id]["canopy_area_m2"], self.eps) for f in features]
         )
 
-    def fit(self, features: list[SpecimenFeatures]) -> "CanopyAreaAllometric":
+    def fit(self, features: list[SpecimenFeatures]) -> CanopyAreaAllometric:
         area = self._area(features)
         mass = np.array([max(f.target_kg, self.eps) for f in features])
         design = np.stack([np.log(area), np.ones_like(area)], axis=1)

@@ -18,7 +18,7 @@ from __future__ import annotations
 import math
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from ..config import MODEL
 from .embedding import FourierFeatures, normalise_world

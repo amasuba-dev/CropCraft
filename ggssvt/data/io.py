@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
-from ..config import DEPTH_MAX_M, DEPTH_MIN_M, DEPTH_SCALE_M, Intrinsics, KINECT_V2
+from ..config import DEPTH_MAX_M, DEPTH_MIN_M, DEPTH_SCALE_M, KINECT_V2, Intrinsics
 
 try:  # Pillow is the only image dependency and is optional at import time.
     from PIL import Image

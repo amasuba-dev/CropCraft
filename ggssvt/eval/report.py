@@ -14,12 +14,11 @@ from pathlib import Path
 
 import numpy as np
 
-from ..config import WORK_DIR
-from ..config import voxel_grid_centres
+from ..config import WORK_DIR, voxel_grid_centres
 from ..data.preprocess import load_cached, load_quality
-from .plausibility import classify, summarise
 from .baselines import evaluate_baselines, load_features
 from .metrics import RegressionMetrics, bootstrap_interval, regression_metrics
+from .plausibility import classify, summarise
 
 REPORT_DIR = WORK_DIR / "reports"
 

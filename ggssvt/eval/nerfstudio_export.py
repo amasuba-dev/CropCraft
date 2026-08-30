@@ -37,7 +37,7 @@ from pathlib import Path
 
 import numpy as np
 
-from ..config import DEPTH_SCALE_M, Intrinsics, KINECT_V2, PLANTS_DIR, WORK_DIR
+from ..config import DEPTH_SCALE_M, KINECT_V2, PLANTS_DIR, WORK_DIR, Intrinsics
 
 # Nerfstudio/Blender cameras look down -z with +y up; OpenCV looks down +z with
 # +y down. Negating the y and z basis vectors converts between them.

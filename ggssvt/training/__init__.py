@@ -2,7 +2,14 @@
 
 from .dataset import SamplingConfig, SpecimenBatch, SpecimenDataset, collate
 from .losses import LossTerms, biomass_loss, compute_loss, occupancy_loss
-from .trainer import FoldResult, TrainingRun, loocv, predict, resolve_device, train_stage
+from .trainer import (
+    FoldResult,
+    TrainingRun,
+    loocv,
+    predict,
+    resolve_device,
+    train_stage,
+)
 
 __all__ = [
     "FoldResult",

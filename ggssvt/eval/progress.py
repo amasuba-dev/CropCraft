@@ -140,6 +140,42 @@ def _programme(work_dir: Path) -> tuple[Experiment, ...]:
             needs_gpu=True,
         ),
         Experiment(
+            "frequency", "Spectral analysis of the target", "classical",
+            "python -m ggssvt.cli frequency",
+            reports / "frequency.json",
+            "H3's premise, measured rather than argued: what the occupancy "
+            "contains against what the encoding can represent.",
+        ),
+        Experiment(
+            "label_efficiency", "Label-efficiency curves", "classical",
+            "python -m ggssvt.cli label-efficiency",
+            reports / "label_efficiency.json",
+            "H1's second half. How few labels each representation needs to "
+            "reach the baseline's full-label accuracy.",
+        ),
+        Experiment(
+            "viewpoint", "Held-out-view consistency", "check",
+            "python -m ggssvt.cli viewpoint",
+            reports / "viewpoint.json",
+            "H2's viewpoint claim, on a view the reconstruction never saw. "
+            "Re-projection into the views it was built from does not measure "
+            "this.",
+        ),
+        Experiment(
+            "robustness", "Noise and occlusion sweeps", "check",
+            "python -m ggssvt.cli robustness",
+            reports / "robustness.json",
+            "H4's other two thirds. Depth noise at multiples of the sensor's "
+            "own characteristic, and a band across the subject in every view.",
+        ),
+        Experiment(
+            "reciprocity", "Reconstruction refining the masks", "reconstruction",
+            "python -m ggssvt.cli reciprocity",
+            reports / "reciprocity.json",
+            "Closes the loop the pipeline never closed: the reconstruction is "
+            "decided from twelve views and each mask from one.",
+        ),
+        Experiment(
             "quality", "Reconstruction metrics", "reconstruction",
             "python -m ggssvt.cli quality",
             reports / "reconstruction_quality.json",
@@ -215,6 +251,28 @@ def _headline(key: str, path: Path) -> tuple[str | None, dict]:
     if key == "view_ablation" and isinstance(data, list) and data:
         worst = min(data, key=lambda r: r.get("n_views", 99))
         return f"down to {worst.get('n_views')} views", {}
+    if key == "frequency" and isinstance(data, dict):
+        reach = data.get("encoding_reach_cycles_per_m")
+        nyquist = data.get("grid_nyquist_cycles_per_m")
+        if reach and nyquist:
+            return f"encoding reaches {reach / nyquist:.1f}x the grid Nyquist", {}
+    if key == "label_efficiency" and isinstance(data, dict):
+        reached = data.get("comparison", {}).get("labels_to_reach", {})
+        best = min((v for v in reached.values() if v), default=None)
+        return (f"best reaches the bar with {best} labels", {}) if best else (None, {})
+    if key == "viewpoint" and isinstance(data, dict):
+        summary = data.get("summary", {})
+        if summary.get("relative_drop") is not None:
+            return f"{summary['relative_drop']:.1%} drop on a held-out view", {}
+    if key == "robustness" and isinstance(data, dict):
+        rows = data.get("summary", {})
+        worst = max((v.get("fragments", 0) for v in rows.values()), default=0)
+        return f"up to {worst} fragmented under occlusion", {}
+    if key == "reciprocity" and isinstance(data, dict):
+        rules = data.get("summary", {})
+        best = max(rules.items(), key=lambda kv: kv[1].get("plausible", 0), default=None)
+        if best:
+            return f"{best[0]}: {best[1]['plausible']}/{best[1]['n']} plausible", {}
     if key == "quality" and isinstance(data, dict):
         carve = data.get("reprojection", {}).get("carve", [])
         fused = data.get("reprojection", {}).get("fused", [])

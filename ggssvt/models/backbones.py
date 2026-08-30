@@ -38,8 +38,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 from ..config import MODEL
 
@@ -206,7 +206,7 @@ class _DinoBackbone(Backbone):
             raise BackboneError(f"{repo} exposes no hidden_size; unsupported architecture")
         return model, hidden, patch_size
 
-    def train(self, mode: bool = True):  # noqa: D102 - a frozen backbone stays in eval
+    def train(self, mode: bool = True):
         super().train(mode)
         if self.frozen:
             self.backbone.eval()
@@ -380,14 +380,14 @@ def backbone_is_available(kind: str, variant: str = "small") -> tuple[bool, str]
 
 __all__ = [
     "BACKBONES",
+    "DINOV3_ACCESS_HELP",
     "Backbone",
     "BackboneError",
     "CnnBackbone",
-    "DINOV3_ACCESS_HELP",
     "Dinov2Backbone",
     "Dinov3Backbone",
     "backbone_is_available",
+    "build_backbone",
     "dinov3_access_help",
     "repo_access",
-    "build_backbone",
 ]

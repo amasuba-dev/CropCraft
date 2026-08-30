@@ -27,8 +27,8 @@ __all__ = [
     "load_ground_truth",
     "load_rgb",
     "load_specimen",
-    "select_views",
     "parse_position",
     "project",
     "resolve_positions",
+    "select_views",
 ]

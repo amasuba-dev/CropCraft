@@ -131,7 +131,7 @@ class _ReferenceGrid:
             hits[inside] = self.grid[kept[:, 0], kept[:, 1], kept[:, 2]]
         return float(hits.mean())
 
-    def dilated(self, iterations: int = 1) -> "_ReferenceGrid":
+    def dilated(self, iterations: int = 1) -> _ReferenceGrid:
         """A dilated copy, so a near miss still counts as a hit."""
         grown = self.grid.copy()
         for _ in range(max(0, iterations)):

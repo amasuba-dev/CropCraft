@@ -29,11 +29,11 @@ from ..config import (
     CARVE_DEPTH_MARGIN_M,
     CARVE_DEPTH_MARGIN_SLOPE,
     CARVE_MASK_DILATION,
-    Intrinsics,
     KINECT_V2,
     POT_HEIGHT_M,
     VOXEL_RESOLUTION,
     VOXEL_SIZE_M,
+    Intrinsics,
     voxel_grid_centres,
 )
 from .rig import RigSolution

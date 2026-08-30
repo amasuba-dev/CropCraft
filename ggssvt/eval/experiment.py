@@ -87,7 +87,7 @@ class ComparisonReport:
             features = condition.extras.get("n_features", "")
             lines.append(
                 f"{label:34s} {m.rmse_kg:7.3f} {m.mae_kg:7.3f} "
-                f"{m.mare * 100:7.1f} {m.r2:7.3f} {str(features):>7s}"
+                f"{m.mare * 100:7.1f} {m.r2:7.3f} {features!s:>7s}"
             )
 
         paired = self.paired_against_control()

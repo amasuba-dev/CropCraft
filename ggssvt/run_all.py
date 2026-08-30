@@ -147,12 +147,40 @@ def programme(work_dir: Path, *, device: str, plan: str, batch_size: int,
         Step("dino_segment", "DITR-style DINO lifting", cli + ["dino-segment"],
              reports / "dino_segment.json", required=False),
 
+        Step("frequency", "Spectral analysis", cli + ["frequency"],
+             reports / "frequency.json", required=False,
+             note="H3's premise, measured. Run before the campaign's band "
+                  "ladder so the ladder has a reason."),
+
+        Step("label_efficiency", "Label-efficiency curves",
+             cli + ["label-efficiency"],
+             reports / "label_efficiency.json", required=False,
+             note="H1's second half. Seconds, on frozen features."),
+
+        Step("viewpoint", "Held-out-view consistency", cli + ["viewpoint"],
+             reports / "viewpoint.json", required=False,
+             note="H2's viewpoint claim. About 25 minutes on CPU."),
+
+        Step("robustness", "Noise and occlusion sweeps", cli + ["robustness"],
+             reports / "robustness.json", required=False,
+             note="H4's other two thirds. About 20 minutes on CPU."),
+
+        Step("reciprocity", "Reconstruction refining the masks",
+             cli + ["reciprocity"],
+             reports / "reciprocity.json", required=False,
+             note="About 12 minutes on CPU."),
+
         Step("gallery", "Reconstruction gallery", cli + ["gallery"],
              work_dir / "reports" / "gallery" / "reconstructions.html",
              required=False),
 
         Step("architecture", "Architecture diagrams", cli + ["architecture"],
              reports / "architecture", required=False),
+
+        Step("funnel", "Screening funnel figure", cli + ["funnel"],
+             reports / "figures" / "screening_funnel.png", required=False,
+             note="Reads its counts from the other reports, so it goes after "
+                  "them."),
 
         Step("smoke", "Campaign smoke test",
              [sys.executable, "-m", "ggssvt.campaign",

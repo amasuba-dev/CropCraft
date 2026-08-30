@@ -286,6 +286,74 @@ def cmd_viewpoint(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_frequency(args: argparse.Namespace) -> int:
+    """H3's measurement: what spectral content the occupancy target actually has.
+
+    The campaign's band ladder is justified against the grid Nyquist, and this is
+    what turns that from an argument about voxel size into something measured on
+    the data. Run it before the H3 runs, so the ladder has a reason rather than a
+    rationale.
+    """
+    from .data.preprocess import load_cached, usable_plant_ids
+    from .eval.frequency import characterise, encoding_reach_cycles_per_m
+
+    plant_ids = args.plants or usable_plant_ids(args.cache_dir)
+    rows = []
+    for plant_id in plant_ids:
+        cached = load_cached(plant_id, args.cache_dir)
+        row = characterise(cached.occupancy, voxel_size_m=cached.voxel_size_m)
+        row["plant_id"] = plant_id
+        rows.append(row)
+
+    nyquist = float(np.median([r["nyquist_cycles_per_m"] for r in rows]))
+    from .config import VOLUME_EXTENT_M
+
+    encoding = encoding_reach_cycles_per_m(
+        MODEL.fourier_bands, MODEL.fourier_max_freq, VOLUME_EXTENT_M
+    )
+    reach = encoding["top_cycles_per_m"]
+    b95 = float(np.median([r["bandwidth_95"] for r in rows]))
+    b99 = float(np.median([r["bandwidth_99"] for r in rows]))
+
+    print(f"Radial power spectrum over {len(rows)} specimens, medians:")
+    print(f"  95% of the power below      {b95:8.1f} cycles/m")
+    print(f"  99% of the power below      {b99:8.1f} cycles/m")
+    print(f"  grid Nyquist                {nyquist:8.1f} cycles/m")
+    print(f"  encoding reaches            {reach:8.1f} cycles/m "
+          f"({encoding['n_bands']} bands, {encoding['encoding_dims']} dims)")
+    print()
+    if reach > nyquist:
+        print(f"The encoding reaches {reach / nyquist:.1f} times the grid Nyquist, so")
+        print("its top octaves address detail the voxel grid cannot represent. That")
+        print("is the over-provisioning H3 predicts can be cut at no cost.")
+    else:
+        print("The encoding sits at or below the grid Nyquist, so H3's premise does")
+        print("not hold on this configuration and the band ladder needs restating.")
+
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(json.dumps({
+        "median_bandwidth_95": round(b95, 2),
+        "median_bandwidth_99": round(b99, 2),
+        "grid_nyquist_cycles_per_m": round(nyquist, 2),
+        "encoding_reach_cycles_per_m": round(reach, 2),
+        "encoding": encoding,
+        "per_specimen": rows,
+    }, indent=2), encoding="utf-8")
+    print(f"\nSaved to {args.out}")
+    return 0
+
+
+def cmd_funnel(args: argparse.Namespace) -> int:
+    """The staged screening figure, drawn from whatever has actually run."""
+    from .eval.funnel import write
+
+    path = write(args.out)
+    print(f"Wrote {path}")
+    print("Every count is read from the report JSON, so the figure cannot")
+    print("disagree with the results it summarises.")
+    return 0
+
+
 def cmd_access(args: argparse.Namespace) -> int:
     """Report which account is authenticated and what it can actually download.
 
@@ -1104,6 +1172,26 @@ def build_parser() -> argparse.ArgumentParser:
     )
     viewpoint.add_argument("--quiet", action="store_true")
     viewpoint.set_defaults(func=cmd_viewpoint)
+
+    frequency = sub.add_parser(
+        "frequency",
+        help="H3: radial power spectrum of the occupancy target (CPU)",
+    )
+    _add_common(frequency)
+    frequency.add_argument("--plants", nargs="*")
+    frequency.add_argument(
+        "--out", type=Path, default=WORK_DIR / "reports" / "frequency.json"
+    )
+    frequency.set_defaults(func=cmd_frequency)
+
+    funnel = sub.add_parser(
+        "funnel", help="the staged screening figure, from the report JSON"
+    )
+    funnel.add_argument(
+        "--out", type=Path,
+        default=WORK_DIR / "reports" / "figures" / "screening_funnel.png",
+    )
+    funnel.set_defaults(func=cmd_funnel)
 
     preflight = sub.add_parser(
         "preflight",

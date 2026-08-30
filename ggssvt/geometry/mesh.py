@@ -101,7 +101,7 @@ class Mesh:
     def height_m(self) -> float:
         return float(self.bounds()[1][2]) if not self.is_empty else 0.0
 
-    def crop_above(self, z_m: float) -> "Mesh":
+    def crop_above(self, z_m: float) -> Mesh:
         """Keep only the faces whose centroid sits above a height.
 
         A crude cut rather than a proper plane clip: it leaves the mesh open at

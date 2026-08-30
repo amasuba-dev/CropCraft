@@ -20,12 +20,12 @@ import numpy as np
 
 from ..config import (
     EXCESS_GREEN_THRESHOLD,
-    Intrinsics,
     KINECT_V2,
     POT_HEIGHT_M,
     ROI_RADIUS_M,
     ROI_Z_MAX_M,
     ROI_Z_MIN_M,
+    Intrinsics,
 )
 from ..data.io import backproject, depth_validity, excess_green
 from .rig import ViewPose

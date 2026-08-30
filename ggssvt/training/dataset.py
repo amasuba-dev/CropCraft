@@ -25,7 +25,13 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-from ..config import POT_HEIGHT_M, VOXEL_RESOLUTION, VOXEL_SIZE_M, WORK_DIR, voxel_grid_centres
+from ..config import (
+    POT_HEIGHT_M,
+    VOXEL_RESOLUTION,
+    VOXEL_SIZE_M,
+    WORK_DIR,
+    voxel_grid_centres,
+)
 from ..data.preprocess import CachedSpecimen, load_cached, usable_plant_ids
 
 
@@ -129,7 +135,7 @@ class SpecimenBatch:
     pot_height_m: torch.Tensor     # (B,) per-specimen rim, not a constant
     occupancy: torch.Tensor | None = None   # (B, R, R, R), eval only
 
-    def to(self, device: torch.device | str) -> "SpecimenBatch":
+    def to(self, device: torch.device | str) -> SpecimenBatch:
         moved = {}
         for key, value in self.__dict__.items():
             moved[key] = value.to(device) if torch.is_tensor(value) else value

@@ -43,7 +43,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ..config import Intrinsics, KINECT_V2, ROI_RADIUS_M, ROI_Z_MAX_M, ROI_Z_MIN_M
+from ..config import KINECT_V2, ROI_RADIUS_M, ROI_Z_MAX_M, ROI_Z_MIN_M, Intrinsics
 from ..data.io import backproject, depth_validity, project
 from .rig import RigSolution, ViewPose
 from .segment import ViewSegmentation, segment_view
@@ -139,7 +139,7 @@ class Sam3DSegmenter:
         self._model = None
         self._processor = None
 
-    def load(self) -> "Sam3DSegmenter":
+    def load(self) -> Sam3DSegmenter:
         """Load the SAM weights. Called lazily by :meth:`segment_specimen`."""
         if self._model is not None:
             return self

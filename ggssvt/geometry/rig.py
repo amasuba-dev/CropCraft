@@ -32,15 +32,15 @@ from dataclasses import dataclass
 import numpy as np
 
 from ..config import (
-    Intrinsics,
     KINECT_V2,
     NOMINAL_CAM_HEIGHT_M,
     NOMINAL_CAM_RADIUS_M,
     ROI_RADIUS_M,
     ROI_Z_MAX_M,
+    Intrinsics,
 )
-from ..data.io import backproject, depth_validity
 from ..data.dataset import Specimen
+from ..data.io import backproject, depth_validity
 from .plane import Plane, PlaneFitError, fit_plane_ransac
 from .refine import RefinementResult, refine_registration
 
@@ -431,7 +431,7 @@ class RigSolution:
     warnings: list[str]
     subject_distance_m: float = float("nan")
     agreement: float = float("nan")
-    refinement: "RefinementResult | None" = None
+    refinement: RefinementResult | None = None
 
     @property
     def n_views(self) -> int:
