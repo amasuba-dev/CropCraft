@@ -279,8 +279,18 @@ def execute(
     from .training.trainer import loocv, train_stage
 
     started = time.time()
+    # The batch size and seed live on the train config, not the run, so they
+    # were absent from the recorded result -- and "what batch size was that
+    # fitted at?" is the first question anyone comparing two runs will ask.
     result = RunResult(
-        name=run.name, question=run.question, status="failed", config=run.as_dict()
+        name=run.name,
+        question=run.question,
+        status="failed",
+        config={
+            **run.as_dict(),
+            "batch_size": train_config.batch_size,
+            "seed": train_config.seed,
+        },
     )
 
     cache_dir = run.cache_dir()
