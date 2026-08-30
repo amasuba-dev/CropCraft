@@ -354,6 +354,52 @@ def cmd_funnel(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_neural_field(args: argparse.Namespace) -> int:
+    """A trained neural field as a third reconstruction operator.
+
+    Sweeps the density threshold rather than choosing one, because that
+    threshold has no physical calibration and picking a value would be picking
+    the answer.
+    """
+    from .eval.neural_field import run
+
+    if not args.outputs.exists():
+        print(
+            f"No Nerfstudio outputs at {args.outputs}. Export the transforms "
+            "with `cli nerfstudio`, then train in the `cropcraft` environment; "
+            "the export prints the ns-train command lines.",
+            file=sys.stderr,
+        )
+        return 2
+
+    report = run(args.outputs, cache_dir=args.cache_dir, device=args.device,
+                 verbose=not args.quiet)
+    agreement = report["consensus"]
+
+    print()
+    print(f"  specimens scored              {agreement['n_specimens']}")
+    print(f"  no threshold works for        "
+          f"{len(agreement['specimens_with_no_working_threshold'])}")
+    shared = agreement["shared_thresholds"]
+    if shared:
+        print(f"  plausible for every specimen  {shared[0]:.3g} to {shared[-1]:.3g}")
+        print()
+        print("A single density threshold serves the whole set, so it is a")
+        print("calibration rather than a fitted parameter. That is a measured")
+        print("density scale for this sensor and subject.")
+    else:
+        best = agreement["best_threshold"]
+        covers = agreement["best_threshold_covers"]
+        print(f"  best single threshold         {best:.3g}, covering {covers}")
+        print()
+        print("No single threshold is plausible for every specimen, so there is")
+        print("no calibration here: a per-specimen value is a fitted parameter")
+        print("and would be worth nothing on a new plant. If most specimens have")
+        print("no working threshold at all, the envelope finding generalises")
+        print("from silhouette hulls to neural fields.")
+    return 0
+
+
 def cmd_access(args: argparse.Namespace) -> int:
     """Report which account is authenticated and what it can actually download.
 
@@ -1192,6 +1238,19 @@ def build_parser() -> argparse.ArgumentParser:
         default=WORK_DIR / "reports" / "figures" / "screening_funnel.png",
     )
     funnel.set_defaults(func=cmd_funnel)
+
+    neural_field = sub.add_parser(
+        "neural-field",
+        help="a trained Nerfstudio field as a third operator, threshold swept",
+    )
+    _add_common(neural_field)
+    neural_field.add_argument(
+        "--outputs", type=Path, default=WORK_DIR / "nerfstudio" / "outputs",
+        help="directory of Nerfstudio training outputs, one per plant id",
+    )
+    neural_field.add_argument("--device", default="cuda")
+    neural_field.add_argument("--quiet", action="store_true")
+    neural_field.set_defaults(func=cmd_neural_field)
 
     preflight = sub.add_parser(
         "preflight",

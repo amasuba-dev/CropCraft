@@ -145,9 +145,11 @@ UNSUPPORTED: dict[str, str] = {
         "persistent 3D grid, not the results."
     ),
     "NeRF / splatfacto": (
-        "Same view-count problem, though far less severe, and transforms.json is "
-        "already exported for every specimen. Worth running before DeepVoxels "
-        "would be: it is maintained, and gaussians can be read as geometry."
+        "No longer unsupported, only unrun. transforms.json is exported for "
+        "every specimen and `cli neural-field` reads a trained field back as a "
+        "third operator, sweeping the density threshold rather than choosing "
+        "one. Needs the other conda environment and a training run per "
+        "specimen, so it is sequenced after the campaign."
     ),
     "SAM 3 / SAM 3D Objects": (
         "Gated on HuggingFace and not granted to this account. The adapter exists "

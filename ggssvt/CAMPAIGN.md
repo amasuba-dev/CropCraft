@@ -295,6 +295,42 @@ skipped, and that produced a convincing false positive.
 
 ---
 
+## After the campaign: a neural field as a third operator
+
+Not part of the Monday plan, and deliberately sequenced last: it closes no
+hypothesis, it extends an operator comparison that is already resolved, and it
+competes with the campaign for the card.
+
+```bash
+python -m ggssvt.cli nerfstudio          # export transforms, already written
+# then, in the cropcraft environment, ns-train per specimen
+python -m ggssvt.cli neural-field        # read the fields back, sweep the threshold
+```
+
+A neural field gives a **density**, not occupancy, and turning it into a volume
+needs a threshold with no physical calibration. That is precisely the free
+parameter C1 exists to remove, so `neural-field` does not choose one: it sweeps
+21 values across five orders of magnitude and asks whether *any* of them makes
+each reconstruction able to weigh its plant.
+
+Both outcomes are results. If no threshold works, the envelope finding
+generalises from silhouette hulls to neural fields, which is a broader claim than
+the project currently makes. If one works for every specimen, that value is a
+measured density calibration for this sensor and subject, which nobody publishes
+because nobody has a mass to calibrate against. A threshold that works
+per-specimen but not across the set is neither: that is a fitted parameter, and
+the report says so rather than quoting the best one.
+
+**Do not modify `nerfstudio/`.** It is unmodified upstream, and the adaptation
+belongs on this side. The one thing that goes wrong silently is coordinates:
+Nerfstudio re-centres and rescales the scene at load, so the metric voxel grid
+has to be mapped through `dataparser_transforms.json`. Skipping that puts every
+query in the wrong place and looks like an empty reconstruction rather than a
+mis-registration, which is the same class of mistake as the OpenCV to OpenGL
+convention in the export.
+
+---
+
 ## When it finishes
 
 ```bash
