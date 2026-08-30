@@ -150,6 +150,132 @@ that cleanly rather than by argument.
 
 ---
 
+## What each hypothesis needs, and what is missing
+
+The seven runs are necessary and **not sufficient**. Two of the four hypotheses
+name a measurement the campaign does not produce, and neither is built. Both are
+listed here rather than discovered on Sunday night.
+
+### H1: self-supervised ViTs beat CNNs, from fewer labels
+
+Two claims, and the campaign answers one of them.
+
+| | supplied by | state |
+|---|---|---|
+| ViT beats CNN | `h1_dinov2` against `baseline_cnn`, paired bootstrap | **in the core plan** |
+| DINOv3 variant | `h1_dinov3` | **only in `--plan full`** |
+| reaches accuracy from fewer labels | a label-efficiency curve | **not built** |
+
+The second half of H1 is the whole point of a self-supervised method and there is
+no experiment for it. What it needs: re-run stage 2 on subsampled label sets, at
+say 25%, 50%, 75% and 100% of the specimens, with stage 1 unchanged, and plot
+RMSE against label count for both backbones. If the ViT curve is flatter, that is
+the label-efficiency claim; if the curves are parallel, H1's second half fails.
+
+This is cheap relative to the campaign because stage 1 is not repeated. Budget
+roughly one extra hour per backbone.
+
+### H2: geometry grounding gives viewpoint consistency and better reconstruction
+
+Three claims, and the campaign answers one and a half.
+
+| | supplied by | state |
+|---|---|---|
+| grounding helps | `h2_no_geometry` ablation | **in the core plan** |
+| the geometry bias is doing something | `cli attention`, mean distance scale | **built** |
+| higher consistency across viewpoints | held-out-view agreement | **not built** |
+
+`reconstruction_quality.reproject` scores a reconstruction against the views it
+was *built from*, which is self-consistency, not viewpoint generalisation. What
+H2 actually claims needs a view held out: reconstruct from eleven, predict the
+twelfth, and compare against what the sensor measured there. That is a different
+number and the honest one.
+
+The view caches for 3, 4 and 6 views already exist, so the machinery for
+rebuilding from a subset is there; what is missing is scoring against the
+excluded view rather than against the included ones.
+
+### H3: frequency and geometry grounding together improve parameter efficiency
+
+The best-specified of the four, and fully covered.
+
+| | supplied by | state |
+|---|---|---|
+| what the target's spectrum contains | `eval/frequency.py` | **built** |
+| encoding matched to the grid Nyquist | `h3_bands_8_freq7` | in the core plan |
+| below Nyquist should hurt | `h3_bands_6_freq6` | in the core plan |
+| far above should add nothing | `h3_bands_16_freq10` | in the core plan |
+
+Nothing missing. Run the frequency analysis first so the Nyquist argument is
+measured against the data rather than asserted from the voxel size.
+
+### H4: robustness to occlusion, noise and sparse sampling
+
+**Answered, and it needed no GPU.** See [FINDINGS.md](FINDINGS.md) section 7i.
+Sparse sampling from the view ablation, noise and occlusion from
+`cli robustness`. Robust to depth noise at four times the sensor's own
+characteristic; not robust to sustained occlusion, which destroys 33 of 36
+reconstructions at 50%.
+
+---
+
+## Getting the learned arm to 90% before Monday
+
+The learned arm is currently at zero. Ninety per cent means H1, H2 and H3 each
+have an experiment that ran and a number that can be reported with an interval.
+
+**Friday evening.** The two pre-checks, then launch. The campaign is the long
+pole and everything else fits around it.
+
+```bash
+python -m ggssvt.cli preflight && python -m ggssvt.cli dino-probe --plants $(python -c "import sys;sys.path.insert(0,'.');from pathlib import Path;from ggssvt.data.preprocess import usable_plant_ids;print(' '.join(p for p in usable_plant_ids(Path('work_dirs/ggssvt/cache')) if p!='V010'))")
+```
+
+```bash
+python -m ggssvt.campaign --plan smoke --device cuda
+```
+
+```bash
+nohup python -m ggssvt.campaign --plan core --device cuda --workers 8 --batch-size 2 > campaign.log 2>&1 &
+```
+
+**Friday evening, in parallel, on the CPU.** These do not touch the GPU and
+close H3's measurement and H4 entirely.
+
+```bash
+python -m ggssvt.cli robustness
+```
+
+**Saturday.** The campaign should be finished. Read the summary, run the
+attention read for H2, and rebuild the page.
+
+```bash
+python -m ggssvt.cli attention --plant M001 && python -m ggssvt.cli report && python -m ggssvt.cli dashboard
+```
+
+**Saturday and Sunday, in priority order, if the time exists:**
+
+1. The **label-efficiency curve** for H1. Highest value of the three, because it
+   is the half of H1 that makes the method self-supervised rather than merely
+   transformer-based.
+2. **Held-out-view consistency** for H2. Second, because without it H2 rests on
+   an ablation and a single attention statistic.
+3. `--plan full`, which adds `h1_dinov3` and the two SAM3D cells. Lowest value:
+   it broadens rather than deepens, and DINOv3 is another backbone answering a
+   question DINOv2 already answers.
+
+**What 90% looks like on Monday.** H3 complete, H4 complete, H1 answered on the
+comparison and open on label efficiency, H2 answered on the ablation and open on
+viewpoint consistency. That is three of four hypotheses with real numbers, which
+is the difference between a results chapter and a plan.
+
+**What would make it 100%** is the two missing experiments above, and those are
+worth a week rather than a weekend. Do not compress them into Sunday night; an
+experiment built in a hurry against a deadline is how the reciprocity control got
+skipped, and that produced a convincing false positive.
+
+---
+
 ## When it finishes
 
 ```bash

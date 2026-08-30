@@ -656,6 +656,49 @@ out would be the stronger test and costs twelve carves per specimen.
 
 ---
 
+## 7i. H4, two thirds answered: noise is harmless, occlusion is not
+
+The view-count ablation already answered sparse sampling. These are the other
+two, both degradations of the cached inputs, so neither needed the GPU. Scored
+by C1, and by whether the reconstruction survived at all.
+
+| degradation | plausible | **fragments** | median kg/m³ | mean volume |
+|---|---|---|---|---|
+| control | 8/36 | 0 | 116.8 | 10.34 L |
+| noise, 1x sensor | 7/36 | 0 | 118.4 | 10.05 L |
+| noise, 2x | 7/36 | 0 | 123.4 | 10.10 L |
+| noise, 4x | 7/36 | 1 | 145.3 | 9.61 L |
+| occlusion, 10% | 6/36 | 5 | 775.2 | 3.11 L |
+| occlusion, 25% | 10/36 | 9 | 356.7 | 3.38 L |
+| **occlusion, 50%** | **0/36** | **33/36** | 339.4 | 6.55 L |
+
+**Robust to depth noise, not robust to sustained occlusion.** Quadrupling the
+sensor's own noise characteristic costs one specimen and 7% of the volume; the
+carve uses depth only for free-space votes with a margin, so noise inside that
+margin changes nothing. A band across 50% of the subject's height in every view
+destroys 33 of 36 reconstructions.
+
+**The fragment column is the finding that nearly did not get recorded.** Without
+it, occlusion at 25% appears to *improve* the plausible count from 8 to 17. It
+does not. A mid-height band severs the plant, `largest_connected_component` keeps
+whichever side is bigger, and the surviving piece lands inside the plausible band
+by coincidence. E001 at 50% keeps 5% of its volume and scores 484 kg/m³, which is
+squarely "plausible".
+
+**So C1 is necessary and not sufficient**, and that belongs in the methods
+section as a stated limitation rather than being discovered by an examiner. A
+reconstruction can pass the physical check by being a well-proportioned fragment
+of the plant. The surviving fraction is now recorded per specimen and a fragment
+is excluded from the plausible count.
+
+The occlusion here is deliberately the pessimistic case: the same band in every
+view. Occlusion that moves between viewpoints is partly recovered by the other
+eleven, and that variant is not measured.
+
+`python -m ggssvt.cli robustness`, about 20 minutes on one CPU core.
+
+---
+
 ## 7h. The CNN control collapse, diagnosed
 
 At n=36 the frozen-feature probe's control scored RMSE 0.458, R² **+0.312**. At

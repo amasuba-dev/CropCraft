@@ -204,7 +204,15 @@ TRAIN = TrainConfig()
 # ---------------------------------------------------------------------------
 TARGET_COLUMN = "net_weight_g"
 SPECIES_COLUMN = "species_breed"
-EXCLUDED_PLANTS: tuple[str, ...] = ("X001",)   # 2 views only, single specimen
+# Excluded from every experiment, with the reason. Both are capture failures
+# rather than difficult specimens: a specimen the rig never finished is not
+# evidence about the method, and keeping it would put a 9-view reconstruction
+# in a 12-view comparison.
+EXCLUDED_PLANTS: tuple[str, ...] = (
+    "X001",   # 2 views only, single synthetic specimen
+    "V011",   # capture stopped at 240 degrees; 9 views of 12, a contiguous
+              # 120 degree arc never captured. Dropped rather than re-shot.
+)
 
 
 def voxel_grid_centres(

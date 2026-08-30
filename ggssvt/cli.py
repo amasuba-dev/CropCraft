@@ -226,6 +226,26 @@ def cmd_reciprocity(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_robustness(args: argparse.Namespace) -> int:
+    """H4: depth noise and occlusion, scored physically. No GPU."""
+    from .eval.robustness import run
+
+    report = run(seed=args.seed, verbose=not args.quiet)
+    print()
+    print(f"  {'degradation':18s} {'plausible':>10} {'fragments':>10} "
+          f"{'median kg/m3':>13} {'mean vol L':>11}")
+    for key, row in sorted(report["summary"].items(),
+                           key=lambda kv: (kv[1]["kind"], kv[1]["level"])):
+        print(f"  {key:18s} {str(row['plausible']) + '/' + str(row['n']):>10} "
+              f"{row['fragments']:>10} {row['median_density']!s:>13} "
+              f"{row['mean_volume_l']!s:>11}")
+    print()
+    print("A fragment is a reconstruction that lost more than half its volume. It")
+    print("can still land inside the plausible band by coincidence, so it is")
+    print("counted separately rather than as a success. Read that column first.")
+    return 0
+
+
 def cmd_access(args: argparse.Namespace) -> int:
     """Report which account is authenticated and what it can actually download.
 
@@ -1020,6 +1040,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     reciprocity.add_argument("--quiet", action="store_true")
     reciprocity.set_defaults(func=cmd_reciprocity)
+
+    robustness = sub.add_parser(
+        "robustness", help="H4: depth noise and occlusion sweeps (CPU)"
+    )
+    robustness.add_argument("--seed", type=int, default=0)
+    robustness.add_argument("--quiet", action="store_true")
+    robustness.set_defaults(func=cmd_robustness)
 
     preflight = sub.add_parser(
         "preflight",
