@@ -37,10 +37,15 @@ import numpy as np
 from ..config import WORK_DIR
 
 # What can be drawn. Each is a function of one cached specimen.
-LAYERS = ("rgb", "depth", "segmentation", "occupancy", "points", "mesh")
+LAYERS = ("rgb", "depth", "segmentation", "occupancy", "points", "mesh",
+          "density", "threshold_sweep")
 
-# Where a reconstruction can come from. The names match the cache directories.
-SOURCES = {"carve": "cache", "fused": "cache_tsdf", "sam3d": "cache_sam3d"}
+# Where a reconstruction can come from. The first three name cache directories;
+# `neural` is different, and the difference is the point: a trained field has no
+# occupancy until a density threshold is chosen, so it needs one more knob than
+# the others and the layers that need it say so.
+SOURCES = {"carve": "cache", "fused": "cache_tsdf", "sam3d": "cache_sam3d",
+           "neural": None}
 
 # Perceptually uniform ramps only, plus greys. See the module docstring.
 COLORMAPS = ("viridis", "greys", "greys_r")
@@ -78,6 +83,9 @@ class VizConfig:
     label: bool = True
     backend: str = "pil"
     cache_root: Path = field(default=WORK_DIR)
+    nerf_output: Path | None = None
+    threshold: float = 1.0
+    sweep_thresholds: tuple[float, ...] = (0.1, 1.0, 10.0, 100.0)
 
     def __post_init__(self) -> None:
         unknown = [layer for layer in self.layers if layer not in LAYERS]
@@ -89,6 +97,12 @@ class VizConfig:
             raise ValueError(
                 f"unknown source {self.source!r}; expected one of {list(SOURCES)}"
             )
+        if self.source == "neural" and self.nerf_output is None:
+            raise ValueError(
+                "source='neural' needs nerf_output: the directory `cli "
+                "neural-field` sampled, which holds density_grid.npz. Without a "
+                "field there is nothing to threshold."
+            )
         if self.cmap not in COLORMAPS:
             raise ValueError(
                 f"unknown colormap {self.cmap!r}; expected one of {list(COLORMAPS)}. "
@@ -98,7 +112,17 @@ class VizConfig:
 
     @property
     def cache_dir(self) -> Path:
-        return self.cache_root / SOURCES[self.source]
+        """Where the capture lives.
+
+        Always a real cache, even for ``source="neural"``: the colour frames,
+        masks and weighed mass are properties of the capture, not of whichever
+        operator turned them into a volume. Only the occupancy is substituted.
+        """
+        return self.cache_root / (SOURCES[self.source] or "cache")
+
+    @property
+    def needs_field(self) -> bool:
+        return self.source == "neural"
 
 
 def ramp(values: np.ndarray, cmap: str) -> np.ndarray:
@@ -116,8 +140,11 @@ def ramp(values: np.ndarray, cmap: str) -> np.ndarray:
 
 def _caption(cached, config: VizConfig) -> str:
     litres = cached.occupancy.sum() * cached.voxel_size_m ** 3 * 1000
+    tag = config.source
+    if config.needs_field:
+        tag += f" @ density > {config.threshold:g}"
     return (f"{cached.plant_id}  {cached.species[:12]}  "
-            f"{float(cached.target_kg):.2f} kg  {litres:.1f} L  [{config.source}]")
+            f"{float(cached.target_kg):.2f} kg  {litres:.1f} L  [{tag}]")
 
 
 def _panel_rgb(cached, config: VizConfig) -> np.ndarray:
@@ -240,6 +267,74 @@ def _panel_mesh(cached, config: VizConfig) -> np.ndarray:
     return np.concatenate(panels, axis=1)
 
 
+def _field(config: VizConfig) -> np.ndarray:
+    """The sampled density grid for this specimen's trained field."""
+    from .neural_field import load_density
+
+    return load_density(config.nerf_output)
+
+
+def _panel_density(cached, config: VizConfig) -> np.ndarray:
+    """The raw density field, maximum-projected. No threshold anywhere.
+
+    This is the honest picture of a neural field: every other view of one needs
+    a cut, and the cut is the free parameter. A maximum projection along each
+    axis shows what the field contains before anyone decides what counts as
+    matter, so a reader can see whether the plant is even in there separately
+    from arguing about where to put the line.
+
+    Log-scaled, because density spans orders of magnitude and a linear ramp
+    renders everything but the densest voxels as background.
+    """
+    density = _field(config)
+    logged = np.log10(np.clip(density, 1e-6, None))
+    low, high = float(logged.min()), float(logged.max())
+    normalised = (logged - low) / max(high - low, 1e-9)
+
+    panels = []
+    for view in config.views:
+        axis = {"front": 1, "side": 0, "top": 2}[view]
+        projected = normalised.max(axis=axis)
+        if view != "top":
+            projected = projected.T[::-1]
+        coloured = ramp(projected.ravel(), config.cmap).reshape(*projected.shape, 3)
+        # Nearest-neighbour upscale to the requested panel size. Deliberate:
+        # smoothing a density projection would invent gradients between voxels
+        # that the field does not contain.
+        scale = max(1, config.size // max(projected.shape))
+        panels.append(np.repeat(np.repeat(coloured, scale, axis=0), scale, axis=1))
+    width = max(p.shape[1] for p in panels)
+    height = max(p.shape[0] for p in panels)
+    padded = []
+    for panel in panels:
+        canvas = np.full((height, width, 3), config.background, dtype=np.uint8)
+        canvas[: panel.shape[0], : panel.shape[1]] = panel
+        padded.append(canvas)
+    return np.concatenate(padded, axis=1)
+
+
+def _panel_threshold_sweep(cached, config: VizConfig) -> np.ndarray:
+    """The same field cut at several thresholds, side by side.
+
+    The visual counterpart to `cli neural-field`. Seeing the shape collapse as
+    the threshold rises is what makes it obvious that no single cut both keeps
+    the canopy and excludes the haze, which a table of volumes states but does
+    not show.
+    """
+    from .render import render_volume
+
+    density = _field(config)
+    panels = []
+    for threshold in config.sweep_thresholds:
+        occupancy = density > threshold
+        panels.append(render_volume(
+            occupancy, view=config.views[0], size=config.size,
+            background=config.background, point_radius=config.point_radius,
+            supersample=config.supersample,
+        ))
+    return np.concatenate(panels, axis=1)
+
+
 _PANELS = {
     "rgb": _panel_rgb,
     "depth": _panel_depth,
@@ -247,7 +342,12 @@ _PANELS = {
     "occupancy": _panel_occupancy,
     "points": _panel_points,
     "mesh": _panel_mesh,
+    "density": _panel_density,
+    "threshold_sweep": _panel_threshold_sweep,
 }
+
+# Layers that read a trained field rather than a cached reconstruction.
+FIELD_LAYERS = ("density", "threshold_sweep")
 
 
 def _stack(panels: list[np.ndarray], background) -> np.ndarray:
@@ -261,6 +361,35 @@ def _stack(panels: list[np.ndarray], background) -> np.ndarray:
     return np.concatenate(padded, axis=0)
 
 
+def _with_field_occupancy(cached, config: VizConfig):
+    """A shallow copy whose occupancy is the field cut at ``config.threshold``.
+
+    The threshold is stated in the caption rather than left implicit, because a
+    volume from a neural field is meaningless without it and a figure that omits
+    it invites the reader to treat the shape as given.
+    """
+    from .neural_field import load_density
+
+    density = load_density(config.nerf_output)
+    if density.shape != cached.occupancy.shape:
+        raise ValueError(
+            f"the sampled field is {density.shape} and the cache is "
+            f"{cached.occupancy.shape}. Re-sample with the cache's resolution "
+            "and voxel size, or the two cannot be compared."
+        )
+
+    class _Field:
+        pass
+
+    out = _Field()
+    for name in ("plant_id", "species", "position_ids", "rgb", "depth_m", "mask",
+                 "rotation", "centre", "voxel_size_m", "crop_top", "target_kg",
+                 "n_views"):
+        setattr(out, name, getattr(cached, name))
+    out.occupancy = density > config.threshold
+    return out
+
+
 def render(plant_id: str, config: VizConfig | None = None) -> np.ndarray:
     """Draw every requested layer for one specimen, stacked."""
     from ..data.preprocess import load_cached
@@ -268,6 +397,12 @@ def render(plant_id: str, config: VizConfig | None = None) -> np.ndarray:
 
     config = config or VizConfig()
     cached = load_cached(plant_id, config.cache_dir)
+
+    if config.needs_field:
+        # The capture stays as captured; only the occupancy is substituted, so
+        # the rgb and segmentation panels still show what the sensor saw rather
+        # than what the field imagined.
+        cached = _with_field_occupancy(cached, config)
 
     panels = [_PANELS[layer](cached, config) for layer in config.layers]
     image = _stack(panels, config.background)

@@ -796,6 +796,32 @@ the constructor, with the reason: they put luminance edges at arbitrary values,
 and in a depth-cued plant projection a reader reads those as structure. Greyscale
 is there because a printed thesis is often read in it.
 
+### Neural fields
+
+A trained Nerfstudio field is a fourth source, and it needs one knob the others
+do not: a density threshold.
+
+```bash
+python -m ggssvt.cli neural-field                     # samples and caches the grid
+python -m ggssvt.cli show --plants M001 --source neural     --nerf-output work_dirs/ggssvt/nerfstudio/outputs/M001     --layers density threshold_sweep occupancy --threshold 1.0
+```
+
+Sampling needs nerfstudio and a GPU; looking at the result needs neither, because
+`neural-field` caches the grid as `density_grid.npz` beside the training output.
+
+Two layers exist only for fields. `density` is a maximum projection of the raw
+field with **no threshold anywhere**, log-scaled because density spans orders of
+magnitude: it shows what the field contains before anyone decides what counts as
+matter. `threshold_sweep` draws the same field cut at several values side by
+side, which is what makes it obvious whether any single cut keeps the canopy and
+excludes the haze.
+
+The colour frames, masks and weighed mass still come from the capture cache when
+`--source neural` is used. Only the occupancy is substituted, so an `rgb` or
+`segmentation` panel beside a field reconstruction shows what the sensor saw
+rather than what the field imagined. The threshold is written into the caption,
+because a volume from a field is meaningless without it.
+
 The Python API is the same knobs as a config object:
 
 ```python

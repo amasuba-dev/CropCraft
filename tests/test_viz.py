@@ -43,9 +43,68 @@ def test_every_advertised_layer_has_a_panel():
     assert set(LAYERS) == set(_PANELS)
 
 
-def test_every_advertised_source_maps_to_a_cache_directory():
+def test_every_cache_backed_source_maps_to_a_cache_directory():
     for source in SOURCES:
+        if source == "neural":
+            continue           # covered separately; it needs a field, not a cache
         assert VizConfig(source=source).cache_dir.name.startswith("cache")
+
+
+def test_the_neural_source_refuses_without_a_field():
+    """A trained field has no occupancy until a threshold is chosen.
+
+    Failing in the constructor means a figure cannot be produced from a source
+    that has nothing behind it.
+    """
+    with pytest.raises(ValueError, match="needs nerf_output"):
+        VizConfig(source="neural")
+
+
+def test_the_neural_source_still_reads_the_capture_from_the_carve_cache(tmp_path):
+    """Colour frames and masks are properties of the capture, not the operator.
+
+    Substituting the whole specimen would show what the field imagined instead
+    of what the sensor saw, which is the opposite of what a comparison needs.
+    """
+    config = VizConfig(source="neural", nerf_output=tmp_path)
+    assert config.cache_dir.name == "cache"
+    assert config.needs_field is True
+
+
+def test_a_field_of_the_wrong_shape_is_refused(tmp_path):
+    """Comparing a 64^3 field against a 128^3 cache would silently mis-scale."""
+    import numpy as np
+
+    from ggssvt.eval.neural_field import density_cache_path
+    from ggssvt.eval.viz import _with_field_occupancy
+
+    np.savez_compressed(density_cache_path(tmp_path),
+                        density=np.zeros((16, 16, 16), np.float32))
+
+    class _Cache:
+        occupancy = np.zeros((32, 32, 32), bool)
+
+    with pytest.raises(ValueError, match="cannot be compared"):
+        _with_field_occupancy(_Cache(), VizConfig(source="neural",
+                                                  nerf_output=tmp_path))
+
+
+def test_the_caption_states_the_threshold_a_field_was_cut_at(tmp_path):
+    """A volume from a field is meaningless without the threshold that made it."""
+    import numpy as np
+
+    from ggssvt.eval.viz import _caption
+
+    class _Cache:
+        plant_id = "M001"
+        species = "Mango"
+        target_kg = 0.74
+        occupancy = np.ones((8, 8, 8), bool)
+        voxel_size_m = 0.012
+
+    text = _caption(_Cache(), VizConfig(source="neural", nerf_output=tmp_path,
+                                        threshold=2.5))
+    assert "density > 2.5" in text
 
 
 def test_viridis_is_perceptually_ordered():

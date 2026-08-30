@@ -159,12 +159,36 @@ def consensus(per_specimen: dict[str, list[ThresholdScore]]) -> dict:
     }
 
 
+def density_cache_path(output_dir: Path) -> Path:
+    """Where a sampled density grid is kept, beside the training output.
+
+    Sampling needs nerfstudio and a GPU; looking at the result should need
+    neither. Caching the grid is what lets `cli show --source neural` work in
+    the main environment, on a laptop, after the fact.
+    """
+    return output_dir / "density_grid.npz"
+
+
+def load_density(output_dir: Path) -> np.ndarray:
+    """Read a previously sampled grid. Raises if it was never sampled."""
+    path = density_cache_path(output_dir)
+    if not path.exists():
+        raise FileNotFoundError(
+            f"no sampled density at {path}. Run `cli neural-field` in the "
+            "cropcraft environment first; it caches the grid so that looking "
+            "at it afterwards needs neither nerfstudio nor a GPU."
+        )
+    with np.load(path) as data:
+        return np.asarray(data["density"], dtype=np.float32)
+
+
 def sample_density(
     output_dir: Path,
     *,
     resolution: int = VOXEL_RESOLUTION,
     voxel_size_m: float = VOXEL_SIZE_M,
     device: str = "cuda",
+    cache: bool = True,
 ) -> np.ndarray:
     """Query a trained Nerfstudio field on the metric voxel grid.
 
@@ -215,7 +239,13 @@ def sample_density(
         points = torch.from_numpy(queried).float().to(device)
         densities = field.density_fn(points).squeeze(-1).cpu().numpy()
 
-    return densities.reshape(resolution, resolution, resolution)
+    grid = densities.reshape(resolution, resolution, resolution).astype(np.float32)
+    if cache:
+        np.savez_compressed(
+            density_cache_path(output_dir), density=grid,
+            voxel_size_m=voxel_size_m, resolution=resolution,
+        )
+    return grid
 
 
 def run(
@@ -246,10 +276,13 @@ def run(
                 print(f"  {plant_id}: no cache, skipping")
             continue
 
-        density = sample_density(
-            directory, resolution=cached.occupancy.shape[0],
-            voxel_size_m=cached.voxel_size_m, device=device,
-        )
+        try:
+            density = load_density(directory)
+        except FileNotFoundError:
+            density = sample_density(
+                directory, resolution=cached.occupancy.shape[0],
+                voxel_size_m=cached.voxel_size_m, device=device,
+            )
         scores = sweep(
             density, plant_id=plant_id, mass_kg=float(cached.target_kg),
             voxel_size_m=cached.voxel_size_m,
@@ -270,5 +303,6 @@ def run(
     return report
 
 
-__all__ = ["THRESHOLDS", "ThresholdScore", "consensus", "run", "sample_density",
-           "sweep", "working_thresholds"]
+__all__ = ["THRESHOLDS", "ThresholdScore", "consensus", "density_cache_path",
+           "load_density", "run", "sample_density", "sweep",
+           "working_thresholds"]

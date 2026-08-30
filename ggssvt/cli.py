@@ -408,6 +408,9 @@ def cmd_show(args: argparse.Namespace) -> int:
     config = VizConfig(
         layers=tuple(args.layers),
         views=tuple(args.views),
+        nerf_output=args.nerf_output,
+        threshold=args.threshold,
+        sweep_thresholds=tuple(args.sweep_thresholds),
         view_index=args.view,
         size=args.size,
         point_radius=args.point_radius,
@@ -1318,8 +1321,24 @@ def build_parser() -> argparse.ArgumentParser:
                              help="render at this multiple and average down")
     show_parser.add_argument("--cmap", default="viridis",
                              choices=["viridis", "greys", "greys_r"])
-    show_parser.add_argument("--source", default="carve",
-                             choices=["carve", "fused", "sam3d"])
+    show_parser.add_argument(
+        "--source", default="carve",
+        choices=["carve", "fused", "sam3d", "neural"],
+        help="neural needs --nerf-output and a threshold",
+    )
+    show_parser.add_argument(
+        "--nerf-output", type=Path,
+        help="a directory cli neural-field sampled, holding density_grid.npz",
+    )
+    show_parser.add_argument(
+        "--threshold", type=float, default=1.0,
+        help="density cut for source=neural; stated in the caption",
+    )
+    show_parser.add_argument(
+        "--sweep-thresholds", type=float, nargs="+",
+        default=[0.1, 1.0, 10.0, 100.0],
+        help="cuts drawn side by side by the threshold_sweep layer",
+    )
     show_parser.add_argument("--max-points", type=int, default=20000)
     show_parser.add_argument("--no-label", action="store_true")
     show_parser.add_argument(
