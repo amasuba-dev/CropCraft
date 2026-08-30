@@ -266,6 +266,26 @@ def cmd_label_efficiency(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_viewpoint(args: argparse.Namespace) -> int:
+    """H2: agreement with a view the reconstruction never saw. No GPU."""
+    from .eval.viewpoint import run
+
+    report = run(verbose=not args.quiet)
+    summary = report["summary"]
+    print()
+    print(f"  in-sample IoU   {summary['in_sample_iou']:.4f}   "
+          f"(views the reconstruction was built from)")
+    print(f"  held-out IoU    {summary['held_out_iou']:.4f}   "
+          f"(a view it never saw)")
+    print(f"  gap             {summary['iou_gap']:+.4f}   "
+          f"({summary['relative_drop']:.1%} of the in-sample score)")
+    print()
+    print("The gap is what H2 is about. A hull agrees with its own silhouettes")
+    print("by construction, so the in-sample column is not evidence of anything.")
+    print("A small gap means the reconstruction generalises to new viewpoints.")
+    return 0
+
+
 def cmd_access(args: argparse.Namespace) -> int:
     """Report which account is authenticated and what it can actually download.
 
@@ -1078,6 +1098,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     label_efficiency.add_argument("--quiet", action="store_true")
     label_efficiency.set_defaults(func=cmd_label_efficiency)
+
+    viewpoint = sub.add_parser(
+        "viewpoint", help="H2: held-out-view consistency (CPU, ~25 min)"
+    )
+    viewpoint.add_argument("--quiet", action="store_true")
+    viewpoint.set_defaults(func=cmd_viewpoint)
 
     preflight = sub.add_parser(
         "preflight",

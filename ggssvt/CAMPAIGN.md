@@ -191,17 +191,28 @@ Three claims, and the campaign answers one and a half.
 |---|---|---|
 | grounding helps | `h2_no_geometry` ablation | **in the core plan** |
 | the geometry bias is doing something | `cli attention`, mean distance scale | **built** |
-| higher consistency across viewpoints | held-out-view agreement | **not built** |
+| higher consistency across viewpoints | `cli viewpoint` | **built, and already run** |
 
-`reconstruction_quality.reproject` scores a reconstruction against the views it
-was *built from*, which is self-consistency, not viewpoint generalisation. What
-H2 actually claims needs a view held out: reconstruct from eleven, predict the
-twelfth, and compare against what the sensor measured there. That is a different
-number and the honest one.
+```bash
+python -m ggssvt.cli viewpoint
+```
 
-The view caches for 3, 4 and 6 views already exist, so the machinery for
-rebuilding from a subset is there; what is missing is scoring against the
-excluded view rather than against the included ones.
+About 25 minutes on CPU. Holds each view out in turn, reconstructs from the
+other eleven, and scores against what the sensor measured at the withheld
+azimuth. `reproject` does not do this: it scores against the views a
+reconstruction was *built from*, which is self-consistency.
+
+Baseline established, [FINDINGS.md](FINDINGS.md) 7k: the carve scores **0.4070
+in-sample against 0.3896 held out, a gap of 4.3 per cent** over 432 held-out
+views. Read that as a floor rather than a triumph. Eleven silhouettes nearly
+determine a hull, so a small gap is close to guaranteed, and the same hull can
+only weigh 8 of 36 plants. Viewpoint consistency and fidelity are independent
+and this measures the first.
+
+**Its value is comparative, and the campaign is what supplies the comparison.**
+Run the same protocol against a geometry-grounded model and against
+`h2_no_geometry`, and the question becomes whether grounding shrinks a gap that
+is already small. 4.3 per cent is the number those runs have to beat.
 
 ### H3: frequency and geometry grounding together improve parameter efficiency
 

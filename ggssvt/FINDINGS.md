@@ -656,6 +656,45 @@ out would be the stronger test and costs twelve carves per specimen.
 
 ---
 
+## 7k. H2's viewpoint consistency, on a view never seen
+
+`reconstruction_quality.reproject` projects a reconstruction into the twelve
+views it was built from, which is self-consistency, not the viewpoint
+generalisation H2 claims. This holds each view out in turn: reconstruct from
+eleven, predict the twelfth, compare against what the sensor measured there.
+432 held-out views across 36 specimens, no GPU.
+
+| | mean silhouette IoU |
+|---|---|
+| in-sample, the views it was built from | 0.4070 |
+| **held out, a view it never saw** | **0.3896** |
+| gap | 0.0174, **4.3%** of the in-sample score |
+
+**The carve loses only 4 per cent of its agreement when a view is withheld**, and
+that number is more interesting than it looks in either direction.
+
+Read one way it is a positive result: twelve views at 30 degree steps are dense
+enough that any eleven of them nearly determine the hull, so the reconstruction
+is not fitted to individual silhouettes. That is a real viewpoint-consistency
+finding, and it is the first quantitative evidence on H2.
+
+Read the other way it is a warning about the metric. A visual hull built from
+eleven silhouettes is barely different from one built from twelve, so a small gap
+here is close to guaranteed and does **not** show the reconstruction captured the
+subject. The same hull scores 0.407 in-sample while only 8 of 36 specimens can
+physically weigh their plant. **Viewpoint consistency and fidelity are
+independent, and this measures the first.**
+
+That makes the gap useful as a *comparative* number rather than an absolute one.
+Its value is in what the campaign does with it: run the same held-out protocol
+against a geometry-grounded model and against the `h2_no_geometry` ablation, and
+the question becomes whether grounding shrinks a gap that is already small on a
+hull. A baseline of 4.3 per cent is what those runs have to beat.
+
+`python -m ggssvt.cli viewpoint`, about 25 minutes on one CPU core.
+
+---
+
 ## 7j. H1's second half: DINOv2 needs a quarter of the labels
 
 H1 makes two claims and the second is the one that makes the method
