@@ -39,6 +39,18 @@ from .config import MODEL, TRAIN, WORK_DIR
 
 CAMPAIGN_DIR = WORK_DIR / "campaign"
 
+
+def default_out_dir(plan: str) -> Path:
+    """Where a plan writes, when the caller does not say.
+
+    The smoke plan gets its own directory. It shares nothing with a real
+    campaign except the code path, and it used to write `campaign/summary.txt`,
+    which is the artefact `run_all` reads to decide the campaign has already
+    run. A five-minute plumbing check would therefore mark eight hours of
+    training as done, and the unattended run would skip it and report success.
+    """
+    return WORK_DIR / ("campaign_smoke" if plan == "smoke" else "campaign")
+
 # Which directory each `Run.cache` name points at. A module constant rather
 # than a class attribute so the dataclass has no mutable default to argue about.
 CACHE_DIRNAMES = {
@@ -384,7 +396,7 @@ def run_campaign(
     plan: str = "core",
     *,
     device=None,
-    out_dir: Path = CAMPAIGN_DIR,
+    out_dir: Path | None = None,
     workers: int = 8,
     batch_size: int = 2,
     only: list[str] | None = None,
@@ -398,6 +410,7 @@ def run_campaign(
         raise ValueError(f"unknown plan {plan!r}; expected one of {sorted(PLANS)}")
 
     device = device or resolve_device(TRAIN.device)
+    out_dir = out_dir or default_out_dir(plan)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     train_config = dataclasses.replace(
@@ -511,7 +524,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--device", default=TRAIN.device)
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--batch-size", type=int, default=2)
-    parser.add_argument("--out-dir", type=Path, default=CAMPAIGN_DIR)
+    parser.add_argument(
+        "--out-dir", type=Path, default=None,
+        help="defaults to work_dirs/ggssvt/campaign, or campaign_smoke for the "
+             "smoke plan, which must not share the real campaign's artefact",
+    )
     parser.add_argument("--only", nargs="*", help="run only these named runs")
     parser.add_argument(
         "--force", action="store_true", help="re-run even if results exist"

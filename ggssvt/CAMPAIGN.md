@@ -92,6 +92,12 @@ other than V010 is wrong, and eight hours would be spent on a broken reference.
 python -m ggssvt.campaign --plan smoke --device cuda
 ```
 
+The smoke plan writes to `work_dirs/ggssvt/campaign_smoke/`, not to
+`campaign/`. That separation matters: `run_all` decides the campaign has already
+run by looking for `campaign/summary.txt`, so a five-minute plumbing check
+sharing that path would mark eight hours of training as done and the unattended
+run would skip it and report success. It did, until commit `4c8b0f1`.
+
 **It is expected to report `blocked`.** Two epochs cannot train an occupancy
 field, so the volume integral is meaningless and the gate says so. What you are
 checking is that the loop, the checkpointing and the resume all work. A run that

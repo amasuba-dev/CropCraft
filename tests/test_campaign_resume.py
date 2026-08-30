@@ -141,3 +141,37 @@ def test_the_training_config_seed_is_actually_wired_to_the_cli():
 
     args = argparse.Namespace(seed=1234)
     assert _training_config(args).seed == 1234
+
+
+def test_the_smoke_plan_does_not_write_the_campaign_s_artefact():
+    """A five-minute plumbing check must not mark eight hours as done.
+
+    run_all decides the campaign has already run by looking for
+    campaign/summary.txt. The smoke plan used to write exactly that, so an
+    unattended run launched after a smoke test would skip the campaign
+    entirely and report success.
+    """
+    from ggssvt.campaign import default_out_dir
+
+    assert default_out_dir("smoke") != default_out_dir("core")
+    assert default_out_dir("core") == default_out_dir("full")
+
+
+def test_run_all_watches_the_directory_the_real_plans_write():
+    """The two halves of the trap, pinned together.
+
+    If either the runner's artefact path or the campaign's default output
+    directory moves, this fails rather than silently skipping a night.
+    """
+    from pathlib import Path
+
+    from ggssvt.campaign import default_out_dir
+    from ggssvt.run_all import programme
+
+    steps = {s.key: s for s in programme(Path("wd"), device="cpu", plan="core",
+                                         batch_size=2, workers=4)}
+    watched = steps["campaign"].artefact
+    assert watched is not None
+    assert watched.name == "summary.txt"
+    assert watched.parent.name == default_out_dir("core").name
+    assert watched.parent.name != default_out_dir("smoke").name
