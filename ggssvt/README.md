@@ -768,3 +768,39 @@ fresh clone passes without running preprocessing first.
 The gate tests are worth knowing about: each one constructs the failure its check
 exists for and asserts it is caught, then constructs a healthy case and asserts it
 is not. A check that cannot fail is decoration.
+
+## Looking at things
+
+One command, every knob, replacing four that each had their own flags.
+
+```bash
+python -m ggssvt.cli show --plants M001 --layers rgb segmentation depth occupancy points --size 400
+```
+
+Layers stack top to bottom in the order given: `rgb`, `depth`, `segmentation`,
+`occupancy`, `points`, `mesh`. `--source carve|fused|sam3d` picks the
+reconstruction, `--view N` picks which captured view the per-view layers use, and
+`--size`, `--point-radius`, `--supersample` and `--cmap` control the drawing.
+
+```bash
+python -m ggssvt.cli show --plants M001 --layers points --backend matplotlib
+```
+
+Opens an interactive 3D scatter. Worth it for point clouds and nothing else:
+rotating one makes the difference between a hull and a fused shell obvious in a
+way no fixed viewpoint does. Matplotlib is not a dependency and is imported only
+for this.
+
+Colormaps are `viridis`, `greys` and `greys_r`. Jet and rainbow are refused by
+the constructor, with the reason: they put luminance edges at arbitrary values,
+and in a depth-cued plant projection a reader reads those as structure. Greyscale
+is there because a printed thesis is often read in it.
+
+The Python API is the same knobs as a config object:
+
+```python
+from ggssvt.eval.viz import VizConfig, save
+save("M001", Path("figure.png"),
+     VizConfig(layers=("segmentation", "occupancy"), size=500, cmap="greys"))
+```
+

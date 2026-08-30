@@ -400,6 +400,49 @@ def cmd_neural_field(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_show(args: argparse.Namespace) -> int:
+    """Look at any layer of any specimen, with every knob on the command line."""
+    from .data.preprocess import usable_plant_ids
+    from .eval.viz import COLORMAPS, LAYERS, SOURCES, VizConfig, save, show
+
+    config = VizConfig(
+        layers=tuple(args.layers),
+        views=tuple(args.views),
+        view_index=args.view,
+        size=args.size,
+        point_radius=args.point_radius,
+        supersample=args.supersample,
+        cmap=args.cmap,
+        source=args.source,
+        max_points=args.max_points,
+        label=not args.no_label,
+        backend=args.backend,
+    )
+
+    plant_ids = args.plants or usable_plant_ids(config.cache_dir)[:1]
+    if not plant_ids:
+        print(f"No usable specimens in {config.cache_dir}.", file=sys.stderr)
+        return 2
+
+    if config.backend == "matplotlib":
+        for plant_id in plant_ids:
+            show(plant_id, config)
+        return 0
+
+    for plant_id in plant_ids:
+        out = args.out_dir / f"{plant_id}_{'_'.join(config.layers)}.png"
+        save(plant_id, out, config)
+        print(f"  {plant_id} -> {out}")
+
+    print()
+    print(f"layers    {', '.join(LAYERS)}")
+    print(f"sources   {', '.join(SOURCES)}")
+    print(f"colormaps {', '.join(COLORMAPS)}")
+    print("Jet and rainbow are deliberately absent: they put luminance edges at")
+    print("arbitrary values, and a reader reads those as structure in the plant.")
+    return 0
+
+
 def cmd_access(args: argparse.Namespace) -> int:
     """Report which account is authenticated and what it can actually download.
 
@@ -1251,6 +1294,42 @@ def build_parser() -> argparse.ArgumentParser:
     neural_field.add_argument("--device", default="cuda")
     neural_field.add_argument("--quiet", action="store_true")
     neural_field.set_defaults(func=cmd_neural_field)
+
+    show_parser = sub.add_parser(
+        "show",
+        help="look at any layer of any specimen; every knob is a flag",
+    )
+    show_parser.add_argument("--plants", nargs="*",
+                             help="specimen ids; the first usable one by default")
+    show_parser.add_argument(
+        "--layers", nargs="+", default=["occupancy"],
+        help="rgb depth segmentation occupancy points mesh, in draw order",
+    )
+    show_parser.add_argument(
+        "--views", nargs="+", default=["front", "side", "top"],
+        help="axes for the occupancy and points layers",
+    )
+    show_parser.add_argument("--view", type=int, default=0,
+                             help="which captured view the per-view layers use")
+    show_parser.add_argument("--size", type=int, default=300,
+                             help="pixels per panel; 400+ for a print figure")
+    show_parser.add_argument("--point-radius", type=int, default=1)
+    show_parser.add_argument("--supersample", type=int, default=3,
+                             help="render at this multiple and average down")
+    show_parser.add_argument("--cmap", default="viridis",
+                             choices=["viridis", "greys", "greys_r"])
+    show_parser.add_argument("--source", default="carve",
+                             choices=["carve", "fused", "sam3d"])
+    show_parser.add_argument("--max-points", type=int, default=20000)
+    show_parser.add_argument("--no-label", action="store_true")
+    show_parser.add_argument(
+        "--backend", default="pil", choices=["pil", "matplotlib"],
+        help="matplotlib opens an interactive 3D scatter; needs matplotlib",
+    )
+    show_parser.add_argument(
+        "--out-dir", type=Path, default=WORK_DIR / "reports" / "figures"
+    )
+    show_parser.set_defaults(func=cmd_show)
 
     preflight = sub.add_parser(
         "preflight",
