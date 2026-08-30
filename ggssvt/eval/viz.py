@@ -24,7 +24,9 @@ a figure that only works in colour is a figure that fails at the viva.
 **On backends.** PIL is the default and needs nothing beyond what the project
 already installs. Matplotlib is offered for interactive 3D inspection, where
 rotating a point cloud is worth more than any static projection, and is imported
-only when asked for so it stays optional.
+only when asked for so it stays optional. `text` draws into the terminal itself,
+which is the one that matters over SSH: a PNG written to a lab machine you are
+holding a shell on is a file you cannot look at.
 """
 
 from __future__ import annotations
@@ -66,8 +68,9 @@ class VizConfig:
         source: which reconstruction, from :data:`SOURCES`.
         max_points: cap for the ``points`` layer and the interactive backend.
         label: draw a caption strip with the specimen's id, species and mass.
-        backend: ``pil`` writes an image; ``matplotlib`` opens an interactive
-            window, which is worth it for point clouds and nothing else.
+        backend: ``pil`` writes an image; ``text`` prints it into the terminal,
+            which is what you want over SSH; ``matplotlib`` opens an interactive
+            window, worth it for point clouds and nothing else.
     """
 
     layers: tuple[str, ...] = ("occupancy",)
@@ -136,6 +139,33 @@ def ramp(values: np.ndarray, cmap: str) -> np.ndarray:
     grey = values if cmap == "greys_r" else 1.0 - values
     channel = np.round(grey * 255).astype(np.uint8)
     return np.stack([channel] * 3, axis=-1)
+
+
+# Dark to light. Chosen so the ramp survives both a light and a dark terminal:
+# density of ink increases monotonically, which is the same property that makes
+# viridis readable in greyscale.
+ASCII_RAMP = " .:-=+*#%@"
+
+
+def to_text(image: np.ndarray, *, width: int = 78, ramp: str = ASCII_RAMP) -> str:
+    """Render an RGB image as characters, for a terminal over SSH.
+
+    Terminal cells are about twice as tall as they are wide, so rows are sampled
+    at half the horizontal rate; without that every reconstruction looks like it
+    has been sat on.
+    """
+    image_width = image.shape[1]
+    step = max(1, image_width // max(1, width))
+    sampled = image[::step * 2, ::step]
+
+    luminance = sampled @ np.array([0.2126, 0.7152, 0.0722])
+    low, high = float(luminance.min()), float(luminance.max())
+    span = max(high - low, 1e-9)
+
+    # Inverted: a white background should read as empty space, not as solid ink.
+    level = 1.0 - (luminance - low) / span
+    index = np.clip((level * (len(ramp) - 1)).round().astype(int), 0, len(ramp) - 1)
+    return "\n".join("".join(ramp[i] for i in row) for row in index)
 
 
 def _caption(cached, config: VizConfig) -> str:
@@ -422,6 +452,10 @@ def show(plant_id: str, config: VizConfig | None = None):
     shows.
     """
     config = config or VizConfig()
+    if config.backend == "text":
+        text = to_text(render(plant_id, config), width=config.size)
+        print(text)
+        return text
     if config.backend != "matplotlib":
         return render(plant_id, config)
 
@@ -477,5 +511,5 @@ def save(plant_id: str, out: Path, config: VizConfig | None = None) -> Path:
     return out
 
 
-__all__ = ["COLORMAPS", "LAYERS", "SOURCES", "VizConfig", "ramp", "render",
-           "save", "show"]
+__all__ = ["ASCII_RAMP", "COLORMAPS", "LAYERS", "SOURCES", "VizConfig", "ramp",
+           "render", "save", "show", "to_text"]

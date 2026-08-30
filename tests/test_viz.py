@@ -137,3 +137,43 @@ def test_values_outside_the_unit_range_are_clipped_not_wrapped():
     high = ramp(np.array([5.0]), "viridis")
     assert np.array_equal(low, ramp(np.array([0.0]), "viridis"))
     assert np.array_equal(high, ramp(np.array([1.0]), "viridis"))
+
+
+def test_the_text_backend_returns_lines_of_the_requested_width():
+    """Over SSH a PNG on the lab machine is a file you cannot look at."""
+    import numpy as np
+
+    from ggssvt.eval.viz import to_text
+
+    image = np.zeros((200, 200, 3), dtype=np.uint8)
+    image[60:140, 60:140] = 255
+    lines = to_text(image, width=40).splitlines()
+
+    assert all(len(line) == len(lines[0]) for line in lines), "ragged output"
+    assert 35 <= len(lines[0]) <= 45
+
+
+def test_the_aspect_is_corrected_for_terminal_cells():
+    """Cells are about twice as tall as wide; without that everything squashes."""
+    import numpy as np
+
+    from ggssvt.eval.viz import to_text
+
+    square = np.zeros((200, 200, 3), dtype=np.uint8)
+    lines = to_text(square, width=40).splitlines()
+    # Half as many rows as columns, because rows are sampled at half the rate.
+    assert len(lines) < len(lines[0])
+
+
+def test_background_reads_as_empty_space():
+    """A white ground must be blank, not solid ink."""
+    import numpy as np
+
+    from ggssvt.eval.viz import ASCII_RAMP, to_text
+
+    image = np.full((100, 100, 3), 255, dtype=np.uint8)
+    image[40:60, 40:60] = 0
+    text = to_text(image, width=30)
+
+    assert text.splitlines()[0].strip() == "", "the background is being inked"
+    assert ASCII_RAMP[-1] in text, "the subject is not drawn"

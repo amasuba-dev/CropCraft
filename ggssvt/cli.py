@@ -427,8 +427,10 @@ def cmd_show(args: argparse.Namespace) -> int:
         print(f"No usable specimens in {config.cache_dir}.", file=sys.stderr)
         return 2
 
-    if config.backend == "matplotlib":
+    if config.backend in ("matplotlib", "text"):
         for plant_id in plant_ids:
+            if config.backend == "text":
+                print(f"\n{plant_id}")
             show(plant_id, config)
         return 0
 
@@ -1342,8 +1344,9 @@ def build_parser() -> argparse.ArgumentParser:
     show_parser.add_argument("--max-points", type=int, default=20000)
     show_parser.add_argument("--no-label", action="store_true")
     show_parser.add_argument(
-        "--backend", default="pil", choices=["pil", "matplotlib"],
-        help="matplotlib opens an interactive 3D scatter; needs matplotlib",
+        "--backend", default="pil", choices=["pil", "text", "matplotlib"],
+        help="text prints into the terminal, which is what you want over SSH; "
+             "matplotlib opens an interactive 3D scatter and needs matplotlib",
     )
     show_parser.add_argument(
         "--out-dir", type=Path, default=WORK_DIR / "reports" / "figures"

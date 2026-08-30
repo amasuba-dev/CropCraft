@@ -796,6 +796,21 @@ the constructor, with the reason: they put luminance edges at arbitrary values,
 and in a depth-cued plant projection a reader reads those as structure. Greyscale
 is there because a printed thesis is often read in it.
 
+### Looking at things over SSH
+
+```bash
+python -m ggssvt.cli show --plants M001 --layers occupancy --size 72 --backend text --no-label
+```
+
+Prints straight into the terminal. On a lab machine you are holding a shell on,
+a PNG is a file you cannot look at, and this is the difference between checking
+a reconstruction and guessing at it. Rows are sampled at half the horizontal
+rate because terminal cells are about twice as tall as they are wide; without
+that every specimen looks like it has been sat on.
+
+`--size` is the character width here rather than pixels. 72 fits a standard
+terminal; 110 or 140 if yours is wider.
+
 ### Neural fields
 
 A trained Nerfstudio field is a fourth source, and it needs one knob the others
