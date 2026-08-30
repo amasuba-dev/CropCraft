@@ -853,6 +853,24 @@ with the method under test and no summary statistic says so.
 
 ## 8. Bugs found and fixed
 
+**Evaluation tracked gradients.** `predict()` put the model in `.eval()` and
+called it without `torch.no_grad()`. `.eval()` switches dropout and
+normalisation; it does not stop autograd. So predicting one specimen built a
+graph over every intermediate activation of a full query grid and held it, and
+the decoder's existing `chunk` argument was never passed, so the whole grid went
+through at once.
+
+All seven campaign runs died the same way: pretraining completed its 120 epochs,
+the first evaluation forward allocated **14.19 GiB**, and the next 576 MiB
+request failed. **The tell was that the number did not move** -- a 19.3M CNN and
+a 105.9M ViT both failed at 14.19 GiB, so it was activations and not weights.
+Nothing on this machine could have caught it: there is no GPU here, and on CPU
+the same code merely runs slowly.
+
+Separately, `execute()` passed `model.state_dict()` into the folds, which hands
+over references to live GPU tensors, and released the pretrained model only
+*after* LOOCV. The weights are copied to the host and the model freed first now.
+
 **`torch.utils.checkpoint` was never imported.** `attention.py` called
 `torch.utils.checkpoint.checkpoint` behind `use_checkpointing`, which defaults
 to True, on a path taken whenever the model is in training mode. A bare

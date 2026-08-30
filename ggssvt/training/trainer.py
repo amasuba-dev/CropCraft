@@ -280,18 +280,30 @@ def predict(
     )
     results: dict[str, dict] = {}
 
+    # `.eval()` only switches dropout and normalisation; it does not stop
+    # autograd. Without no_grad this loop built a graph over every intermediate
+    # activation of a full query grid and held it, which is where the campaign
+    # died: pretraining finished its 120 epochs, the first evaluation forward
+    # allocated 14 GiB of activations nobody would ever backpropagate through,
+    # and the next 576 MiB request failed. The size did not depend on the
+    # backbone, which is what gave it away -- a 19.3M CNN and a 105.9M ViT both
+    # failed at exactly the same number.
     for batch in loader:
         batch = batch.to(device)
-        output = model(
-            batch.rgb,
-            batch.depth,
-            batch.points_world,
-            batch.subject,
-            batch.query_points,
-            predict_biomass=True,
-            voxel_volume_m3=dataset.volume_per_query_m3,
-            pot_height_m=batch.pot_height_m,
-        )
+        with torch.no_grad():
+            output = model(
+                batch.rgb,
+                batch.depth,
+                batch.points_world,
+                batch.subject,
+                batch.query_points,
+                predict_biomass=True,
+                voxel_volume_m3=dataset.volume_per_query_m3,
+                pot_height_m=batch.pot_height_m,
+                # The decoder already knows how to evaluate in pieces, and
+                # nothing was asking it to.
+                chunk=MODEL.query_chunk,
+            )
         for index, plant_id in enumerate(batch.plant_id):
             results[plant_id] = {
                 "mass_kg": float(output.biomass["mass_kg"][index]),

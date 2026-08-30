@@ -197,3 +197,24 @@ def test_the_pretrained_state_handed_to_loocv_is_on_the_host():
     assert 'to("cpu"' in source[handoff:call], "the state is not copied to the host"
     assert "del model" in source[handoff:call], "the pretrained model is not released"
     assert "empty_cache" in source[handoff:call], "the cache is not emptied"
+
+
+def test_evaluation_runs_without_building_a_graph():
+    """`.eval()` switches dropout, not autograd.
+
+    Without no_grad, predicting one specimen built a graph over every
+    intermediate activation of a full query grid and held it. That is where the
+    campaign died: pretraining finished its 120 epochs, the first evaluation
+    forward allocated 14 GiB nobody would ever backpropagate through, and the
+    next request failed. The tell was that a 19.3M CNN and a 105.9M ViT failed
+    at exactly the same number, so it was activations rather than weights.
+    """
+    import inspect
+
+    from ggssvt.training import trainer
+
+    source = inspect.getsource(trainer.predict)
+    forward = source.index("output = model(")
+
+    assert "with torch.no_grad():" in source[:forward], "evaluation tracks gradients"
+    assert "chunk=" in source[forward:], "the query grid is not evaluated in pieces"
