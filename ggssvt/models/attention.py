@@ -27,6 +27,13 @@ import math
 
 import torch
 import torch.nn.functional as F
+
+# Imported explicitly. `torch.utils.checkpoint` is a submodule, and whether a
+# bare `import torch` also binds it varies by version: it does on 2.13, it does
+# not on 2.5.1+cu121. Relying on that is a crash on the first training step,
+# because use_checkpointing defaults to True and train_stage puts the model in
+# training mode, which is the exact path this line guards.
+import torch.utils.checkpoint
 from torch import nn
 
 from ..config import MODEL

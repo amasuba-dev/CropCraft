@@ -823,6 +823,16 @@ with the method under test and no summary statistic says so.
 
 ## 8. Bugs found and fixed
 
+**`torch.utils.checkpoint` was never imported.** `attention.py` called
+`torch.utils.checkpoint.checkpoint` behind `use_checkpointing`, which defaults
+to True, on a path taken whenever the model is in training mode. A bare
+`import torch` binds that submodule on torch 2.13 and does not on 2.5.1+cu121,
+so the development machine could not see it and the lab machine crashed on the
+first forward pass. **This would have killed the campaign in its first training
+step**, eight hours before anyone looked. Found by running the test suite on the
+machine that will actually train.
+
+
 Several would have produced confident wrong numbers rather than errors.
 
 | Bug | Consequence had it stood |

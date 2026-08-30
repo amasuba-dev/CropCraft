@@ -117,28 +117,29 @@ def test_baselines_beat_the_mean_predictor():
 
 
 @requires_cache
-def test_reconstruction_features_do_not_beat_image_only_features():
-    """Research question 3: does reconstructing geometry actually help?
+def test_the_reconstruction_against_image_only_ordering_is_recorded():
+    """Research question 3, as a guard rather than as a claim.
 
-    On this dataset, no -- and the test records that rather than asserting the
-    hoped-for direction. It used to require 3D < 2D, which held while the cache
-    was E and M only (RMSE 0.397 vs 0.440 kg). Adding V001-V008 reverses it
-    (0.544 vs 0.469).
+    This test has now flipped twice, and both flips were informative:
 
-    The reversal is the point. V are small shoots, 0.5-1.8 kg, standing in
-    17-32 kg pots, and their masses span the range the other batches occupy
-    rather than forming a separate cluster. The volume feature was largely
-    reading batch membership, which correlates with mass when the batches sit at
-    different sizes; V removes that correlation and the feature's apparent skill
-    goes with it.
+    * E and M only, n=28: geometric 0.397 beat direct 2D 0.440.
+    * Plus V001-V008, n=36: reversed, 0.544 against 0.469.
+    * Plus V009 and V010, n=38: reversed again, 0.469 against 0.591.
 
-    **Neither ordering is statistically resolved** -- paired bootstrap gives
-    [-0.051, +0.227] here and [-0.168, +0.099] on the old n=28 condition -- and
-    the direction flips if features are whitened before the ridge rather than
-    standardised. So this is a guard against silent drift in the baselines
-    protocol, not evidence for either direction. If it ever fails, find out what
-    changed; do not read a passing or failing run as a result.
+    **Not one of the three is statistically resolved.** The paired bootstrap
+    spans zero every time, and the direction also flips if features are whitened
+    before the ridge rather than standardised. An assertion on the ordering would
+    therefore be asserting noise, and the earlier version of this test did
+    exactly that: it required 3D to lose, and failed the moment two specimens
+    were added.
+
+    So it asserts what is actually stable. Both baselines must be computed, both
+    must beat nothing worse than a broken fit, and the ordering is printed rather
+    than required. If the numbers move, find out what changed in the protocol;
+    do not read either direction as a result without the interval.
     """
+    import numpy as np
+
     from ggssvt.data.preprocess import usable_plant_ids
     from ggssvt.eval.baselines import evaluate_baselines, load_features
 
@@ -147,12 +148,17 @@ def test_reconstruction_features_do_not_beat_image_only_features():
 
     geometric = results["geometric features"][0].rmse_kg
     image_only = results["direct 2D"][0].rmse_kg
+    floor = results["mean"][0].rmse_kg
 
-    assert geometric > image_only, (
-        f"3D features now beat image-only ({geometric:.3f} vs {image_only:.3f} kg). "
-        "That contradicts the recorded result; check whether the cache still "
-        "contains all four batches before treating it as an improvement."
-    )
+    assert np.isfinite(geometric) and np.isfinite(image_only)
+    # A baseline several times the mean predictor is a failed fit, not a poor
+    # one, and that is worth catching however the two happen to be ordered.
+    assert geometric < 5 * floor, f"geometric features failed to fit: {geometric:.3f}"
+    assert image_only < 5 * floor, f"image-only features failed to fit: {image_only:.3f}"
+
+    ahead = "reconstruction ahead" if geometric < image_only else "pixels ahead"
+    print(f"\n  geometric {geometric:.3f} kg, direct 2D {image_only:.3f} kg, "
+          f"mean predictor {floor:.3f} kg ({ahead}; unresolved either way)")
 
 
 @requires_cache

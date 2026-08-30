@@ -168,3 +168,36 @@ def test_normalised_rows_have_no_uninitialised_entries():
     reading = AttentionReading(np.zeros((2, 12)), np.zeros((0, 12, 0, 0)),
                                np.zeros((2, 4)), 12, (4, 4))
     assert np.isfinite(reading.per_view).all()
+
+
+def test_the_checkpoint_submodule_is_imported_explicitly():
+    """`torch.utils.checkpoint` is a submodule, not bound by `import torch`.
+
+    Whether a bare `import torch` also binds it varies by version: it does on
+    2.13, it does not on 2.5.1+cu121. Relying on that crashes on the first
+    training step, because use_checkpointing defaults to True and train_stage
+    puts the model in training mode. The lab machine found this; a machine whose
+    torch happens to bind it never can, which is why the test checks the import
+    rather than the behaviour.
+    """
+    import sys
+
+    import ggssvt.models.attention  # noqa: F401
+
+    assert "torch.utils.checkpoint" in sys.modules
+
+
+def test_checkpointing_is_on_by_default_so_the_import_matters():
+    """If this default ever flips, the test above stops guarding anything."""
+    from ggssvt.config import MODEL
+
+    assert MODEL.use_checkpointing is True
+
+
+def test_the_fusion_runs_in_training_mode():
+    """The path the campaign actually takes, exercised rather than assumed."""
+    fusion = _fusion()
+    fusion.train()
+    assert fusion.training is True
+    out = fusion(*_inputs())
+    assert out.shape == (1, 24, 32)
