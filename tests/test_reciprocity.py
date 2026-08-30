@@ -92,3 +92,39 @@ def test_the_summary_reports_a_count_per_rule():
     assert out["original"] == {"n": 2, "plausible": 1, "median_density": 175.0,
                                "mean_volume_l": 5.5}
     assert out["union"]["plausible"] == 0
+
+
+def test_an_emptied_reconstruction_serialises_as_valid_json():
+    """A rule can empty a volume, making the density infinite.
+
+    json.dump writes that as bare `Infinity`, which Python reads back happily
+    and no other parser accepts. It is not valid JSON, and it broke the document
+    generator that consumes these reports.
+    """
+    import json
+
+    from ggssvt.eval.reciprocity import RefinementResult
+
+    emptied = RefinementResult(
+        plant_id="X", rule="intersection",
+        mask_px_before=100, mask_px_after=0,
+        volume_before_l=4.0, volume_after_l=0.0,
+        density_before=130.0, density_after=float("inf"),
+        plausible_before=False, plausible_after=False,
+    )
+    text = json.dumps(emptied.as_dict(), allow_nan=False)   # raises on Infinity
+    assert json.loads(text)["density_after"] is None
+
+
+def test_summarise_ignores_the_nulls_rather_than_crashing():
+    from ggssvt.eval.reciprocity import summarise
+
+    rows = [
+        {"rule": "union", "plausible_after": False, "density_after": None,
+         "volume_after_l": None},
+        {"rule": "union", "plausible_after": True, "density_after": 300.0,
+         "volume_after_l": 2.0},
+    ]
+    out = summarise(rows)
+    assert out["union"]["median_density"] == 300.0
+    assert out["union"]["mean_volume_l"] == 2.0

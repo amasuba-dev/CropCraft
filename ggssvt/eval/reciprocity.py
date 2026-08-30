@@ -57,15 +57,23 @@ class RefinementResult:
     plausible_after: bool
 
     def as_dict(self) -> dict:
+        # A rule can empty a reconstruction, making the implied density
+        # infinite. json.dump writes that as bare `Infinity`, which Python
+        # reads back and no other parser accepts: it is not valid JSON, and it
+        # broke the document generator that reads these reports. null is the
+        # honest encoding of "no volume, so no density".
+        def finite(value: float, places: int) -> float | None:
+            return round(value, places) if np.isfinite(value) else None
+
         return {
             "plant_id": self.plant_id,
             "rule": self.rule,
             "mask_px_before": self.mask_px_before,
             "mask_px_after": self.mask_px_after,
-            "volume_before_l": round(self.volume_before_l, 3),
-            "volume_after_l": round(self.volume_after_l, 3),
-            "density_before": round(self.density_before, 1),
-            "density_after": round(self.density_after, 1),
+            "volume_before_l": finite(self.volume_before_l, 3),
+            "volume_after_l": finite(self.volume_after_l, 3),
+            "density_before": finite(self.density_before, 1),
+            "density_after": finite(self.density_after, 1),
             "plausible_before": self.plausible_before,
             "plausible_after": self.plausible_after,
         }
@@ -313,14 +321,16 @@ def summarise(rows: list[dict]) -> dict:
         if not subset:
             continue
         densities = [r["density_after"] for r in subset
-                     if np.isfinite(r["density_after"])]
+                     if r["density_after"] is not None
+                     and np.isfinite(r["density_after"])]
         out[rule] = {
             "n": len(subset),
             "plausible": sum(1 for r in subset if r["plausible_after"]),
             "median_density": round(float(np.median(densities)), 1) if densities else None,
-            "mean_volume_l": round(
-                float(np.mean([r["volume_after_l"] for r in subset])), 2
-            ),
+            "mean_volume_l": round(float(np.mean(
+                [r["volume_after_l"] for r in subset
+                 if r["volume_after_l"] is not None]
+            )), 2) if any(r["volume_after_l"] is not None for r in subset) else None,
         }
     return out
 

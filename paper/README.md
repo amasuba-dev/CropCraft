@@ -32,6 +32,24 @@ first if those are stale.
 
 Both documents land next to their generators, in this directory.
 
+## The feasibility results section
+
+```bash
+node paper/feasibility.js
+```
+
+The results, framed the way a feasibility study reports them, after Malan et al.
+in the Journal of Voice, which shares a supervisor with this project. Three
+conventions are taken from it: criteria fixed a priori with the reason for each
+threshold, a staged screening funnel showing everything that entered each stage
+rather than only what survived, and failed stages reported at the same weight as
+successful ones.
+
+Every number is read from `work_dirs/ggssvt/reports` at build time, so unlike
+`paper.js`, whose tables are literals, this document cannot drift from the
+artefacts. Run `python -m ggssvt.cli reciprocity` and the rest of the pipeline
+first; the figure comes from `ggssvt.eval.funnel`, which reads the same reports.
+
 ## The two research proposals
 
 Both build on their own, with no figure dependency:
