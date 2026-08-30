@@ -260,6 +260,10 @@ matters most overnight, when nobody is watching the loss.
 Safe to interrupt: the same command resumes, and a run whose targets
 no longer match its fingerprint is re-run rather than reused.
 
+*The campaign has its own document: [CAMPAIGN.md](CAMPAIGN.md), covering the
+install, the two checks to do first, what each of the seven runs closes, and how
+to read the summary.*
+
 ### 13, the independent check. GPU, about 2 hours
 
 ```bash

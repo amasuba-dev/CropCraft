@@ -41,6 +41,11 @@ ruff>=0.6
 scikit-image>=0.22
 scipy>=1.11
 
+# Alternative regressors (random forest, gradient boosting, MLP), used to show
+# that swapping the estimator resolves nothing while the reconstruction is the
+# constraint. Optional: `cli preflight` reports it as degraded rather than fatal.
+scikit-learn>=1.3
+
 # Pose-free reconstruction (DUSt3R / MASt3R / Fast3R) is NOT pip-installable and
 # is deliberately absent here. Each needs its GitHub repository cloned with
 # submodules, plus a GPU. Run `python -m ggssvt.cli posefree --check-only` for
