@@ -164,16 +164,24 @@ Two claims, and the campaign answers one of them.
 |---|---|---|
 | ViT beats CNN | `h1_dinov2` against `baseline_cnn`, paired bootstrap | **in the core plan** |
 | DINOv3 variant | `h1_dinov3` | **only in `--plan full`** |
-| reaches accuracy from fewer labels | a label-efficiency curve | **not built** |
+| reaches accuracy from fewer labels | `cli label-efficiency` | **built, and already run** |
 
-The second half of H1 is the whole point of a self-supervised method and there is
-no experiment for it. What it needs: re-run stage 2 on subsampled label sets, at
-say 25%, 50%, 75% and 100% of the specimens, with stage 1 unchanged, and plot
-RMSE against label count for both backbones. If the ViT curve is flatter, that is
-the label-efficiency claim; if the curves are parallel, H1's second half fails.
+```bash
+python -m ggssvt.cli label-efficiency
+```
 
-This is cheap relative to the campaign because stage 1 is not repeated. Budget
-roughly one extra hour per backbone.
+Seconds on CPU, because it reads label efficiency off the frozen representation
+rather than re-fine-tuning: the backbone never sees a mass, so subsampling labels
+changes only the head's training set and stage 1 is not repeated.
+
+First result, [FINDINGS.md](FINDINGS.md) 7j: **DINOv2 reaches the geometric
+baseline's full-label accuracy with 8 labels against the baseline's 32.** Two
+caveats travel with it. The geometric curve's 8-label point is a numerical
+failure rather than a poor fit, flagged and excluded. And both conditions reduce
+to 8 principal components, so 1536 dimensions down to 8 is a different operation
+from 7 down to 7, and part of the advantage may be that projection regularising
+rather than the representation carrying more. A matched-capacity control would
+separate them; it does not exist yet.
 
 ### H2: geometry grounding gives viewpoint consistency and better reconstruction
 

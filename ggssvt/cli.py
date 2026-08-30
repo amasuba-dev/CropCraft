@@ -246,6 +246,26 @@ def cmd_robustness(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_label_efficiency(args: argparse.Namespace) -> int:
+    """H1's second half: how many labels each representation needs. No GPU."""
+    from .eval.label_efficiency import run
+
+    report = run(exclude=tuple(args.exclude), verbose=not args.quiet)
+    comparison = report["comparison"]
+    print()
+    print(f"Bar: the reference at full labels, {comparison['bar_rmse']} kg "
+          f"on {comparison['bar_labels']} labels.")
+    for name, labels in comparison["labels_to_reach"].items():
+        reached = f"{labels} labels" if labels else "never reaches it"
+        print(f"  {name:24s} {reached}")
+    print()
+    print("Fewer labels than the reference's own count is the label-efficiency")
+    print("claim. Equal counts mean a condition is better but not more")
+    print("label-efficient, which is H1's second half failing.")
+    print("Points marked * are numerically unstable and excluded from the bar.")
+    return 0
+
+
 def cmd_access(args: argparse.Namespace) -> int:
     """Report which account is authenticated and what it can actually download.
 
@@ -1047,6 +1067,17 @@ def build_parser() -> argparse.ArgumentParser:
     robustness.add_argument("--seed", type=int, default=0)
     robustness.add_argument("--quiet", action="store_true")
     robustness.set_defaults(func=cmd_robustness)
+
+    label_efficiency = sub.add_parser(
+        "label-efficiency",
+        help="H1: labels needed per representation (CPU, seconds)",
+    )
+    label_efficiency.add_argument(
+        "--exclude", nargs="*", default=["V010"],
+        help="specimens kept out; V010 fails the plausibility criterion",
+    )
+    label_efficiency.add_argument("--quiet", action="store_true")
+    label_efficiency.set_defaults(func=cmd_label_efficiency)
 
     preflight = sub.add_parser(
         "preflight",

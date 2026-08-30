@@ -656,6 +656,51 @@ out would be the stronger test and costs twelve carves per specimen.
 
 ---
 
+## 7j. H1's second half: DINOv2 needs a quarter of the labels
+
+H1 makes two claims and the second is the one that makes the method
+self-supervised rather than merely transformer-based: it should reach a given
+accuracy from substantially fewer labelled examples. Nothing measured it.
+
+Label efficiency is conventionally read off a frozen representation with a small
+head fitted on a fraction of the labels, which is the probe already in use here,
+so this needed no GPU. For every held-out specimen the head is fitted on a random
+subsample of the rest, eight independent draws per fraction, with standardisation
+and rotation fitted inside the subsample.
+
+| labels | geometric (7 features) | dinov2-base (1536) |
+|---|---|---|
+| 8 (25%) | 128.8 ± 293.6 * | **0.463 ± 0.022** |
+| 16 (50%) | 1.269 ± 0.767 | 0.444 ± 0.038 |
+| 24 (75%) | 0.915 ± 0.364 | 0.401 ± 0.026 |
+| 32 (100%) | 0.576 | **0.385** |
+
+**DINOv2 reaches the geometric baseline's full-label accuracy with 8 labels; the
+geometric features need 32.** Read as stated, that is H1's second half supported
+by a factor of four. Two things have to travel with it.
+
+**The starred point is a numerical failure, not a measurement.** Seven features
+fitted on eight labels is close to singular and a single draw produced 128 kg
+with a standard deviation of 293. It is flagged and excluded from the comparison
+rather than reported as a curve point, because a bar read off it would be
+meaningless. The instability is itself informative: a low-dimensional descriptor
+does not merely degrade at few labels, it fails.
+
+**The dimensionalities differ and that is a confound.** Both conditions are
+reduced to 8 principal components, but 1536 dimensions reduced to 8 is a
+different operation from 7 reduced to 7, and part of DINOv2's advantage at small
+label counts may be that projection regularising it rather than the
+representation carrying more. Separating the two needs a matched-capacity
+control, which this experiment does not have. The claim is therefore reported as
+supported and confounded, not as clean.
+
+Run on the 33 specimens shared by every condition; E015, E019 and V006 are absent
+from the DINO descriptor cache, and V010 is excluded for failing C1.
+
+`python -m ggssvt.cli label-efficiency`, seconds on one CPU core.
+
+---
+
 ## 7i. H4, two thirds answered: noise is harmless, occlusion is not
 
 The view-count ablation already answered sparse sampling. These are the other
