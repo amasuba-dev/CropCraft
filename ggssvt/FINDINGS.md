@@ -815,6 +815,36 @@ before any of this was measured. What the episode shows is that the existing
 quality gate, which passed V010 on coverage and agreement, is blind to the one
 check that mattered.
 
+**Confirmed, and the repaired comparison reverses the conclusion.** Re-running
+the probe on the lab machine with V010 excluded, n=37:
+
+| condition | RMSE | R² | vs the CNN control |
+|---|---|---|---|
+| cnn (no DINO) | 0.471 | **+0.284** | reference |
+| dinov2-base | **0.400** | +0.483 | −0.071 [−0.193, +0.062], p~0.29 |
+| dinov2-base + geometry | 0.400 | +0.483 | −0.071 [−0.193, +0.062], p~0.29 |
+| dinov3-base | 0.409 | +0.459 | −0.062 [−0.188, +0.077], p~0.38 |
+| dinov3-base + geometry | 0.412 | +0.451 | −0.058 [−0.186, +0.080], p~0.40 |
+
+The control returns to +0.284 against the +0.312 it scored at n=36, so the −27.0
+was one specimen and nothing else.
+
+**Every DINO condition is now unresolved.** The point estimates favour the
+transformer by 13 to 15 per cent, and not one interval excludes zero. Compare
+that with what the broken control produced: four conditions at dRMSE −2.54 to
+−2.56, all "significant" at p~0.02 to 0.05.
+
+That is the whole lesson. **A single leverage point did not merely inflate the
+effect, it changed the verdict**, and the verdict it produced was the one the
+hypothesis wanted. Had the diagnosis not been run, H1's first half would have
+been reported as supported at p~0.02 on the strength of one reconstruction that
+fails the plausibility criterion by a factor of twenty.
+
+The honest statement of H1's first half on frozen features is therefore: the
+self-supervised backbone is better on the point estimate and the difference is
+not resolved at n=37. The campaign's `h1_dinov2` run tests the same claim on a
+*trained* model, which is a different and still-open question.
+
 `eval/metrics.py:leverage_report` now reports whether one specimen carries the
 error, because a score can look catastrophic for a reason that has nothing to do
 with the method under test and no summary statistic says so.
