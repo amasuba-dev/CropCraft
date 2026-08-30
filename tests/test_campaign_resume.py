@@ -175,3 +175,25 @@ def test_run_all_watches_the_directory_the_real_plans_write():
     assert watched.name == "summary.txt"
     assert watched.parent.name == default_out_dir("core").name
     assert watched.parent.name != default_out_dir("smoke").name
+
+
+def test_the_pretrained_state_handed_to_loocv_is_on_the_host():
+    """The folds must not share the card with the model that pretrained them.
+
+    `model.state_dict()` returns references to live GPU tensors, and the
+    pretrained model used to stay alive through all 38 folds, so the card held
+    a spare copy of everything while each fold built its own. On a 16 GB card
+    that failed with an out-of-memory error *after* pretraining had already
+    succeeded, which is the most expensive place to fail.
+    """
+    import inspect
+
+    from ggssvt import campaign
+
+    source = inspect.getsource(campaign.execute)
+    handoff = source.index("pretrained_state = {")
+    call = source.index("pretrained_state=pretrained_state")
+
+    assert 'to("cpu"' in source[handoff:call], "the state is not copied to the host"
+    assert "del model" in source[handoff:call], "the pretrained model is not released"
+    assert "empty_cache" in source[handoff:call], "the cache is not emptied"

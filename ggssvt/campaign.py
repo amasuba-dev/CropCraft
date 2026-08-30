@@ -327,6 +327,24 @@ def execute(
             checkpoint,
         )
 
+        # Copy the weights to the host and release the pretrained model before
+        # the folds start. `model.state_dict()` hands back references to live
+        # GPU tensors, and the model itself stayed alive through all 38 folds,
+        # so the card held a spare copy of everything while each fold built its
+        # own. On a 16 GB card that is the difference between finishing and an
+        # out-of-memory error after pretraining has already succeeded, which is
+        # the most expensive place to fail.
+        pretrained_state = {
+            key: value.detach().to("cpu", copy=True)
+            for key, value in model.state_dict().items()
+        }
+        # Read off the model before releasing it; these go in the result.
+        n_parameters = model.n_parameters(False)
+        n_trainable = model.n_parameters(True)
+        del model
+        if device.type == "cuda":
+            torch.cuda.empty_cache()
+
         folds = loocv(
             plant_ids,
             cache_dir=cache_dir,
@@ -334,7 +352,7 @@ def execute(
             train_config=train_config,
             tokens_per_view=run.tokens_per_view,
             geometry_grounded=run.geometry_grounded,
-            pretrained_state=model.state_dict(),
+            pretrained_state=pretrained_state,
             device=device,
             verbose=False,
         )
@@ -349,8 +367,8 @@ def execute(
             "rmse_ci": [low, high],
             "occupancy_ap": float(np.mean([f.occupancy_ap for f in folds])),
             "occupancy_best_iou": float(np.mean([f.occupancy_best_iou for f in folds])),
-            "n_parameters": model.n_parameters(False),
-            "n_trainable": model.n_parameters(True),
+            "n_parameters": n_parameters,
+            "n_trainable": n_trainable,
             "checkpoint": str(checkpoint),
             "predictions": predicted.tolist(),
             "targets": target.tolist(),
@@ -378,7 +396,6 @@ def execute(
         if verbose:
             print(f"  {metrics}")
 
-        del model
         if device.type == "cuda":
             torch.cuda.empty_cache()
 
