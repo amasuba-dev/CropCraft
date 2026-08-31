@@ -182,6 +182,7 @@ cython_debug/
 /paper/package-lock.json
 /paper/package.json
 /paper/*.docx
+/paper/*.pptx
 
 # Personal contact details for the proposals. candidate.example.json is
 # tracked; the real values live beside it and never leave this machine.

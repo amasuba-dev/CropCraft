@@ -50,6 +50,33 @@ Every number is read from `work_dirs/ggssvt/reports` at build time, so unlike
 artefacts. Run `python -m ggssvt.cli reciprocity` and the rest of the pipeline
 first; the figure comes from `ggssvt.eval.funnel`, which reads the same reports.
 
+## The progress deck
+
+```bash
+cd paper && npm install pptxgenjs
+```
+
+```bash
+node paper/presentation.js
+```
+
+Twenty-one slides covering everything run to date, with speaker notes. Like
+`feasibility.js`, every quantitative claim is read out of
+`work_dirs/ggssvt/reports` at build time rather than typed, so the slides cannot
+drift from the artefacts; the figures come from the gallery, the overlays and
+`figures/screening_funnel.png`, so run `cli gallery` and `cli overlay` if those
+are stale.
+
+Two things about it are deliberate and will look wrong if changed without
+knowing why. The categorical colours are `0E9384, 7B3FA8, C4622D, 2563C9` **in
+that order**, which passes a colour-vision-deficiency separation check that the
+obvious teal/green/orange ordering fails. And every chart value is an integer —
+RMSE in grams rather than kilograms, IoU in percent — because PowerPoint renders
+a decimal separator in the *viewer's* locale, so on a machine set to a comma
+convention `0.457` becomes `0,457` and fights the prose on the same slide. A
+locale tag in the format code does not override it; only avoiding decimals does.
+Exact values with their decimal points live in the captions.
+
 ## The two research proposals
 
 Both build on their own, with no figure dependency:
