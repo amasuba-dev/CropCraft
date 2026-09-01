@@ -561,3 +561,34 @@ the one thing a validation set cannot contain. `run()` reports it under
 3. **Then the regression**, under leave-one-out and under leave-one-cultivar-out.
    The second is this dataset's leave-one-batch-out: it asks whether the fit
    survives a variety it has never seen.
+
+---
+
+## The reconstruction panel on the project page
+
+```bash
+python -m ggssvt.cli virtual-views          # the scores
+python -c "from ggssvt.eval.virtual_views import export_clouds; export_clouds('Maize01')"
+python -m ggssvt.cli dashboard              # rebuilds index.html
+```
+
+`export_clouds` writes `reports/reconstruction_clouds.json` -- about 2 KB, the
+truth, the carve and the fusion as deflated voxel indices in the same encoding
+the specimen viewer already uses. `build_payload` picks it up if it is there and
+omits the section if it is not, so a clone without the 12 GB Pheno4D download
+still builds a correct page.
+
+**On EasyPBR, since it comes up.** It is a native C++/OpenGL renderer with Python
+bindings and no browser target, so it cannot go in the page at all; it would also
+put boost, PCL and OpenCV between a fresh clone and a working build, on Linux
+only. What it is good for is offline beauty renders, and
+`virtual_views.export_meshes` writes `.obj` for exactly that -- a format EasyPBR,
+MeshLab, Blender and three.js all read, so the choice of renderer never touches
+the pipeline.
+
+Two things about the panel are deliberate. The three canvases share one camera,
+because the comparison only works at a single angle -- drag any one and all three
+turn. And these clouds are *not* downsampled, unlike the specimen viewer's: a
+carved Eucalyptus is tens of thousands of voxels and halves fine, but a maize
+plant at 12 mm is 342 voxels, and halving again leaves 114, which reads as
+scattered dust rather than a plant.

@@ -492,9 +492,97 @@ def export_meshes(
     return written
 
 
+def export_clouds(
+    plant: str = "Maize01",
+    *,
+    out: Path | None = None,
+    subsample: int = 2,
+    verbose: bool = True,
+) -> dict:
+    """Encode the truth, the carve and the fusion for the project page.
+
+    Same encoding the specimen viewer already uses -- occupied voxel indices as
+    byte triples, deflated and base64'd -- so the page's existing renderer draws
+    these with no new code beyond a panel that shares one camera across three
+    canvases. Sharing the camera is the point: read side by side at the same
+    angle, the hull is visibly swallowing the gaps between the leaves, which no
+    still figure and no pair of numbers conveys as directly.
+    """
+    from ..data.pheno4d import DATASET_DIR, latest_per_plant, load_scan, voxelise
+    from ..geometry.carving import carve, largest_connected_component
+    from ..geometry.fusion import FUSION_VOXEL_M, fuse
+    from .dashboard_data import _quantise
+
+    path = next(p for p in latest_per_plant(DATASET_DIR) if p.parent.name == plant)
+    scan = load_scan(path, subsample=subsample)
+
+    rendered = render(scan.points, target_z_m=max(scan.height_m / 2.0, 0.1))
+    rig, segmentations = _rig_and_segmentations(scan.scan_id, rendered)
+
+    grids = {
+        "truth": voxelise(scan.points, resolution=VOXEL_RESOLUTION,
+                          voxel_size_m=VOXEL_SIZE_M),
+        "carve": largest_connected_component(
+            carve(rig, segmentations, plant_id=scan.scan_id).occupancy),
+        "fusion": largest_connected_component(_downsample(
+            fuse(rendered.depth_m, rendered.rotation, rendered.centre,
+                 mask=rendered.mask).interior,
+            round(VOXEL_SIZE_M / FUSION_VOXEL_M))),
+    }
+
+    litres = VOXEL_SIZE_M ** 3 * 1000.0
+    true_volume_l = float(grids["truth"].sum()) * litres
+    labels = {
+        "truth": ("The plant", "laser scan, voxelised at 12 mm"),
+        "carve": ("Silhouette carving", "twelve views, visual hull"),
+        "fusion": ("Depth fusion", "twelve views, truncated signed distance"),
+    }
+
+    arms = []
+    for name, grid in grids.items():
+        volume_l = float(grid.sum()) * litres
+        title, detail = labels[name]
+        arms.append({
+            "key": name,
+            "title": title,
+            "detail": detail,
+            "volume_l": round(volume_l, 3),
+            "ratio": None if name == "truth" else round(
+                volume_l / max(true_volume_l, 1e-9), 2),
+            "iou": None if name == "truth" else round(
+                voxel_iou(grid, grids["truth"]), 3),
+            "silhouette_iou": None if name == "truth" else round(
+                silhouette_iou(grid, rendered), 3),
+            # No downsampling. The specimen viewer halves resolution because a
+            # carved Eucalyptus is tens of thousands of voxels; a maize plant at
+            # 12 mm is 342, and halving again leaves 114, which reads as
+            # scattered dust rather than a plant.
+            "cloud": _quantise(grid, downsample=1),
+        })
+        if verbose:
+            print(f"  {name:7s} {volume_l:6.3f} L  "
+                  f"{int(grid.sum()):6d} voxels")
+
+    payload = {
+        "plant": plant,
+        "species": scan.species,
+        "source": "Pheno4D (Schunck et al., PLOS ONE 2021)",
+        "n_views": N_VIEWS,
+        "true_volume_l": round(true_volume_l, 3),
+        "arms": arms,
+    }
+    out = out or WORK_DIR / "reports" / "reconstruction_clouds.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
+    if verbose:
+        print(f"  wrote {out} ({out.stat().st_size // 1024} KB)")
+    return payload
+
+
 __all__ = [
     "ASSUMED_DENSITY_KG_M3", "CAMERA_DISTANCE_M", "CAMERA_HEIGHT_M", "N_VIEWS",
-    "Rendered", "ScanResult", "camera_poses", "export_meshes", "reconstruct",
+    "Rendered", "ScanResult", "camera_poses", "export_clouds", "export_meshes",
+    "reconstruct",
     "render", "run",
     "silhouette_iou", "voxel_iou",
 ]

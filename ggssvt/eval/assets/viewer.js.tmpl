@@ -37,6 +37,14 @@ async function cloud(id, seg){
   const key = id+"/"+seg, e = byId.get(id).clouds[seg];
   if (cache.has(key)) return cache.get(key);
   if (!e) { cache.set(key,null); return null; }
+  const out = await decodeCloud(e, id);
+  cache.set(key,out); return out;
+}
+
+/* The same bytes-to-points step, without the specimen lookup. The Pheno4D
+   arms are not specimens and have no quality record or pot rim, so they
+   cannot go through cloud(). */
+async function decodeCloud(e, id){
   const bytes = await inflate(e.data);
   let out = null;
   if (bytes){
@@ -57,7 +65,7 @@ async function cloud(id, seg){
     }
     out = {pts, h, n, id};
   }
-  cache.set(key,out); return out;
+  return out;
 }
 
 /* Each specimen's own rim. Pot mass spans 0.7-32 kg across the batches, so one
@@ -432,3 +440,84 @@ function progressTable(){
 }
 
 progressTable();
+
+/* ------------------------------------------------------------------ Pheno4D
+
+   Three reconstructions of one plant whose true shape is known, sharing one
+   camera. Sharing it is the whole point: at a single angle the hull is visibly
+   filling the gaps between the leaves, which neither a still figure nor a pair
+   of IoU numbers conveys as directly.
+
+   Colour is forced to depth here. The specimen viewer's default splits pot from
+   canopy at a measured rim, and a laser-scanned maize plant standing on soil has
+   no pot for that to mean anything about. */
+async function reconstructionPanel(){
+  const R = D.reconstruction;
+  const host = document.getElementById("reconstruction-panels");
+  if (!host || !R) { const s = document.getElementById("reconstruction");
+                     if (s) s.remove(); return; }
+
+  let rYaw = 0.62, rPitch = 0.18;
+  const clouds = {};
+
+  host.innerHTML = R.arms.map(a => `
+    <div class="column">
+      <canvas class="recon" id="recon-${a.key}"
+              style="width:100%;aspect-ratio:1;touch-action:none;cursor:grab"></canvas>
+      <p class="mt-2"><strong>${a.title}</strong><br>
+        <span class="is-size-7 has-text-grey">${a.detail}</span></p>
+      <p class="is-size-7">${a.volume_l.toFixed(2)} L${
+        a.ratio ? ` &middot; <strong>${a.ratio}&times;</strong> true` : ""}${
+        a.iou != null ? `<br>IoU against the truth ${a.iou.toFixed(3)}` : ""}</p>
+    </div>`).join("");
+
+  for (const arm of R.arms) clouds[arm.key] = await decodeCloud(arm.cloud, arm.key);
+
+  const redraw = () => {
+    for (const arm of R.arms){
+      const cv = document.getElementById("recon-" + arm.key);
+      if (cv) draw(cv, clouds[arm.key],
+                   {dot:4, mode:"height", yawL:rYaw, pitchL:rPitch, zoomL:1.15});
+    }
+  };
+
+  for (const arm of R.arms){
+    const cv = document.getElementById("recon-" + arm.key);
+    if (!cv) continue;
+    let drag=false, lx=0, ly=0;
+    cv.addEventListener("pointerdown", e => {
+      drag=true; lx=e.clientX; ly=e.clientY;
+      cv.setPointerCapture(e.pointerId); cv.style.cursor="grabbing"; });
+    cv.addEventListener("pointermove", e => {
+      if(!drag) return;
+      rYaw += (e.clientX-lx)*0.01;
+      rPitch = Math.max(-1.4, Math.min(1.4, rPitch + (e.clientY-ly)*0.01));
+      lx=e.clientX; ly=e.clientY; redraw(); });
+    const stop = e => { drag=false; cv.style.cursor="grab";
+      try{ cv.releasePointerCapture(e.pointerId) }catch(_){} };
+    cv.addEventListener("pointerup", stop);
+    cv.addEventListener("pointercancel", stop);
+  }
+  addEventListener("resize", redraw);
+  redraw();
+
+  const carve = R.arms.find(a => a.key === "carve");
+  const fusion = R.arms.find(a => a.key === "fusion");
+  const note = document.getElementById("reconstruction-note");
+  if (note) note.innerHTML =
+    `${R.plant}, ${R.species}, from ${R.source}. Twelve virtual views, the same
+     carve and the same fusion the pipeline uses. The views are clean &mdash;
+     exact poses, no sensor noise, no segmentation error &mdash; so this bounds
+     the operator from above rather than estimating what the real captures do.`;
+
+  const inv = document.getElementById("reconstruction-inversion");
+  if (inv && carve && fusion) inv.innerHTML =
+    `Against the truth, fusion wins: IoU <strong>${fusion.iou.toFixed(3)}</strong>
+     against ${carve.iou.toFixed(3)}. Scored the usual way, by reprojecting each
+     reconstruction into the silhouettes it came from, carving wins:
+     <strong>${carve.silhouette_iou.toFixed(3)}</strong> against
+     ${fusion.silhouette_iou.toFixed(3)}. Across fourteen plants the two measures
+     disagree on <strong>every one</strong>.`;
+}
+
+reconstructionPanel();

@@ -321,6 +321,38 @@ BODY = """
 </section>
 
 
+<section class="section" id="reconstruction">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3">A plant whose true shape is known</h2>
+    <p class="content">
+      Every claim above rests on a criterion that stands in for reference geometry,
+      because no laser scan of these specimens exists. This one does not.
+      <a href="https://www.ipb.uni-bonn.de/data/pheno4d/">Pheno4D</a> is a
+      laser-scanned plant; twelve virtual views of it were rendered at the rig&rsquo;s
+      azimuths and put through the same carve and the same fusion. Drag any panel
+      &mdash; all three turn together, so they can be compared at one angle.
+    </p>
+
+    <div class="columns" id="reconstruction-panels"></div>
+
+    <p class="is-size-7 has-text-grey" id="reconstruction-note"></p>
+
+    <article class="message is-warning mt-4">
+      <div class="message-header"><p>The usual metric ranks these backwards</p></div>
+      <div class="message-body">
+        <p id="reconstruction-inversion"></p>
+        <p class="is-size-7 mt-3">
+          A visual hull agrees with the silhouettes it was carved from
+          <em>by construction</em>. Reprojecting it therefore measures whether the carve
+          executed, never whether the shape is right &mdash; and a plant is mostly the gaps
+          between its leaves, which no view ever sees through.
+        </p>
+      </div>
+    </article>
+  </div>
+</section>
+
+
 <section class="section">
   <div class="container is-max-desktop">
     <h2 class="title is-3">What these numbers cannot say</h2>

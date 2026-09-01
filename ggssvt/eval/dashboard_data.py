@@ -74,6 +74,10 @@ class DashboardPayload:
     methods: list[dict]
     summary: dict
     notes: dict
+    # The Pheno4D truth/carve/fusion triple, when it has been exported. Absent
+    # on a machine without the download, and the page omits the section rather
+    # than showing an empty frame.
+    reconstruction: dict | None = None
 
     def to_json(self) -> str:
         return json.dumps(
@@ -82,6 +86,7 @@ class DashboardPayload:
                 "methods": self.methods,
                 "summary": self.summary,
                 "notes": self.notes,
+                "reconstruction": self.reconstruction,
             },
             separators=(",", ":"),
         )
@@ -292,8 +297,15 @@ def build_payload(
         ),
     }
 
+    reconstruction_path = WORK_DIR / "reports" / "reconstruction_clouds.json"
+    reconstruction = (
+        json.loads(reconstruction_path.read_text(encoding="utf-8"))
+        if reconstruction_path.exists() else None
+    )
+
     return DashboardPayload(
-        specimens=specimens, methods=methods, summary=summary, notes=notes
+        specimens=specimens, methods=methods, summary=summary, notes=notes,
+        reconstruction=reconstruction,
     )
 
 
