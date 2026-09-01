@@ -48,6 +48,7 @@ const freq = read("frequency.json");
 const recip = read("reciprocity.json");
 const recon = read("reconstruction_quality.json");
 const ablation = read("view_ablation.json");
+const holdout = read("batch_holdout.json");
 
 // ---------------------------------------------------------------- palette
 // Categorical order validated with the dataviz validator:
@@ -412,7 +413,7 @@ const chartFrame = (extra) => Object.assign({
     valAxisMaxVal: 36, valAxisMajorUnit: 9,
     chartColors: [AMBER, TEAL],
   }));
-  caption(s, L, 6.12, 6.6, "Same grid, same masks, same criterion. Only the operator changed.");
+  caption(s, L, 6.12, 6.6, "Same grid, same masks, same criterion. Only the operator changed. Exact McNemar over the 29 discordant specimens: p = 0.000015.");
 
   stat(s, 7.7, 1.85, 4.93, "0.407  vs  0.219", "mean silhouette IoU, carving against fusion. The standard reprojection metric ranks the worse reconstruction higher.", { h: 1.95, size: 26, color: AMBER });
   card(s, 7.7, 4.0, 4.93, 1.8);
@@ -422,7 +423,7 @@ const chartFrame = (extra) => Object.assign({
   });
   body(s, 7.98, 4.57, 4.37, 1.3,
     "A hull agrees with its own silhouettes by construction, so silhouette IoU rewards exactly the failure it should catch. " +
-    "Reporting it alone would have inverted the conclusion.",
+    "Reporting it alone would have inverted the conclusion. The counts are paired, so McNemar settles them at p = 1.5 × 10⁻⁵.",
     { size: 12, color: MUTED, lineSpacing: 16 });
   chrome(s, false);
   s.addNotes("This is the single most transferable result so far: a widely used reconstruction metric is actively misleading on this class of subject.");
@@ -472,9 +473,11 @@ const chartFrame = (extra) => Object.assign({
   s.background = { color: DARK };
   heading(s, "The finding that caps everything", "Batch membership explained more than any method did", { dark: true, titleSize: 28 });
   const cw = 3.75, gap = 0.34;
+  const batchOnly = holdout.rows.find(
+    (r) => r.condition === "batch membership only" && r.scheme === "loocv");
   stat(s, L, 1.95, cw, "R² = 0.887", "explained by knowing only which capture batch a plant came from — more than mesh geometry managed on the same specimens.", { dark: true, h: 2.0, size: 30, color: AMBER });
-  stat(s, L + cw + gap, 1.95, cw, "R² < 0.2", "reached by every method inside either batch. The signal lived between the batches, not within them.", { dark: true, h: 2.0, size: 30, color: AMBER });
-  stat(s, L + 2 * (cw + gap), 1.95, cw, "R² = 0.697", "after V001–V008 was captured to span a continuous mass range. The confound fell, and the 3D advantage fell with it.", { dark: true, h: 2.0, size: 30, color: TEAL });
+  stat(s, L + cw + gap, 1.95, cw, "R² = 0.697", "after V001–V008 was captured to span a continuous mass range. The confound fell, and the 3D advantage fell with it.", { dark: true, h: 2.0, size: 30, color: AMBER });
+  stat(s, L + 2 * (cw + gap), 1.95, cw, batchOnly.rmse_kg.toFixed(3) + " kg", "what batch membership alone predicts mass to, using no geometry and no image. It beats every method in this deck.", { dark: true, h: 2.0, size: 30, color: AMBER });
   card(s, L, 4.25, W, 1.8, true);
   s.addText("What can be claimed, and what cannot", {
     x: L + 0.35, y: 4.48, w: W - 0.7, h: 0.32, isTextBox: true, margin: 0,
@@ -482,11 +485,59 @@ const chartFrame = (extra) => Object.assign({
   });
   body(s, L + 0.35, 4.9, W - 0.7, 1.2,
     "Reconstructed geometry separates plant size classes — tall and sparse against short and solid. That is supported. " +
-    "\"Estimates biomass\" is not, and an examiner who checks the batch structure finds this in minutes. The fix was data, and it worked: " +
-    "one capture batch spanning a continuous mass range was worth more than any modelling change on the schedule.",
+    "\"Estimates biomass\" is not, and the next slide puts a number on why. There will be no further capture, so the confound is " +
+    "met by measuring it and by validating on public data rather than by collecting more.",
     { size: 13, color: ONDARK, lineSpacing: 19 });
   chrome(s, true);
   s.addNotes("Lead with this rather than defending it. It reframes the contribution from a biomass estimator to a validated reconstruction and screening pipeline, which is what the evidence supports.");
+}
+
+// ========================================== 12 leave-one-batch-out
+{
+  const s = pres.addSlide();
+  heading(s, "Finding", "What the confound costs the protocol", { titleSize: 29 });
+
+  const row = (condition, scheme) => holdout.rows.find(
+    (r) => r.condition === condition && r.scheme === scheme);
+  const geo = { loocv: row("geometric, every usable specimen", "loocv"),
+                lobo: row("geometric, every usable specimen", "lobo") };
+  const dinoRow = { loocv: row("dinov2-base", "loocv"), lobo: row("dinov2-base", "lobo") };
+
+  s.addChart(pres.ChartType.bar, [
+    { name: "Leave one specimen out",
+      labels: ["Geometric features", "DINOv2 frozen", "Batch label alone"],
+      values: [Math.round(geo.loocv.rmse_kg * 1000),
+               Math.round(dinoRow.loocv.rmse_kg * 1000),
+               Math.round(row("batch membership only", "loocv").rmse_kg * 1000)] },
+    { name: "Leave one capture batch out",
+      labels: ["Geometric features", "DINOv2 frozen", "Batch label alone"],
+      values: [Math.round(geo.lobo.rmse_kg * 1000),
+               Math.round(dinoRow.lobo.rmse_kg * 1000), null] },
+  ], chartFrame({
+    x: L, y: 1.85, w: 7.3, h: 4.15,
+    barDir: "col", barGapWidthPct: 55,
+    showValue: true, dataLabelPosition: "outEnd", dataLabelFormatCode: "0",
+    valAxisMinVal: 0, valAxisMaxVal: 1300, valAxisMajorUnit: 250,
+    valAxisTitle: "RMSE, grams", showValAxisTitle: true,
+    valAxisTitleColor: MUTED, valAxisTitleFontSize: 11, valAxisTitleFontFace: BODY,
+    showLegend: true, legendPos: "b", legendColor: MUTED,
+    legendFontSize: 11, legendFontFace: BODY,
+    chartColors: [MUTED, AMBER],
+  }));
+  caption(s, L, 6.12, 7.3, "Same estimator, same folds-within-folds, only the withholding rule changes. Batch-label-alone has nothing left to predict from once its batch is withheld.");
+
+  stat(s, 8.35, 1.85, 4.28, "351 g", "what knowing only the capture batch achieves. No geometry, no image, no features — and it beats every real method here.", { h: 1.95, size: 34, color: AMBER });
+  card(s, 8.35, 4.0, 4.28, 2.05);
+  s.addText("Why both columns, always", {
+    x: 8.63, y: 4.2, w: 3.72, h: 0.3, isTextBox: true, margin: 0,
+    fontFace: HEAD, fontSize: 14.5, bold: true, color: INK,
+  });
+  body(s, 8.63, 4.58, 3.72, 1.35,
+    "Leave-one-out keeps the rest of a plant's capture session in the training fold, carrying that session's mean mass. "
+    + "The gap between the two bars is how much of the score came from the session rather than the plant.",
+    { size: 12, color: MUTED, lineSpacing: 16 });
+  chrome(s, false);
+  s.addNotes("Do not soften this. The honest reading is that the biomass regression is not yet a result, and the reconstruction and screening work is. Every experiment on the surrounding slides is unaffected, because none of them regress against mass.");
 }
 
 // ============================================================== 12 H1 backbone
@@ -759,11 +810,11 @@ const chartFrame = (extra) => Object.assign({
   bullets(s, L + 0.35, 2.68, cw - 0.7, 3.4, [
     "Poses can be recovered from depth alone when no calibration sequence exists",
     "Implied bulk density screens reconstructions with no reference geometry",
-    "Depth fusion beats silhouette carving, 31 against 8 of 36",
+    "Depth fusion beats silhouette carving, 31 against 8 of 36, paired McNemar p = 0.000015",
     "Silhouette IoU ranks these reconstructions backwards",
     "Reconstruction refining segmentation more than doubles the plausible count",
     "Frozen DINOv2 features reach the baseline's accuracy on a quarter of the labels",
-    "Reconstructed geometry separates plant size classes",
+    "Reconstructed geometry separates plant size classes, with the leave-one-batch-out gap quoted",
   ], { size: 11.5, color: ONDARK, gap: 7, lineSpacing: 15 });
   card(s, L + cw + 0.45, 1.95, cw, 4.35, true);
   s.addText("Not supported yet", {
@@ -771,7 +822,7 @@ const chartFrame = (extra) => Object.assign({
     fontFace: HEAD, fontSize: 17, bold: true, color: AMBER,
   });
   bullets(s, L + cw + 0.8, 2.68, cw - 0.7, 3.4, [
-    "That the pipeline estimates biomass — batch structure still explains R² = 0.697",
+    "That the pipeline estimates biomass — batch label alone beats every method under leave-one-out",
     "That a self-supervised backbone is more accurate; the interval crosses zero",
     "That 3D geometry beats image-only regression on this data",
     "Anything at all about the trained GG-SSVT model, which has produced no result yet",
@@ -789,8 +840,8 @@ const chartFrame = (extra) => Object.assign({
   const steps = [
     ["Tonight", "Seven training runs complete on the Titan", "The first learned results the project has ever had, at last."],
     ["Monday", "Paired bootstraps on every campaign comparison", "Numbers propagate into the findings record, the results section and both proposals."],
-    ["Then", "Pose-free reconstruction, the one unrun step", "DUSt3R and MASt3R against the depth-derived poses, testing whether calibration is needed at all."],
-    ["Beyond", "A capture campaign across a mass continuum", "The dataset is the binding constraint, not the architecture. This is worth more than any modelling work on the schedule."],
+    ["Then", "Twelve virtual views from a Pheno4D cloud", "Run the whole pipeline on rendered views of a known laser cloud, and the density screen is calibrated against ground truth at last."],
+    ["Beyond", "External validation on two public sets", "Pheno4D supplies the reference geometry this project has never had; 388 lettuce with destructive fresh mass supply the labels ours cannot."],
   ];
   let y = 1.85;
   steps.forEach(([when, what, why], i) => {
@@ -809,7 +860,7 @@ const chartFrame = (extra) => Object.assign({
   card(s, L, 5.92, W, 0.72);
   body(s, L + 0.32, 6.1, W - 0.64,
     0.45,
-    "The contribution that holds regardless: a reconstruction and screening pipeline that can be validated without reference geometry.",
+    "No further capture. The 36 specimens are the method-development set; public data becomes the external-validation set.",
     { size: 12.5, color: INK, lineSpacing: 16 });
   chrome(s, false);
   s.addNotes("Close on the durable contribution rather than on the pending model, because the pipeline is what stands whatever the campaign returns.");

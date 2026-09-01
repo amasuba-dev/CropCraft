@@ -158,6 +158,15 @@ range within one species, which is what V001–V008 turned out to be. More
 specimens of the two original clusters would have reinforced the confound rather
 than broken it.
 
+> **Superseded by §7l, which is worse.** This section regresses mass on batch
+> label, which describes the data. §7l measures what the confound costs the
+> reported protocol, and finds that batch membership alone *outperforms every
+> method here* under leave-one-out. Quote §7l's table, not this paragraph.
+>
+> **And no further capture is coming.** As of 1 September 2026 the 36 specimens
+> are the dataset, so "the fix was data" is closed as a route. See
+> [CAMPAIGN.md](CAMPAIGN.md) § "The no-new-data plan" for what replaces it.
+
 ---
 
 ## 5. DINO backbones
@@ -851,6 +860,79 @@ with the method under test and no summary statistic says so.
 
 ---
 
+## 7l. The confound, measured rather than argued
+
+Section 4 established the confound by regressing mass on batch label. That is a
+description of the data. What it never gave was the size of the error every
+reported LOOCV number carries because of it, and *that* is the quantity a
+reviewer needs. `eval/batch_holdout.py` supplies it.
+
+**The design.** Leave-one-out withholds a specimen and leaves the other nine or
+so members of its own capture session in the training fold, carrying that
+session's mean mass. Leave-one-batch-out withholds the whole session, so the
+model has never seen a plant captured on the same day as the one it is scored
+on. Everything else -- estimator, standardisation, PCA, alpha -- is held fixed.
+
+| condition | LOOCV RMSE | LOOCV R² | LOBO RMSE | LOBO R² | inflation |
+|---|---|---|---|---|---|
+| geometric, all 36 | 0.458 | +0.312 | 1.151 | −3.339 | **+0.692 kg** |
+| geometric, shared 33 | 0.576 | −0.080 | 1.105 | −2.970 | +0.529 kg |
+| DINOv2 frozen, 33 | 0.385 | +0.518 | 0.921 | −1.758 | +0.536 kg |
+| **batch membership only** | **0.351** | **+0.600** | — | — | — |
+
+**Read the last row first.** Predicting a specimen's mass as the mean of the rest
+of its own batch -- no geometry, no image, no features whatsoever -- scores
+0.351 kg under leave-one-out and **beats every real method on this dataset**. The
+best learned representation (DINOv2 at 0.385) does not reach it. Under
+leave-one-batch-out every condition falls below the mean predictor.
+
+This is stronger than section 4's statement and less comfortable. Section 4 said
+batch membership explains most of the variance; this says batch membership is
+*better than our method*, under the very protocol the project has been reporting.
+
+**What it does not touch.** No reconstruction or screening result is a regression
+against mass, so §7b, §7f, §7g, §7i, §7k and the view-count sweep are unaffected.
+The relocation is confined to the biomass claim, which §10 had already
+recommended relocating for a weaker reason.
+
+**How to report it.** Quote both columns, always. A method whose two scores are
+close has learned something about plants; one whose LOBO score collapses to the
+mean learned which batch a specimen came from. The gap is the finding, and
+publishing it is a far better position than having it found.
+
+The n=33 row exists because the descriptor caches were built on the set shared
+with the SAM3D cache; E015, E019 and V006 are absent from them. Conditions fitted
+on different specimens are not comparable, so the DINO comparison runs on the
+intersection and the geometric condition is reported on both sets.
+
+---
+
+## 7m. The paired tests the designs already earned
+
+Three of this project's comparisons are paired -- the same specimens, the same
+criterion, one thing changed -- and all three were being reported as bare ratios,
+which throws away exactly where the power is.
+
+**Carving against fusion.** 8 and 31 plausible of the same 36 reconstructions.
+Twenty-nine specimens discriminate (3 favour carving, 26 favour fusion); the
+concordant seven carry no information about which operator is better. Exact
+McNemar on the discordant pairs:
+
+**p = 1.5 × 10⁻⁵.**
+
+That is the most decisive statistic in the project, and it was sitting unused
+behind a ratio. `eval/batch_holdout.py:mcnemar`.
+
+The same treatment applies to the reciprocity rules (8 → 19 of 36, §7g) and to
+the view-count sweep (§7). Neither is done yet; both are one call each.
+
+**Why it matters more than it looks.** Section 7f's finding -- that silhouette
+IoU ranks the worse reconstruction higher -- rests on the density screen
+disagreeing with the metric. A screen comparison at p = 1.5 × 10⁻⁵ is a much
+firmer foundation for that argument than "8 versus 31".
+
+---
+
 ## 8. Bugs found and fixed
 
 **Evaluation tracked gradients.** `predict()` put the model in `.eval()` and
@@ -936,8 +1018,15 @@ Intel RealSense; the target is fresh mass, not oven-dry AGB.
 
 **The dataset is the binding constraint, not the method.** Two clusters of
 similar plants at n=28 cannot support a biomass estimation claim regardless of
-architecture. One more capture campaign spanning a continuous mass range within
-one species is worth more than any modelling work currently planned.
+architecture.
+
+> **Decided against, 1 September 2026.** This recommended one more capture
+> campaign. There will not be one. The constraint is real and the diagnosis
+> stands, but it is now met by measuring the confound (§7l) and by external
+> validation on public data rather than by collecting more: Pheno4D for the
+> reference geometry this project has never had, and the 4TU lettuce set (388
+> plants, RGB-D, destructive fresh mass) for the regression. Both are ungated;
+> see [CAMPAIGN.md](CAMPAIGN.md) § "The no-new-data plan".
 
 **Inverse procedural modelling is the principled route past the leaf-area
 ceiling.** The area hypothesis failed because a hull's surface is envelope area.
