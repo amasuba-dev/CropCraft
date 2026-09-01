@@ -187,3 +187,6 @@ cython_debug/
 # Personal contact details for the proposals. candidate.example.json is
 # tracked; the real values live beside it and never leave this machine.
 /paper/candidate.local.json
+
+# The 4TU lettuce set (DOI 10.4121/15023088), ~1 GB. Downloaded, not vendored.
+/dataset_biomass/

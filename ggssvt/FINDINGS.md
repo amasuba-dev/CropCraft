@@ -933,6 +933,104 @@ firmer foundation for that argument than "8 versus 31".
 
 ---
 
+## 7n. External validation: the method transfers, the dataset did not
+
+7l left the biomass claim unsupportable on our own data and no further capture is
+coming, so the question moved to somebody else's plants. The 4TU greenhouse
+lettuce set (DOI 10.4121/15023088) is 387 usable RGB-D pairs across four
+cultivars and a seven-week growth series, destructively weighed: 1.4 g to 459.7 g
+with a mean of 115.2 g, continuous by construction rather than clustered into
+sessions. `eval/external.py`; run with `cli external`.
+
+**Step 1, the measurement, before any regression.** Their height, diameter and
+leaf area were measured destructively on the same plants, so the depth-derived
+versions can be checked against a ruler:
+
+| trait | Pearson r | MAE |
+|---|---|---|
+| diameter | **+0.920** | 2.67 cm |
+| projected area vs leaf area | **+0.925** | 1563 cm² |
+| height | +0.592 | 3.74 cm |
+
+Diameter and area are solid. **Height is the weak measurement**, and it is weak
+for a reason worth recording: the reference surface is a tray whose height
+changes between growth stages, and a top-down camera sees the canopy top, not the
+attachment point their ruler starts from. The area MAE is large because projected
+area and true leaf area are different quantities -- curled leaves hide area from
+a camera -- so the correlation is what matters there, not the difference.
+
+**Step 2, the screen.** Agreement with the measured diameter to within 40%,
+fixed before the numbers were read: **378 of 387 pass**. Nine failures out of 387
+is a far better segmentation rate than we achieve on our own captures, which says
+more about a controlled greenhouse than about the segmenter.
+
+**Step 3, the regression**, leave-one-out beside leave-one-cultivar-out -- this
+dataset's leave-one-batch-out, holding out a variety the fit has never seen:
+
+| condition | LOOCV | held-out cultivar | unscreened, held-out cultivar |
+|---|---|---|---|
+| direct 2D | 48.0 g (R² +0.806) | 55.1 g (R² +0.744) | 56.0 g (R² +0.736) |
+| **2D + profile** | **42.7 g (R² +0.846)** | **50.9 g (R² +0.782)** | 54.7 g (R² +0.747) |
+| volume only | 54.3 g (R² +0.751) | 58.0 g (R² +0.716) | 58.1 g (R² +0.716) |
+
+**Set that against our own data, same estimator, same code path:**
+
+| | our 36 specimens | lettuce, 378 plants |
+|---|---|---|
+| leave-one-out R² | +0.312 | **+0.846** |
+| grouped holdout R² | **−3.339** | **+0.782** |
+| what the holdout costs | catastrophic | 0.064 in R² |
+
+That is the answer to the question the project has been unable to answer. The
+regression **does** estimate biomass; it could not be shown to on our specimens
+because our specimens were four capture sessions with different mean masses. The
+same features, the same ridge, the same leave-one-group-out protocol, hold up on
+a cultivar they have never seen.
+
+**Two further things this settles.**
+
+*The method ranking is the same in both datasets.* `2D + profile` beats
+`direct 2D` beats volume alone here, exactly the order §3 found on our specimens.
+A ranking that survives a change of species, sensor and facility is worth more
+than the margin that produced it.
+
+*The screen is not carrying the result.* The screen uses their measured diameter,
+which correlates with mass, so a screened score is selected partly on the label
+-- the same exposure our density criterion has, since implied density is mass
+over volume. Reported unscreened, the held-out-cultivar R² moves from +0.782 to
++0.747. The selection is worth 0.035 in R², not the result.
+
+**What is honestly claimed.** Transfer runs across a sensor change (their
+RealSense D415, our Kinect v2), a species change, and a facility change, using
+only the image-only half of the pipeline -- one top-down view means no carve and
+no fusion. Both those methods are the ones that already won on our data, so the
+thing validated externally is the thing being claimed. What is *not* validated
+here is anything about the reconstruction: the carve, the fusion, the density
+screen and the reciprocity loop cannot run on a single view and remain supported
+only by §7b, §7f and §7g on our own specimens.
+
+**One record is unusable as distributed.** The ground truth has 388 measurements
+and the archive pairs with 387: `Image332` names `RGB_332.png`, which is absent,
+while an unreferenced `RGB_322.png` sits in the folder with no matching record.
+Pairing them was tested by overlapping the RGB's saturated region with the
+depth's raised region; the candidate scored 0.163 where known-correct pairs
+scored 0.151 to 0.321, so the check does not discriminate and settles nothing.
+The record is skipped and counted rather than repaired.
+
+**And a segmentation finding that would have cost a cultivar.** Two of the four
+varieties are red-leaf. Satine measures R 80, G 49, B 24 -- an excess green of
+**−0.02**, indistinguishable from concrete. Segmenting these images with the
+index the rest of this project uses would have silently dropped an entire
+cultivar, and it would have dropped the *heaviest* plants. No colour index fixes
+it: a red lettuce and the orange crate the tray stands on overlap on excess
+green, saturation and green-minus-blue alike. What separates them is that the
+tray sits on top of the crate, so height above the tray surface is the
+discriminator. The lesson generalises to our own work -- the excess-green
+segmenter in `geometry/segment.py` would fail on any red or purple foliage, and
+nothing currently warns about that.
+
+---
+
 ## 8. Bugs found and fixed
 
 **Evaluation tracked gradients.** `predict()` put the model in `.eval()` and

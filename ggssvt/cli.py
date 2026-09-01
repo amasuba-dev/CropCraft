@@ -282,6 +282,29 @@ def cmd_batch_holdout(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_external(args: argparse.Namespace) -> int:
+    """Transfer the regression to the 4TU lettuce set. No GPU, ~4 min first run."""
+    from pathlib import Path
+
+    from .eval.external import run
+
+    report = run(
+        root=Path(args.root) if args.root else None,
+        force=args.force,
+        verbose=not args.quiet,
+    )
+    print()
+    print(f"{report['n_after_screen']} of {report['n_plants']} plants after the "
+          f"screen, mass {report['mass_range_g'][0]:.1f}-"
+          f"{report['mass_range_g'][1]:.1f} g, "
+          + ", ".join(f"{k} ({v})" for k, v in report["cultivars"].items()))
+    print()
+    print("A held-out cultivar is this dataset's leave-one-batch-out. Read the")
+    print("two columns together: a method that holds up on a variety it never")
+    print("saw is the only one that has transferred.")
+    return 0
+
+
 def cmd_viewpoint(args: argparse.Namespace) -> int:
     """H2: agreement with a view the reconstruction never saw. No GPU."""
     from .eval.viewpoint import run
@@ -1287,6 +1310,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     batch_holdout.add_argument("--quiet", action="store_true")
     batch_holdout.set_defaults(func=cmd_batch_holdout)
+
+    external = sub.add_parser(
+        "external",
+        help="external validation on the 4TU lettuce set (CPU, ~4 min first run)",
+    )
+    external.add_argument(
+        "--root", default=None,
+        help="where the download was unpacked; defaults to dataset_biomass/",
+    )
+    external.add_argument(
+        "--force", action="store_true", help="re-measure instead of using the cache",
+    )
+    external.add_argument("--quiet", action="store_true")
+    external.set_defaults(func=cmd_external)
 
     viewpoint = sub.add_parser(
         "viewpoint", help="H2: held-out-view consistency (CPU, ~25 min)"

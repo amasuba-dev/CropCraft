@@ -95,20 +95,36 @@ class Scheme:
         return asdict(self)
 
 
-def _folds(plant_ids: list[str], scheme: str) -> list[np.ndarray]:
-    """Test-index arrays for a scheme. One specimen per fold, or one batch."""
+def _folds(
+    plant_ids: list[str], scheme: str, groups: list[str] | None = None
+) -> list[np.ndarray]:
+    """Test-index arrays for a scheme. One specimen per fold, or one group.
+
+    ``groups`` names the group each specimen belongs to. Left out, it is derived
+    from the identifiers, which is what our own capture batches are. Passed
+    explicitly, any grouping works -- the lettuce validation set holds out one
+    cultivar at a time, which is the same question asked of a different nuisance
+    variable.
+    """
     n = len(plant_ids)
     if scheme == "loocv":
         return [np.array([i]) for i in range(n)]
 
-    labels = batch_names(plant_ids)
+    if groups is None:
+        labels = batch_names(plant_ids)
+        member = [labels[pid] for pid in plant_ids]
+    else:
+        if len(groups) != n:
+            raise ValueError("groups must name every specimen")
+        member = list(groups)
+
     order: list[str] = []
-    for pid in plant_ids:
-        if labels[pid] not in order:
-            order.append(labels[pid])
+    for name in member:
+        if name not in order:
+            order.append(name)
     return [
-        np.array([i for i, pid in enumerate(plant_ids) if labels[pid] == name])
-        for name in order
+        np.array([i for i, name in enumerate(member) if name == held])
+        for held in order
     ]
 
 
@@ -144,12 +160,13 @@ def cross_validate(
     *,
     condition: str,
     scheme: str,
+    groups: list[str] | None = None,
     alpha: float = 1.0,
     components: int | None = 8,
 ) -> tuple[Scheme, np.ndarray]:
     """Score one feature set under one scheme. Returns the summary and the
     out-of-fold predictions, which the paired bootstrap needs."""
-    folds = _folds(plant_ids, scheme)
+    folds = _folds(plant_ids, scheme, groups)
     predictions = np.zeros(len(targets))
     smallest = len(targets)
 
@@ -176,7 +193,8 @@ def cross_validate(
 
 
 def batch_only(
-    targets: np.ndarray, plant_ids: list[str], *, scheme: str
+    targets: np.ndarray, plant_ids: list[str], *, scheme: str,
+    groups: list[str] | None = None,
 ) -> tuple[Scheme, np.ndarray]:
     """Predict a specimen's mass from its batch and nothing else.
 
@@ -187,13 +205,14 @@ def batch_only(
     that made batch membership powerful is exactly the information the scheme
     removes.
     """
-    labels = batch_names(plant_ids)
+    member = (list(groups) if groups is not None
+              else [batch_names(plant_ids)[pid] for pid in plant_ids])
     predictions = np.zeros(len(targets))
 
-    for test in _folds(plant_ids, scheme):
+    for test in _folds(plant_ids, scheme, groups):
         train = np.setdiff1d(np.arange(len(targets)), test)
         for i in test:
-            same = [j for j in train if labels[plant_ids[j]] == labels[plant_ids[i]]]
+            same = [j for j in train if member[j] == member[i]]
             predictions[i] = targets[same].mean() if same else targets[train].mean()
 
     m = regression_metrics(predictions, targets)
@@ -205,7 +224,7 @@ def batch_only(
         r2=round(m.r2, 4),
         bias_kg=round(m.bias_kg, 4),
         n=m.n,
-        n_folds=len(_folds(plant_ids, scheme)),
+        n_folds=len(_folds(plant_ids, scheme, groups)),
         smallest_train=0,
     ), predictions
 

@@ -491,3 +491,73 @@ set. Both claims then stand on the evidence that actually supports them:
 | next | propagate LOBO and McNemar into FINDINGS, the feasibility results, both proposals and the deck | the campaign's numbers land in the same pass |
 | then | Pheno4D virtual-view validation | the experiment an examiner will ask for |
 | after | lettuce external validation | the biomass chapter's honest ending |
+
+---
+
+## The external validation set, in practice
+
+The 4TU lettuce download (DOI `10.4121/15023088`) unpacks into `dataset_biomass/`
+at the repository root -- 388 RGB-D pairs, `GroundTruth_All_388_Images.json`, and
+a ReadMe carrying the RealSense intrinsics. It is gitignored: about 1 GB, and it
+is somebody else's data to distribute.
+
+```bash
+python -m ggssvt.cli external
+```
+
+First run measures all 388 plants and caches the descriptors to
+`work_dirs/ggssvt/reports/lettuce_features.npz`; about four minutes on a CPU.
+Later runs read the cache. `--force` re-measures.
+
+### Two things the pipeline had to learn to do
+
+**Excess green loses half the dataset.** Two of the four cultivars are red-leaf.
+Satine measures R 80, G 49, B 24 -- an excess green of **−0.02**, which is
+indistinguishable from concrete. Segmenting these images the way we segment our
+own would silently drop an entire cultivar, and the plants it dropped would be
+the large ones, because the red varieties reach the top of the mass range.
+
+The fix is not a better colour index. A red lettuce and the orange crate the tray
+stands on overlap on excess green, on saturation and on green-minus-blue alike;
+no threshold separates them. What separates them is geometry: the tray sits *on
+top of* the crate, so anything raised above the tray surface is plant. Saturation
+then removes the tray's own lid, which is at tray height but unsaturated.
+
+**The reference surface is the tray, not the floor.** They are only about 12 cm
+apart and both read as bright and unsaturated -- tray at value 172, saturation
+0.07; concrete at 124 and 0.08. Taking the modal depth over the whole region of
+interest returns whichever fills more of it, and when it returns the floor every
+height comes out ~12 cm too large, which is taller than most of the plants. The
+tray is therefore looked for in a tight box at frame centre first, and the wide
+box is only a fallback. This is the same problem as our own measured pot rim, and
+it has the same answer: measure the surface, do not assume it.
+
+### One record is unusable as distributed
+
+The ground truth has 388 measurements but the archive pairs with only 387 of
+them. `Image332` names `RGB_332.png`, which is not in the folder, while an
+unreferenced `RGB_322.png` is -- and no `Image322` record or `Depth_322.png`
+exists. A misnamed file is the obvious explanation.
+
+It was tested rather than assumed. If `RGB_322` really photographs the plant in
+`Depth_332`, the saturated region of the one and the raised region of the other
+describe the same object and should overlap more than a mismatched pair does.
+The candidate scored 0.163, and known-correct pairs from the same run scored
+between 0.151 and 0.321 -- the check does not discriminate at all, so it settles
+nothing.
+
+The record is therefore skipped and counted, not repaired. Substituting on a
+hunch would put a plant of unverified identity into the validation set, which is
+the one thing a validation set cannot contain. `run()` reports it under
+`skipped_no_image`, and the effective n is 387.
+
+### What it reports, in order
+
+1. **Does the measurement work.** Depth-derived height, diameter and area
+   correlated against their destructive measurements of the same plants. A
+   pipeline whose diameter does not track a ruler has no business predicting mass.
+2. **What the screen costs.** Agreement with the measured diameter to within
+   40%, fixed before the numbers were read, reported with its count.
+3. **Then the regression**, under leave-one-out and under leave-one-cultivar-out.
+   The second is this dataset's leave-one-batch-out: it asks whether the fit
+   survives a variety it has never seen.
