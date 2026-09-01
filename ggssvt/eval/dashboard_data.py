@@ -78,6 +78,7 @@ class DashboardPayload:
     # Each is absent on a machine that has not run it, and the page omits the
     # section rather than showing an empty frame.
     reconstruction: dict | None = None
+    resolution: dict | None = None
     batch_holdout: dict | None = None
     external: dict | None = None
 
@@ -89,6 +90,7 @@ class DashboardPayload:
                 "summary": self.summary,
                 "notes": self.notes,
                 "reconstruction": self.reconstruction,
+                "resolution": self.resolution,
                 "batch_holdout": self.batch_holdout,
                 "external": self.external,
             },
@@ -308,6 +310,7 @@ def build_payload(
 
     return DashboardPayload(
         specimens=specimens, methods=methods, summary=summary, notes=notes,
+        resolution=report("resolution.json"),
         reconstruction=report("reconstruction_clouds.json"),
         batch_holdout=report("batch_holdout.json"),
         external=report("external_lettuce.json"),

@@ -331,6 +331,18 @@ def cmd_plots(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_resolution(args: argparse.Namespace) -> int:
+    """The ledger: every comparison, and what its design could have detected."""
+    from .eval.resolution import run
+
+    run(verbose=not args.quiet)
+    print()
+    print("A null means nothing until the design says what it could have found.")
+    print("The detectable column is the smallest difference each comparison")
+    print("would find four times in five, from its own bootstrap interval.")
+    return 0
+
+
 def cmd_viewpoint(args: argparse.Namespace) -> int:
     """H2: agreement with a view the reconstruction never saw. No GPU."""
     from .eval.viewpoint import run
@@ -1368,6 +1380,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     plots.add_argument("--quiet", action="store_true")
     plots.set_defaults(func=cmd_plots)
+
+    resolution = sub.add_parser(
+        "resolution",
+        help="what each comparison could detect, and which settled (CPU, seconds)",
+    )
+    resolution.add_argument("--quiet", action="store_true")
+    resolution.set_defaults(func=cmd_resolution)
 
     viewpoint = sub.add_parser(
         "viewpoint", help="H2: held-out-view consistency (CPU, ~25 min)"

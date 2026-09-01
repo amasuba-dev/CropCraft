@@ -321,6 +321,26 @@ BODY = """
 </section>
 
 
+<section class="section" id="ledger">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3">What settled, and what is still open</h2>
+    <p class="content">
+      The resolved results live in six different report files and the unresolved
+      ones all live in one table, which gives the impression that nothing
+      settled. Collected together the pattern is plain: paired counts and paired
+      differences on large samples settle, and a difference in RMSE between two
+      methods on thirty-six specimens does not.
+    </p>
+
+    <div id="ledgerfacts" class="keyfacts mb-4"></div>
+
+    <div class="table-container">
+      <table class="table is-fullwidth is-narrow" id="ledgertable"></table>
+    </div>
+  </div>
+</section>
+
+
 <section class="section" id="holdout">
   <div class="container is-max-desktop">
     <h2 class="title is-3">What the capture batch was worth to the score</h2>
@@ -491,6 +511,18 @@ BODY = """
     </article>
 
     <div class="content is-size-7 has-text-grey" id="notes"></div>
+
+    <article class="message is-info mt-4">
+      <div class="message-header"><p>What that table can and cannot show</p></div>
+      <div class="message-body">
+        <p id="methodsresolution"></p>
+        <p class="is-size-7 mt-3">
+          A null result means nothing until the design says what it could have
+          detected. The last column is the smallest difference each comparison
+          would find four times in five, computed from its own bootstrap interval.
+        </p>
+      </div>
+    </article>
   </div>
 </section>
 

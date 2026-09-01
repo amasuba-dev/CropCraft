@@ -162,20 +162,87 @@ function pipeline(){
 }
 
 function methodTable(){
-  const ref=D.summary.reference_method;
-  const head=`<thead><tr><th>Method</th><th>RMSE kg</th><th>MAE kg</th><th>MARE %</th>
-    <th>R²</th><th>vs ${ref}</th></tr></thead>`;
-  const rows=D.methods.map((m,i)=>{
-    const v=m.vs_reference;
-    const cell = m.name===ref ? '<span class="has-text-grey">reference</span>'
-      : v ? `${v.difference>0?"+":""}${f(v.difference,3)}
-             <span class="tag is-small ${v.resolved?"is-success":"is-light"}">${v.resolved?"resolved":"not resolved"}</span>`
-          : ", ";
-    return `<tr class="${i===0?"best":""}"><td>${m.name}</td>
-      <td>${f(m.rmse_kg,3)}</td><td>${f(m.mae_kg,3)}</td>
-      <td>${f(m.mare_pct,1)}</td><td>${f(m.r2,3)}</td>
-      <td>${cell}</td></tr>`;}).join("");
-  document.getElementById("methods").innerHTML = head+`<tbody>${rows}</tbody>`;
+  const ref = D.summary.reference_method;
+  /* The smallest difference each row's own design could have found, so a null
+     can be read. Without it eight "not resolved" tags look like eight failures
+     to choose between methods, when they are one fact about the sample size. */
+  const mde = new Map();
+  for (const c of (D.resolution ? D.resolution.comparisons : []))
+    if (c.detectable && c.question.endsWith(`against ${ref}, on mass`))
+      mde.set(c.question.split(" against ")[0], c.detectable);
+
+  const head = `<thead><tr><th>Method</th><th>RMSE kg</th><th>MAE kg</th>
+    <th>MARE %</th><th>R²</th><th>vs ${ref}</th>
+    <th>this design can detect</th></tr></thead>`;
+  const rows = D.methods.map((m, i) => {
+    const x = m.vs_reference;
+    const cell = m.name === ref ? '<span class="has-text-grey">reference</span>'
+      : x ? `${x.difference > 0 ? "+" : ""}${f(x.difference, 3)}
+             <span class="tag is-small ${x.resolved ? "is-success" : "is-light"}">${
+               x.resolved ? "resolved" : "not resolved"}</span>`
+          : "n/a";
+    return `<tr class="${i === 0 ? "best" : ""}"><td>${m.name}</td>
+      <td>${f(m.rmse_kg, 3)}</td><td>${f(m.mae_kg, 3)}</td>
+      <td>${f(m.mare_pct, 1)}</td><td>${f(m.r2, 3)}</td>
+      <td>${cell}</td>
+      <td class="has-text-grey">${mde.get(m.name) || ""}</td></tr>`;
+  }).join("");
+  document.getElementById("methods").innerHTML = head + `<tbody>${rows}</tbody>`;
+
+  const R = D.resolution;
+  const note = document.getElementById("methodsresolution");
+  if (note && R && R.biomass_table){
+    const b = R.biomass_table;
+    note.innerHTML =
+      `The largest difference in this table is
+       <strong>${b.largest_observed_difference_kg} kg</strong>. The smallest one
+       this design can detect, at 80% power, is
+       <strong>${b.smallest_detectable_difference_kg} kg</strong>. So the eight
+       nulls are one fact about the sample size and not eight about the methods,
+       and no method here is distinguishable from predicting the mean.`;
+  }
+}
+
+/* The ledger. Every comparison the project has made, resolved and unresolved in
+   one place, because the resolved ones live in six different report files and
+   the unresolved ones all live in the table above. Read apart they suggest
+   nothing settled; read together the pattern is that paired counts and paired
+   differences on large samples settle, and RMSE differences on 36 specimens do
+   not. */
+function resolutionSection(){
+  const R = D.resolution, section = document.getElementById("ledger");
+  if (!R || !R.comparisons){ if (section) section.remove(); return; }
+
+  document.getElementById("ledgerfacts").innerHTML = [
+    [String(R.n_resolved), "comparisons resolved"],
+    [String(R.n_unresolved), "still open"],
+    [String(R.n_comparisons), "asked in total"],
+  ].map(([n, l]) =>
+    `<div class="keyfact"><div class="num">${n}</div><div class="lab">${l}</div></div>`
+  ).join("");
+
+  const tag = c => c.verdict === "resolved"
+    ? '<span class="tag is-small is-success">resolved</span>'
+    : c.verdict === "measured"
+      ? '<span class="tag is-small is-info">measured</span>'
+      : '<span class="tag is-small is-light">open</span>';
+
+  const order = {resolved: 0, measured: 1, "not resolved": 2};
+  const rows = [...R.comparisons]
+    .sort((a, b) => order[a.verdict] - order[b.verdict])
+    .map(c => `<tr${c.verdict === "not resolved" ? ' class="pending"' : ""}>
+      <td>${c.question}<br>
+          <span class="is-size-7 has-text-grey">${c.experiment}, n = ${c.n},
+          ${c.design}</span></td>
+      <td>${c.effect}</td>
+      <td>${tag(c)}</td>
+      <td class="is-size-7">${c.evidence}${
+        c.detectable ? `<br><span class="has-text-grey">could detect ${
+          c.detectable}</span>` : ""}</td></tr>`).join("");
+
+  document.getElementById("ledgertable").innerHTML =
+    `<thead><tr><th>Question</th><th>Observed</th><th>Verdict</th>
+     <th>Evidence</th></tr></thead><tbody>${rows}</tbody>`;
 }
 
 function nextTable(){
@@ -697,3 +764,4 @@ function externalSection(){
 }
 
 holdoutSection(); externalSection();
+resolutionSection();

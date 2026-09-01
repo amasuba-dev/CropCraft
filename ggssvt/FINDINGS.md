@@ -1175,6 +1175,78 @@ see.
 
 ---
 
+## 7q. Eight nulls are one fact, and it is about the sample size
+
+The biomass table reports eight comparisons and marks nearly all of them "not
+resolved". Read as it stands, that says the methods are much of a muchness and
+the project could not choose between them. That reading is wrong, and the table
+cannot correct it, because **a null result means nothing until the design says
+what it could have detected**.
+
+`eval/resolution.py` computes it. From each comparison's own paired bootstrap
+interval, the standard error is the half-width over 1.96, and the smallest
+difference the same design would find four times in five is 2.8 standard errors.
+
+| comparison against geometric features | observed | this design detects |
+|---|---|---|
+| 2D + profile | −0.087 kg | 0.205 kg |
+| fused geometry | −0.079 kg | 0.226 kg |
+| direct 2D | −0.075 kg | 0.203 kg |
+| mesh geometry | −0.037 kg | 0.138 kg |
+| mean | +0.024 kg | 0.217 kg |
+| volume allometric | +0.048 kg | 0.217 kg |
+| canopy area allometric | +0.054 kg | 0.246 kg |
+
+**The largest difference in the table is 0.087 kg. The smallest the design can
+detect is 0.138 kg.** Every comparison is between one and a half and ten times
+below its own detection threshold, so the eight nulls are one fact about n = 36
+and not eight facts about the methods.
+
+It follows that **no method in that table is distinguishable from predicting the
+mean**, including the reference. That is a much clearer statement than eight
+tags, and it is the correct one.
+
+### The pattern across every comparison the project has made
+
+Collected into one ledger, resolved and unresolved together, the split is not
+random:
+
+**Resolved (7).** The operator screen, 8 against 31 plausible of the same 36,
+McNemar p = 1.5 × 10⁻⁵ (§7m). The metric inversion, 14 of 14 against known
+geometry, p = 1.2 × 10⁻⁴ (§7p). Depth fusion recovering more of the plant than a
+hull, 14 of 14 (§7p). Three of the four lettuce feature-set comparisons, on 378
+plants with a cultivar held out (§7o). Label efficiency, 8 labels against 32
+(§7j).
+
+**Not resolved (10).** Seven rows of the biomass table, both DINO probe
+comparisons (§5, §7h), and the surface-only condition on lettuce.
+
+Every resolved result is either a **paired count**, where the pairing carries the
+power and n = 14 suffices, or a **paired difference on several hundred samples**,
+or a **ratio inside one experiment**, which does not require separating two
+nearly equal error values at all. Every unresolved result is a difference in RMSE
+between two methods on 36 specimens.
+
+**That is a statement about experimental design, not about the methods**, and it
+is the most useful thing the null results have to say. Three of them are now
+resolved on the lettuce set using the same estimator and the same protocol, which
+is the direct demonstration: the comparisons were fine, the sample was not.
+
+### How to report it
+
+Lead with the ledger, not the table. Quote the detectable column beside every
+null, so a reader can see the design was asked a question it could not answer
+rather than that it answered "no". State once, plainly, that no method on our own
+36 specimens separates from the mean, and that batch label alone beats all of
+them (§7l). Then give the resolved results their own space, because they are the
+findings and they are currently buried among eight grey tags that say nothing.
+
+```bash
+python -m ggssvt.cli resolution
+```
+
+---
+
 ## 8. Bugs found and fixed
 
 **Evaluation tracked gradients.** `predict()` put the model in `.eval()` and
