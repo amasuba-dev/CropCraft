@@ -180,7 +180,7 @@ const materials = [
     + `${Math.max(...masses).toFixed(2)} kg, weighed on the day of capture. No `
     + `calibration sequence was recorded, so every pose is estimated from the depth `
     + `itself (section 3.1).`),
-  ...figure(fig("gallery", "contact_sheet_geometric.png"), 460, "Figure 1",
+  ...figure(fig("gallery", "contact_sheet_geometric.png"), 570, "Figure 1",
     `Every usable specimen, reconstructed from its twelve views. Two elevations and a `
     + `plan per plant. The first ten Eucalyptus captures reconstruct as almost pure `
     + `pedestal, which section 6.1 traces to a staging arrangement rather than to the `
@@ -211,7 +211,7 @@ const methods = [
     + `the multi-view consistency of the segmented points. The refinement saturates at `
     + `plus or minus eight degrees on 25 of 30 views, which bounds every reconstruction `
     + `downstream and is reported rather than hidden.`),
-  ...figure(fig("overlays", "M001_rig.png"), 460, "Figure 2",
+  ...figure(fig("overlays", "M001_rig.png"), 570, "Figure 2",
     `Six of twelve views of one Mango specimen with the recovered plant axis drawn in. `
     + `The dotted arc is the fitted turntable circle.`),
   h2("3.2 Segmentation and reconstruction"),
@@ -268,11 +268,11 @@ const metric = [
     `Both operators on the same fourteen plants, scored two ways. The two measures do `
     + `not merely disagree; they are opposite on every plant. Exact test on the `
     + `discordant pairs: p = ${s.metric_vs_truth.p_value.toExponential(1)}.`),
-  ...figure(fig("figures", "metric_inversion.png"), 460, "Figure 3",
+  ...figure(fig("figures", "metric_inversion.png"), 570, "Figure 3",
     `Carving against fusion under both measures. Points above the diagonal are plants `
     + `where fusion scored better. Agreement with the truth puts every plant above it; `
     + `silhouette agreement puts every plant below.`),
-  ...figure(fig("figures", "maize01_truth_carve_fusion.png"), 460, "Figure 4",
+  ...figure(fig("figures", "maize01_truth_carve_fusion.png"), 570, "Figure 4",
     `One plant, its visual hull and its fused reconstruction at a common scale. The `
     + `hull is 4.1 times the true volume because it fills the gaps between the leaves, `
     + `which is exactly what no viewpoint can see through and therefore exactly what `
@@ -309,7 +309,7 @@ const ourData = [
     + `of ${rec.original.n} against a re-carve control that drifts `
     + `${pct(reciprocity.control.max_drift, 1)} at worst. Regressor family: no member `
     + `resolved, because the constraint was the input rather than the estimator.`),
-  ...figure(fig("figures", "screening_funnel.png"), 440, "Figure 5",
+  ...figure(fig("figures", "screening_funnel.png"), 560, "Figure 5",
     `The four stages, with everything that entered each one rather than only what `
     + `survived. The failed stage is reported at the same weight as the three that `
     + `passed.`),
