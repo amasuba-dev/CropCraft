@@ -74,10 +74,12 @@ class DashboardPayload:
     methods: list[dict]
     summary: dict
     notes: dict
-    # The Pheno4D truth/carve/fusion triple, when it has been exported. Absent
-    # on a machine without the download, and the page omits the section rather
-    # than showing an empty frame.
+    # Results that arrive from their own reports rather than from the caches.
+    # Each is absent on a machine that has not run it, and the page omits the
+    # section rather than showing an empty frame.
     reconstruction: dict | None = None
+    batch_holdout: dict | None = None
+    external: dict | None = None
 
     def to_json(self) -> str:
         return json.dumps(
@@ -87,6 +89,8 @@ class DashboardPayload:
                 "summary": self.summary,
                 "notes": self.notes,
                 "reconstruction": self.reconstruction,
+                "batch_holdout": self.batch_holdout,
+                "external": self.external,
             },
             separators=(",", ":"),
         )
@@ -297,15 +301,16 @@ def build_payload(
         ),
     }
 
-    reconstruction_path = WORK_DIR / "reports" / "reconstruction_clouds.json"
-    reconstruction = (
-        json.loads(reconstruction_path.read_text(encoding="utf-8"))
-        if reconstruction_path.exists() else None
-    )
+    def report(name: str):
+        path = WORK_DIR / "reports" / name
+        return (json.loads(path.read_text(encoding="utf-8"))
+                if path.exists() else None)
 
     return DashboardPayload(
         specimens=specimens, methods=methods, summary=summary, notes=notes,
-        reconstruction=reconstruction,
+        reconstruction=report("reconstruction_clouds.json"),
+        batch_holdout=report("batch_holdout.json"),
+        external=report("external_lettuce.json"),
     )
 
 

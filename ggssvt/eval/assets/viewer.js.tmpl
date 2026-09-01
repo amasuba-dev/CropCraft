@@ -584,3 +584,116 @@ async function reconstructionPanel(){
 }
 
 reconstructionPanel();
+
+/* ------------------------------------------------- batch holdout and transfer
+
+   Two results that were measured after the page was first written and had
+   nowhere to appear. Both are tables rather than renders, so they read straight
+   out of their own report files. Each section removes itself when its report is
+   absent, so a clone that has not run the experiment still builds. */
+function holdoutSection(){
+  const R = D.batch_holdout, section = document.getElementById("holdout");
+  if (!R || !R.rows){ if (section) section.remove(); return; }
+
+  const SHORT = {
+    "geometric, every usable specimen": "geometric features, all 36",
+    "geometric (no DINO)": "geometric features, shared 33",
+    "dinov2-base": "DINOv2 frozen, 33",
+    "dinov2-base + geometry": "DINOv2 with geometry, 33",
+    "batch membership only": "batch label alone",
+  };
+  const by = new Map();
+  for (const r of R.rows){
+    if (!by.has(r.condition)) by.set(r.condition, {});
+    by.get(r.condition)[r.scheme] = r;
+  }
+
+  const rows = [...by.entries()].map(([name, pair]) => {
+    const a = pair.loocv, b = pair.lobo;
+    const gap = a && b ? (b.rmse_kg - a.rmse_kg) : null;
+    const isBatch = name === "batch membership only";
+    return `<tr${isBatch ? ' class="pending"' : ""}>
+      <td>${isBatch ? "<strong>" : ""}${SHORT[name] || name}${isBatch ? "</strong>" : ""}</td>
+      <td>${a ? a.rmse_kg.toFixed(3) : "n/a"}</td>
+      <td>${a ? (a.r2 >= 0 ? "+" : "") + a.r2.toFixed(3) : "n/a"}</td>
+      <td>${b ? b.rmse_kg.toFixed(3) : "n/a"}</td>
+      <td>${b ? (b.r2 >= 0 ? "+" : "") + b.r2.toFixed(3) : "n/a"}</td>
+      <td>${gap == null ? "n/a" : "<strong>+" + gap.toFixed(3) + "</strong>"}</td></tr>`;
+  }).join("");
+
+  document.getElementById("holdouttable").innerHTML =
+    `<thead><tr><th>Condition</th><th>LOOCV RMSE kg</th><th>LOOCV R&sup2;</th>
+     <th>Batch held out, RMSE kg</th><th>R&sup2;</th><th>Inflation kg</th></tr></thead>
+     <tbody>${rows}</tbody>`;
+
+  const batch = by.get("batch membership only");
+  const best = [...by.entries()]
+    .filter(([n]) => n !== "batch membership only" && by.get(n).loocv)
+    .sort((x, y) => x[1].loocv.rmse_kg - y[1].loocv.rmse_kg)[0];
+  const v = document.getElementById("holdoutverdict");
+  if (v && batch && batch.loocv && best) v.innerHTML =
+    `Knowing only which capture batch a plant came from predicts its mass to
+     <strong>${batch.loocv.rmse_kg.toFixed(3)} kg</strong>, R&sup2;
+     ${batch.loocv.r2.toFixed(3)}. The best real method here manages
+     ${best[1].loocv.rmse_kg.toFixed(3)} kg. ${R.n_specimens} specimens in
+     ${Object.keys(R.batches || {}).length} batches.`;
+}
+
+function externalSection(){
+  const R = D.external, section = document.getElementById("external");
+  if (!R || !R.gaps){ if (section) section.remove(); return; }
+
+  const facts = [
+    [String(R.n_after_screen), "plants after the screen"],
+    [`${R.mass_range_g[0]} to ${R.mass_range_g[1]} g`, "continuous mass range"],
+    [String(Object.keys(R.cultivars || {}).length), "cultivars, one held out at a time"],
+  ];
+  document.getElementById("externalfacts").innerHTML = facts.map(([n, l]) =>
+    `<div class="keyfact"><div class="num">${n}</div><div class="lab">${l}</div></div>`
+  ).join("");
+
+  const label = {diameter_cm: "Diameter", height_cm: "Height",
+                 area_cm2: "Projected area against their leaf area"};
+  document.getElementById("externalchecks").innerHTML =
+    `<thead><tr><th>Trait</th><th>Pearson r</th><th>Mean absolute difference</th>
+     <th>n</th></tr></thead><tbody>` +
+    Object.entries(R.measurement_checks).map(([k, c]) =>
+      `<tr><td>${label[k] || k}</td>
+       <td><strong>${c.r >= 0 ? "+" : ""}${c.r.toFixed(3)}</strong></td>
+       <td>${c.mae.toFixed(2)}</td><td>${c.n}</td></tr>`).join("") + "</tbody>";
+
+  const order = Object.keys(R.gaps);
+  const bestKey = order.reduce((a, b) =>
+    R.gaps[a].held_out_cultivar_rmse_kg <= R.gaps[b].held_out_cultivar_rmse_kg ? a : b);
+  document.getElementById("externaltable").innerHTML =
+    `<thead><tr><th>Feature set</th><th>LOOCV RMSE g</th><th>R&sup2;</th>
+     <th>Cultivar held out, RMSE g</th><th>R&sup2;</th>
+     <th>Unscreened R&sup2;</th></tr></thead><tbody>` +
+    order.map(k => {
+      const g = R.gaps[k], win = k === bestKey;
+      return `<tr>
+        <td>${win ? "<strong>" : ""}${k}${win ? "</strong>" : ""}</td>
+        <td>${(g.loocv_rmse_kg * 1000).toFixed(1)}</td>
+        <td>${g.loocv_r2 >= 0 ? "+" : ""}${g.loocv_r2.toFixed(3)}</td>
+        <td>${win ? "<strong>" : ""}${(g.held_out_cultivar_rmse_kg * 1000).toFixed(1)}${win ? "</strong>" : ""}</td>
+        <td>${g.held_out_cultivar_r2 >= 0 ? "+" : ""}${g.held_out_cultivar_r2.toFixed(3)}</td>
+        <td>${g.unscreened_cultivar_r2 >= 0 ? "+" : ""}${g.unscreened_cultivar_r2.toFixed(3)}</td>
+      </tr>`; }).join("") + "</tbody>";
+
+  const paired = R.paired_vs_2d_profile || {};
+  const surface = paired["2D + profile + surface"];
+  const v = document.getElementById("externalverdict");
+  if (v) v.innerHTML =
+    `Holding out a whole cultivar, <strong>${bestKey}</strong> reaches R&sup2;
+     <strong>${R.gaps[bestKey].held_out_cultivar_r2.toFixed(3)}</strong>, where the
+     same estimator and the same protocol give R&sup2; below zero on our own
+     capture batches.` +
+    (surface ? ` Adding the back-projected surface to the outline set improves
+     RMSE by <strong>${Math.abs(surface.difference * 1000).toFixed(1)} g</strong>,
+     paired bootstrap interval [${(surface.low * 1000).toFixed(1)},
+     ${(surface.high * 1000).toFixed(1)}], p = ${surface.p_direction.toFixed(4)}.
+     That is the first time a 3D against 2D comparison in this project has
+     resolved.` : "");
+}
+
+holdoutSection(); externalSection();

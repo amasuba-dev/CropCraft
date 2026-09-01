@@ -321,6 +321,88 @@ BODY = """
 </section>
 
 
+<section class="section" id="holdout">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3">What the capture batch was worth to the score</h2>
+    <p class="content">
+      Leave-one-out withholds a specimen and leaves the other members of its own
+      capture session in the training fold, carrying that session&rsquo;s mean mass.
+      Leave-one-batch-out withholds the whole session. Everything else is held
+      fixed, so the gap between the two columns is what the confound was worth.
+    </p>
+
+    <div class="table-container">
+      <table class="table is-fullwidth is-narrow" id="holdouttable"></table>
+    </div>
+
+    <article class="message is-danger">
+      <div class="message-header"><p>Read the last row first</p></div>
+      <div class="message-body">
+        <p id="holdoutverdict"></p>
+        <p class="is-size-7 mt-3">
+          It uses no geometry, no image and no features. It predicts a specimen&rsquo;s
+          mass as the mean of the rest of its own capture batch, and under
+          leave-one-out that beats every real method here. Under
+          leave-one-batch-out every method falls below the mean predictor.
+        </p>
+      </div>
+    </article>
+  </div>
+</section>
+
+
+<section class="section" id="external">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3">Does any of it transfer?</h2>
+    <p class="content">
+      The confound above cannot be fixed by re-analysis and there will be no
+      further capture, so the question moved to somebody else&rsquo;s plants. The
+      <a href="https://data.4tu.nl/articles/dataset/3rd_Autonomous_Greenhouse_Challenge_Online_Challenge_Lettuce_Images/15023088">4TU
+      greenhouse lettuce set</a> is 387 usable RGB-D pairs across four cultivars
+      and a seven-week growth series, destructively weighed, so its mass range is
+      continuous by construction rather than clustered into sessions.
+    </p>
+
+    <div id="externalfacts" class="keyfacts mb-4"></div>
+
+    <h3 class="title is-5">First, does the measurement work at all?</h3>
+    <p class="content is-size-7">
+      Their height, diameter and leaf area were measured destructively on the same
+      plants, so the depth-derived versions can be checked against a ruler before
+      anything is regressed. A pipeline whose diameter does not track a ruler has
+      no business predicting mass.
+    </p>
+    <div class="table-container">
+      <table class="table is-fullwidth is-narrow" id="externalchecks"></table>
+    </div>
+
+    <h3 class="title is-5">Then the regression, on a cultivar it never saw</h3>
+    <p class="content is-size-7">
+      Holding out a whole cultivar is this dataset&rsquo;s version of holding out a
+      capture batch. The unscreened column is there because the screen uses their
+      measured diameter, which correlates with mass, so a screened score is
+      selected partly on the label.
+    </p>
+    <div class="table-container">
+      <table class="table is-fullwidth is-narrow" id="externaltable"></table>
+    </div>
+
+    <article class="message is-success">
+      <div class="message-header"><p>It transfers, and 3D earns its place</p></div>
+      <div class="message-body">
+        <p id="externalverdict"></p>
+        <p class="is-size-7 mt-3">
+          One top-down view cannot be carved or fused, so only the image-only half
+          of the pipeline runs here. The surface descriptors come from
+          back-projecting the depth map into a metric point cloud: rugosity, leaf
+          angle from the normals, hull volume, and how the height is distributed.
+        </p>
+      </div>
+    </article>
+  </div>
+</section>
+
+
 <section class="section" id="reconstruction">
   <div class="container is-max-desktop">
     <h2 class="title is-3">A plant whose true shape is known</h2>
