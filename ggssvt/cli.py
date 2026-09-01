@@ -321,6 +321,16 @@ def cmd_virtual_views(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_plots(args: argparse.Namespace) -> int:
+    """Figures for the batch holdout, the transfer and the virtual views."""
+    from .eval.plots import run
+
+    made = run(verbose=not args.quiet)
+    if not made:
+        print("nothing to draw: run batch-holdout, external or virtual-views first")
+    return 0
+
+
 def cmd_viewpoint(args: argparse.Namespace) -> int:
     """H2: agreement with a view the reconstruction never saw. No GPU."""
     from .eval.viewpoint import run
@@ -1352,6 +1362,12 @@ def build_parser() -> argparse.ArgumentParser:
                          help="stop after this many plants")
     virtual.add_argument("--quiet", action="store_true")
     virtual.set_defaults(func=cmd_virtual_views)
+
+    plots = sub.add_parser(
+        "plots", help="draw the figures for the newer experiments (CPU, ~1 min)",
+    )
+    plots.add_argument("--quiet", action="store_true")
+    plots.set_defaults(func=cmd_plots)
 
     viewpoint = sub.add_parser(
         "viewpoint", help="H2: held-out-view consistency (CPU, ~25 min)"
