@@ -128,10 +128,10 @@ nohup python -m ggssvt.campaign --plan core --device cuda --workers 8 --batch-si
 
 | run | closes | prediction |
 |---|---|---|
-| `baseline_cnn` | the reference for everything below | — |
+| `baseline_cnn` | the reference for everything below | n/a |
 | `baseline_fused` | does a *trained* model inherit the fusion advantage the classical features got, 0.544 to 0.335? | unknown, and this is the interesting one |
 | `h2_no_geometry` | **H2**, ablating geometry grounding | grounding helps, or H2 is wrong |
-| `h1_dinov2` | **H1**, self-supervised ViT against the CNN stem | — |
+| `h1_dinov2` | **H1**, self-supervised ViT against the CNN stem | n/a |
 | `h3_bands_8_freq7` | **H3**, encoding matched to the grid Nyquist, 41.7 cyc/m | matches the baseline at lower cost |
 | `h3_bands_6_freq6` | **H3**, half Nyquist, 20.8 cyc/m | **should hurt** |
 | `h3_bands_16_freq10` | **H3**, eight times Nyquist, 333 cyc/m | **should add nothing** |
@@ -387,8 +387,8 @@ feasibility results is written so that result strengthens it.
 ## The no-new-data plan
 
 **Decision, 1 September 2026: no further capture.** The 36 specimens are the
-dataset. That closes the route FINDINGS section 10 recommended -- another capture
-campaign spanning a continuous mass range -- so the confound has to be handled by
+dataset. That closes the route FINDINGS section 10 recommended, another capture
+campaign spanning a continuous mass range, so the confound has to be handled by
 measurement and by external data instead of by collection.
 
 Three things replace it. The first two cost nothing and are done; the third is
@@ -410,7 +410,7 @@ the number to report**:
 | geometric, all 36 | 0.458 kg (R² +0.312) | 1.151 kg (R² −3.339) | **+0.692 kg** |
 | geometric, shared 33 | 0.576 kg (R² −0.080) | 1.105 kg (R² −2.970) | +0.529 kg |
 | DINOv2 frozen, 33 | 0.385 kg (R² +0.518) | 0.921 kg (R² −1.758) | +0.536 kg |
-| **batch membership only** | **0.351 kg (R² +0.600)** | — | — |
+| **batch membership only** | **0.351 kg (R² +0.600)** | n/a | n/a |
 
 Read the last row first. Predicting a specimen's mass from the mean of the rest
 of its own batch, using no geometry and no image at all, **beats every real
@@ -424,7 +424,7 @@ against mass.
 
 ### 2. Use the paired tests the designs already earn
 
-The plausibility counts are paired -- the same 36 reconstructions, the same
+The plausibility counts are paired: the same 36 reconstructions, the same
 criterion, one operator changed. Comparing 8 with 31 as independent samples
 throws the pairing away, and the pairing is where the power is. Exact McNemar
 over the 29 discordant specimens (3 favouring carving, 26 favouring fusion):
@@ -440,7 +440,7 @@ applies to the reciprocity rules and the view-count sweep.
 Both are ungated and download without registration. Confirm the licence on each
 landing page before committing.
 
-**Reference geometry -- [Pheno4D](https://www.ipb.uni-bonn.de/data/pheno4d/)**
+**Reference geometry, [Pheno4D](https://www.ipb.uni-bonn.de/data/pheno4d/)**
 (Bonn; 7 maize, 7 tomato, ~260M labelled points, organ-level labels).
 
 The move is not to run the pipeline *on* Pheno4D, which has no images. It is to
@@ -450,7 +450,7 @@ known cloud. That buys three things nothing in this project has had:
 
 - the implied-density criterion calibrated against ground truth, not defended on
   physical plausibility alone;
-- the silhouette-IoU inversion *demonstrated* rather than inferred -- with a
+- the silhouette-IoU inversion *demonstrated* rather than inferred, with a
   reference cloud, true IoU and Chamfer distance can be computed and the metric
   shown ranking backwards;
 - reconstruction error separated from registration error, because the virtual
@@ -459,13 +459,13 @@ known cloud. That buys three things nothing in this project has had:
 `ggssvt/eval/viz.py` already rasterises point clouds, so the renderer is mostly
 in place.
 
-**Mass labels -- [3rd Autonomous Greenhouse Challenge lettuce](https://data.4tu.nl/articles/dataset/3rd_Autonomous_Greenhouse_Challenge_Online_Challenge_Lettuce_Images/15023088)**
+**Mass labels, [3rd Autonomous Greenhouse Challenge lettuce](https://data.4tu.nl/articles/dataset/3rd_Autonomous_Greenhouse_Challenge_Online_Challenge_Lettuce_Images/15023088)**
 (4TU, DOI `10.4121/15023088`): 388 plants, RealSense D415 RGB-D, four cultivars
 across seven weekly stages, with destructively measured fresh weight, dry weight,
 height, diameter and leaf area.
 
 A seven-week growth series in one facility has a continuous mass range by
-construction -- it is what V001–V008 was trying to be, at 388 plants instead of
+construction: it is what V001–V008 was trying to be, at 388 plants instead of
 8. It is single top-down RGB-D, so the 12-view carve and fusion cannot run on it;
 but `direct 2D` and `2D + profile`, which are currently the two best methods,
 transfer directly. Report the sensor shift (their RealSense against our Kinect
@@ -478,9 +478,9 @@ built, the screening criterion designed, and the operator, reciprocity and
 metric-inversion findings made. The public data becomes the **external-validation**
 set. Both claims then stand on the evidence that actually supports them:
 
-- *"reconstructed geometry separates plant size classes"* -- on our 36, with the
+- *"reconstructed geometry separates plant size classes"*, on our 36, with the
   LOOCV/LOBO gap quoted;
-- *"the regression transfers to an independent 388-plant set"* -- or it does not,
+- *"the regression transfers to an independent 388-plant set"*, or it does not,
   which is also a result worth having.
 
 ### Order of work
@@ -497,7 +497,7 @@ set. Both claims then stand on the evidence that actually supports them:
 ## The external validation set, in practice
 
 The 4TU lettuce download (DOI `10.4121/15023088`) unpacks into `dataset_biomass/`
-at the repository root -- 388 RGB-D pairs, `GroundTruth_All_388_Images.json`, and
+at the repository root, 388 RGB-D pairs, `GroundTruth_All_388_Images.json`, and
 a ReadMe carrying the RealSense intrinsics. It is gitignored: about 1 GB, and it
 is somebody else's data to distribute.
 
@@ -512,7 +512,7 @@ Later runs read the cache. `--force` re-measures.
 ### Two things the pipeline had to learn to do
 
 **Excess green loses half the dataset.** Two of the four cultivars are red-leaf.
-Satine measures R 80, G 49, B 24 -- an excess green of **−0.02**, which is
+Satine measures R 80, G 49, B 24: an excess green of **−0.02**, which is
 indistinguishable from concrete. Segmenting these images the way we segment our
 own would silently drop an entire cultivar, and the plants it dropped would be
 the large ones, because the red varieties reach the top of the mass range.
@@ -524,7 +524,7 @@ top of* the crate, so anything raised above the tray surface is plant. Saturatio
 then removes the tray's own lid, which is at tray height but unsaturated.
 
 **The reference surface is the tray, not the floor.** They are only about 12 cm
-apart and both read as bright and unsaturated -- tray at value 172, saturation
+apart and both read as bright and unsaturated, tray at value 172, saturation
 0.07; concrete at 124 and 0.08. Taking the modal depth over the whole region of
 interest returns whichever fills more of it, and when it returns the floor every
 height comes out ~12 cm too large, which is taller than most of the plants. The
@@ -536,14 +536,14 @@ it has the same answer: measure the surface, do not assume it.
 
 The ground truth has 388 measurements but the archive pairs with only 387 of
 them. `Image332` names `RGB_332.png`, which is not in the folder, while an
-unreferenced `RGB_322.png` is -- and no `Image322` record or `Depth_322.png`
+unreferenced `RGB_322.png` is, and no `Image322` record or `Depth_322.png`
 exists. A misnamed file is the obvious explanation.
 
 It was tested rather than assumed. If `RGB_322` really photographs the plant in
 `Depth_332`, the saturated region of the one and the raised region of the other
 describe the same object and should overlap more than a mismatched pair does.
 The candidate scored 0.163, and known-correct pairs from the same run scored
-between 0.151 and 0.321 -- the check does not discriminate at all, so it settles
+between 0.151 and 0.321: the check does not discriminate at all, so it settles
 nothing.
 
 The record is therefore skipped and counted, not repaired. Substituting on a
@@ -572,7 +572,7 @@ python -c "from ggssvt.eval.virtual_views import export_clouds; export_clouds('M
 python -m ggssvt.cli dashboard              # rebuilds index.html
 ```
 
-`export_clouds` writes `reports/reconstruction_clouds.json` -- about 2 KB, the
+`export_clouds` writes `reports/reconstruction_clouds.json`, about 2 KB, the
 truth, the carve and the fusion as deflated voxel indices in the same encoding
 the specimen viewer already uses. `build_payload` picks it up if it is there and
 omits the section if it is not, so a clone without the 12 GB Pheno4D download
@@ -582,12 +582,12 @@ still builds a correct page.
 bindings and no browser target, so it cannot go in the page at all; it would also
 put boost, PCL and OpenCV between a fresh clone and a working build, on Linux
 only. What it is good for is offline beauty renders, and
-`virtual_views.export_meshes` writes `.obj` for exactly that -- a format EasyPBR,
+`virtual_views.export_meshes` writes `.obj` for exactly that: a format EasyPBR,
 MeshLab, Blender and three.js all read, so the choice of renderer never touches
 the pipeline.
 
 Two things about the panel are deliberate. The three canvases share one camera,
-because the comparison only works at a single angle -- drag any one and all three
+because the comparison only works at a single angle, drag any one and all three
 turn. And these clouds are *not* downsampled, unlike the specimen viewer's: a
 carved Eucalyptus is tens of thousands of voxels and halves fine, but a maize
 plant at 12 mm is 342 voxels, and halving again leaves 114, which reads as

@@ -180,7 +180,7 @@ def build_payload(
                     "volume_l": round(q.volume_m3 * 1000, 2),
                     # Computed at preprocess time against the global constant.
                     # `above_rim_l` on the entry is the per-specimen figure, and
-                    # is the one the density is derived from -- do not show both.
+                    # is the one the density is derived from, do not show both.
                     "above_ground_l": round(q.above_ground_volume_m3 * 1000, 2),
                     "height_m": round(q.height_m, 3),
                     "usable": bool(q.is_usable()),

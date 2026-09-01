@@ -70,8 +70,8 @@ are stale.
 Two things about it are deliberate and will look wrong if changed without
 knowing why. The categorical colours are `0E9384, 7B3FA8, C4622D, 2563C9` **in
 that order**, which passes a colour-vision-deficiency separation check that the
-obvious teal/green/orange ordering fails. And every chart value is an integer —
-RMSE in grams rather than kilograms, IoU in percent — because PowerPoint renders
+obvious teal/green/orange ordering fails. And every chart value is an integer,
+RMSE in grams rather than kilograms and IoU in percent, because PowerPoint renders
 a decimal separator in the *viewer's* locale, so on a machine set to a comma
 convention `0.457` becomes `0,457` and fights the prose on the same slide. A
 locale tag in the format code does not override it; only avoiding decimals does.

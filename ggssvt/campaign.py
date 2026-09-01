@@ -3,7 +3,7 @@
 Designed to be started and left. Every run writes its own JSON result and a
 completion marker, so a campaign that dies at 3am can be restarted and will skip
 what already finished rather than starting over. Failures are recorded and the
-campaign continues -- one OOM on the largest condition should not cost the other
+campaign continues: one OOM on the largest condition should not cost the other
 eleven runs.
 
     python -m ggssvt.campaign --plan full --device cuda
@@ -219,7 +219,7 @@ def dataset_fingerprint(cache_dir: Path) -> str:
     """Identity of the targets a run was fitted against.
 
     Resume skips any run already marked done, which is right after a crash and
-    badly wrong after the ground truth changes -- an overnight campaign would
+    badly wrong after the ground truth changes: an overnight campaign would
     skip every run and report numbers fitted to targets that no longer exist.
     Recording which specimens and which masses a result came from lets the resume
     tell those two cases apart.
@@ -280,7 +280,7 @@ def execute(
 
     started = time.time()
     # The batch size and seed live on the train config, not the run, so they
-    # were absent from the recorded result -- and "what batch size was that
+    # were absent from the recorded result, and "what batch size was that
     # fitted at?" is the first question anyone comparing two runs will ask.
     result = RunResult(
         name=run.name,
@@ -490,7 +490,7 @@ def run_campaign(
                 if stored and stored != current:
                     if verbose:
                         print(
-                            f"[{index}/{len(runs)}] {run.name}: re-running -- it was "
+                            f"[{index}/{len(runs)}] {run.name}: re-running: it was "
                             f"fitted against different targets ({stored}, now {current})"
                         )
                 else:

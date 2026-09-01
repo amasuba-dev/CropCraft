@@ -80,7 +80,7 @@ class PoseFreeReport:
             for method, outcomes in grouped.items():
                 good = [o for o in outcomes if o.ok and o.agreement]
                 if not good:
-                    lines.append(f"{method:10s} {'—':>3s}  no successful reconstructions")
+                    lines.append(f"{method:10s} {'n/a':>3s}  no successful reconstructions")
                     continue
                 centre = np.mean([o.agreement["centre_rmse_m"] for o in good])
                 rot = np.mean([o.agreement["rotation_rmse_deg"] for o in good])

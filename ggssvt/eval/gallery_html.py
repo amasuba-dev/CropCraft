@@ -1,8 +1,8 @@
 """Builds the interactive reconstruction gallery as a standalone HTML page.
 
 Every carved volume is embedded as zlib-compressed uint8 voxel coordinates and
-decompressed in the browser, so the whole gallery -- both segmenters, every
-specimen -- is one self-contained file with no external requests.
+decompressed in the browser, so the whole gallery (both segmenters, every
+specimen) is one self-contained file with no external requests.
 
 Rendering is a painter's-algorithm point cloud on a 2D canvas rather than WebGL:
 the volumes are a few thousand voxels each, the depth cue is the whole point, and
@@ -365,7 +365,7 @@ let sort = "id";
 let yaw = 0.6, pitch = 0.22, zoom = 0.92;
 const panes = [];
 
-function fmt(v, d = 2) { return v === null || v === undefined ? "—" : Number(v).toFixed(d); }
+function fmt(v, d = 2) { return v === null || v === undefined ? "n/a" : Number(v).toFixed(d); }
 
 function buildStats() {
   const segs = RAW.segmenters;
@@ -491,9 +491,9 @@ function facts() {
   const delta = g && s ? (s.volume_l - g.volume_l) / g.volume_l * 100 : null;
   const rows = [
     ["Fresh mass", fmt(ref.target_kg) + " kg"],
-    ["Hull volume", (g ? fmt(g.volume_l, 1) : "—") + (s ? " → " + fmt(s.volume_l, 1) : "") + " L"],
+    ["Hull volume", (g ? fmt(g.volume_l, 1) : "n/a") + (s ? " → " + fmt(s.volume_l, 1) : "") + " L"],
     ["Height", fmt(ref.height_m) + " m"],
-    ["SAM3D Δ volume", delta === null ? "—" : (delta > 0 ? "+" : "") + fmt(delta, 1) + "%"],
+    ["SAM3D Δ volume", delta === null ? "n/a" : (delta > 0 ? "+" : "") + fmt(delta, 1) + "%"],
   ];
   document.getElementById("facts").innerHTML = rows
     .map(([k, v]) => `<div class="fact"><span class="k eyebrow">${k}</span><br><span class="v">${v}</span></div>`)

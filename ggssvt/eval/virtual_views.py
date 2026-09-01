@@ -3,7 +3,7 @@
 Every reconstruction claim in this project has been argued rather than measured,
 because no reference geometry for our own specimens exists. The implied bulk
 density criterion was built to stand in for one (§7b), and §7f goes further and
-argues that silhouette IoU ranks our reconstructions *backwards* -- which rests
+argues that silhouette IoU ranks our reconstructions *backwards*, which rests
 on the density screen disagreeing with the metric, an inference, not a
 demonstration.
 
@@ -31,8 +31,8 @@ against a known volume; here it can be.
 noise, no segmentation error, no missing returns. A reconstruction that fails
 here fails for geometric reasons alone, which makes this an upper bound on our
 real performance rather than an estimate of it. That is the right direction for
-the argument -- an operator that cannot recover a plant from perfect views will
-not recover one from Kinect returns -- but it is not a claim about our captures.
+the argument: an operator that cannot recover a plant from perfect views will
+not recover one from Kinect returns, but it is not a claim about our captures.
 """
 
 from __future__ import annotations
@@ -55,7 +55,7 @@ CAMERA_HEIGHT_M = 1.0
 
 # Each point is splatted over this radius in pixels. A subsampled cloud leaves
 # pin-holes in the depth map otherwise, and a hole reads to the carve as
-# background -- free space -- which would eat the plant for a reason that has
+# background, free space, which would eat the plant for a reason that has
 # nothing to do with the operator under test.
 SPLAT_RADIUS = 1
 
@@ -215,7 +215,7 @@ def silhouette_iou(occupancy: np.ndarray, rendered: Rendered, *,
 
     The metric §7f is about. A visual hull agrees with the silhouettes it was
     carved from by construction, so this rewards exactly the failure it should
-    catch -- which is the claim this function exists to test rather than assert.
+    catch, which is the claim this function exists to test rather than assert.
     """
     from ..geometry.carving import voxel_grid_centres
 
@@ -493,7 +493,7 @@ def export_meshes(
 
 
 def export_clouds(
-    plant: str = "Maize01",
+    plants: str | list[str] | None = None,
     *,
     out: Path | None = None,
     subsample: int = 2,
@@ -501,19 +501,58 @@ def export_clouds(
 ) -> dict:
     """Encode the truth, the carve and the fusion for the project page.
 
-    Same encoding the specimen viewer already uses -- occupied voxel indices as
-    byte triples, deflated and base64'd -- so the page's existing renderer draws
+    Same encoding the specimen viewer already uses, occupied voxel indices as
+    byte triples, deflated and base64'd, so the page's existing renderer draws
     these with no new code beyond a panel that shares one camera across three
     canvases. Sharing the camera is the point: read side by side at the same
     angle, the hull is visibly swallowing the gaps between the leaves, which no
     still figure and no pair of numbers conveys as directly.
     """
-    from ..data.pheno4d import DATASET_DIR, latest_per_plant, load_scan, voxelise
+    from ..data.pheno4d import DATASET_DIR, latest_per_plant, voxelise
     from ..geometry.carving import carve, largest_connected_component
     from ..geometry.fusion import FUSION_VOXEL_M, fuse
     from .dashboard_data import _quantise
 
-    path = next(p for p in latest_per_plant(DATASET_DIR) if p.parent.name == plant)
+    available = latest_per_plant(DATASET_DIR)
+    if plants is None:
+        wanted = [p.parent.name for p in available]
+    elif isinstance(plants, str):
+        wanted = [plants]
+    else:
+        wanted = list(plants)
+
+    entries = []
+    for name in wanted:
+        entries.append(_one_plant(
+            name, available, subsample=subsample, verbose=verbose,
+            voxelise=voxelise, carve=carve,
+            largest_connected_component=largest_connected_component,
+            fuse=fuse, fusion_voxel_m=FUSION_VOXEL_M, quantise=_quantise,
+        ))
+
+    payload = {
+        "source": "Pheno4D (Schunck et al., PLOS ONE 2021)",
+        "n_views": N_VIEWS,
+        "voxel_size_m": VOXEL_SIZE_M,
+        "plants": entries,
+    }
+    out = out or WORK_DIR / "reports" / "reconstruction_clouds.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
+    if verbose:
+        print(f"  wrote {out} ({out.stat().st_size // 1024} KB, "
+              f"{len(entries)} plants)")
+    return payload
+
+
+def _one_plant(
+    plant, available, *, subsample, verbose,
+    voxelise, carve, largest_connected_component, fuse, fusion_voxel_m, quantise,
+) -> dict:
+    """Reconstruct one plant three ways and encode all three for the page."""
+    from ..data.pheno4d import load_scan
+
+    path = next(p for p in available if p.parent.name == plant)
     scan = load_scan(path, subsample=subsample)
 
     rendered = render(scan.points, target_z_m=max(scan.height_m / 2.0, 0.1))
@@ -527,7 +566,7 @@ def export_clouds(
         "fusion": largest_connected_component(_downsample(
             fuse(rendered.depth_m, rendered.rotation, rendered.centre,
                  mask=rendered.mask).interior,
-            round(VOXEL_SIZE_M / FUSION_VOXEL_M))),
+            round(VOXEL_SIZE_M / fusion_voxel_m))),
     }
 
     litres = VOXEL_SIZE_M ** 3 * 1000.0
@@ -557,26 +596,21 @@ def export_clouds(
             # carved Eucalyptus is tens of thousands of voxels; a maize plant at
             # 12 mm is 342, and halving again leaves 114, which reads as
             # scattered dust rather than a plant.
-            "cloud": _quantise(grid, downsample=1),
+            "cloud": quantise(grid, downsample=1),
         })
-        if verbose:
-            print(f"  {name:7s} {volume_l:6.3f} L  "
-                  f"{int(grid.sum()):6d} voxels")
+    if verbose:
+        ratios = "  ".join(
+            f"{a['key']} {a['volume_l']:.2f} L" for a in arms)
+        print(f"  {plant:9s} {ratios}")
 
-    payload = {
+    return {
         "plant": plant,
         "species": scan.species,
-        "source": "Pheno4D (Schunck et al., PLOS ONE 2021)",
-        "n_views": N_VIEWS,
+        "n_organs": scan.n_organs,
+        "height_m": round(scan.height_m, 3),
         "true_volume_l": round(true_volume_l, 3),
         "arms": arms,
     }
-    out = out or WORK_DIR / "reports" / "reconstruction_clouds.json"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
-    if verbose:
-        print(f"  wrote {out} ({out.stat().st_size // 1024} KB)")
-    return payload
 
 
 __all__ = [

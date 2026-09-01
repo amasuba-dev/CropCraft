@@ -443,81 +443,144 @@ progressTable();
 
 /* ------------------------------------------------------------------ Pheno4D
 
-   Three reconstructions of one plant whose true shape is known, sharing one
-   camera. Sharing it is the whole point: at a single angle the hull is visibly
-   filling the gaps between the leaves, which neither a still figure nor a pair
-   of IoU numbers conveys as directly.
+   Fourteen laser-scanned plants, each reconstructed three ways, sharing one
+   camera across the three panels. Sharing it is the whole point: at a single
+   angle the hull is visibly filling the gaps between the leaves, which neither
+   a still figure nor a pair of IoU numbers conveys as directly.
 
    Colour is forced to depth here. The specimen viewer's default splits pot from
    canopy at a measured rim, and a laser-scanned maize plant standing on soil has
    no pot for that to mean anything about. */
+const RECON = { yaw: 0.62, pitch: 0.18, zoom: 1.15, plant: null, clouds: new Map() };
+
+async function reconArm(entry, arm){
+  const key = entry.plant + "/" + arm.key;
+  if (!RECON.clouds.has(key))
+    RECON.clouds.set(key, await decodeCloud(arm.cloud, key));
+  return RECON.clouds.get(key);
+}
+
+function reconDraw(){
+  const entry = RECON.plant;
+  if (!entry) return;
+  for (const arm of entry.arms){
+    const cv = document.getElementById("recon-" + arm.key);
+    const c = RECON.clouds.get(entry.plant + "/" + arm.key);
+    if (cv && c) draw(cv, c, {dot: 4, mode: "height",
+      yawL: RECON.yaw, pitchL: RECON.pitch, zoomL: RECON.zoom});
+  }
+}
+
+function reconZoom(factor){
+  RECON.zoom = Math.max(0.4, Math.min(4.0, RECON.zoom * factor));
+  reconDraw();
+}
+
+async function reconSelect(entry){
+  RECON.plant = entry;
+  await Promise.all(entry.arms.map(a => reconArm(entry, a)));
+
+  for (const arm of entry.arms){
+    const stat = document.getElementById("reconstat-" + arm.key);
+    if (stat) stat.innerHTML =
+      `${arm.volume_l.toFixed(2)} L` +
+      (arm.ratio ? ` &middot; <strong>${arm.ratio}&times;</strong> true` : "") +
+      (arm.iou != null ? `<br>IoU against the truth ${arm.iou.toFixed(3)}` : "");
+  }
+
+  const carve = entry.arms.find(a => a.key === "carve");
+  const fusion = entry.arms.find(a => a.key === "fusion");
+  const note = document.getElementById("reconstruction-note");
+  if (note) note.innerHTML =
+    `${entry.plant}, ${entry.species}, ${entry.n_organs} labelled organs,
+     ${(entry.height_m * 100).toFixed(0)} cm tall, from ${D.reconstruction.source}.
+     True volume ${entry.true_volume_l.toFixed(2)} L. Twelve virtual views, the
+     same carve and the same fusion the pipeline uses. The views are clean, with
+     exact poses, no sensor noise and no segmentation error, so this bounds the
+     operator from above rather than estimating what the real captures do.`;
+
+  const inv = document.getElementById("reconstruction-inversion");
+  if (inv && carve && fusion){
+    const truthWins = fusion.iou > carve.iou ? "fusion" : "carving";
+    const metricWins = fusion.silhouette_iou > carve.silhouette_iou
+      ? "fusion" : "carving";
+    inv.innerHTML =
+      `Against the truth, ${truthWins} wins: IoU
+       <strong>${fusion.iou.toFixed(3)}</strong> for fusion against
+       ${carve.iou.toFixed(3)} for carving. Scored the usual way, by reprojecting
+       each reconstruction into the silhouettes it came from, ${metricWins} wins:
+       <strong>${carve.silhouette_iou.toFixed(3)}</strong> for carving against
+       ${fusion.silhouette_iou.toFixed(3)} for fusion. Across fourteen plants the
+       two measures disagree on <strong>every one</strong>.`;
+  }
+
+  document.querySelectorAll("#reconstruction-plants button").forEach(b =>
+    b.setAttribute("aria-pressed", String(b.dataset.plant === entry.plant)));
+  syncPressed(document.getElementById("reconstruction-plants"));
+  reconDraw();
+}
+
 async function reconstructionPanel(){
   const R = D.reconstruction;
+  const section = document.getElementById("reconstruction");
+  if (!R || !R.plants || !R.plants.length){ if (section) section.remove(); return; }
+
+  const picker = document.getElementById("reconstruction-plants");
+  picker.innerHTML = R.plants.map(p =>
+    `<button class="button is-small" data-plant="${p.plant}"
+             aria-pressed="false">${p.plant}</button>`).join("");
+  picker.onclick = async e => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    await reconSelect(R.plants.find(p => p.plant === b.dataset.plant));
+  };
+
   const host = document.getElementById("reconstruction-panels");
-  if (!host || !R) { const s = document.getElementById("reconstruction");
-                     if (s) s.remove(); return; }
-
-  let rYaw = 0.62, rPitch = 0.18;
-  const clouds = {};
-
-  host.innerHTML = R.arms.map(a => `
+  host.innerHTML = R.plants[0].arms.map(a => `
     <div class="column">
       <canvas class="recon" id="recon-${a.key}"
               style="width:100%;aspect-ratio:1;touch-action:none;cursor:grab"></canvas>
       <p class="mt-2"><strong>${a.title}</strong><br>
         <span class="is-size-7 has-text-grey">${a.detail}</span></p>
-      <p class="is-size-7">${a.volume_l.toFixed(2)} L${
-        a.ratio ? ` &middot; <strong>${a.ratio}&times;</strong> true` : ""}${
-        a.iou != null ? `<br>IoU against the truth ${a.iou.toFixed(3)}` : ""}</p>
+      <p class="is-size-7" id="reconstat-${a.key}"></p>
     </div>`).join("");
 
-  for (const arm of R.arms) clouds[arm.key] = await decodeCloud(arm.cloud, arm.key);
-
-  const redraw = () => {
-    for (const arm of R.arms){
-      const cv = document.getElementById("recon-" + arm.key);
-      if (cv) draw(cv, clouds[arm.key],
-                   {dot:4, mode:"height", yawL:rYaw, pitchL:rPitch, zoomL:1.15});
-    }
-  };
-
-  for (const arm of R.arms){
+  /* One camera for all three canvases. Dragging or scrolling on any of them
+     moves every panel, because a comparison at two different angles is not a
+     comparison. */
+  for (const arm of R.plants[0].arms){
     const cv = document.getElementById("recon-" + arm.key);
     if (!cv) continue;
-    let drag=false, lx=0, ly=0;
+    let drag = false, lx = 0, ly = 0;
     cv.addEventListener("pointerdown", e => {
-      drag=true; lx=e.clientX; ly=e.clientY;
-      cv.setPointerCapture(e.pointerId); cv.style.cursor="grabbing"; });
+      drag = true; lx = e.clientX; ly = e.clientY;
+      cv.setPointerCapture(e.pointerId); cv.style.cursor = "grabbing"; });
     cv.addEventListener("pointermove", e => {
-      if(!drag) return;
-      rYaw += (e.clientX-lx)*0.01;
-      rPitch = Math.max(-1.4, Math.min(1.4, rPitch + (e.clientY-ly)*0.01));
-      lx=e.clientX; ly=e.clientY; redraw(); });
-    const stop = e => { drag=false; cv.style.cursor="grab";
-      try{ cv.releasePointerCapture(e.pointerId) }catch(_){} };
+      if (!drag) return;
+      RECON.yaw += (e.clientX - lx) * 0.01;
+      RECON.pitch = Math.max(-1.4, Math.min(1.4,
+        RECON.pitch + (e.clientY - ly) * 0.01));
+      lx = e.clientX; ly = e.clientY; reconDraw(); });
+    const stop = e => { drag = false; cv.style.cursor = "grab";
+      try { cv.releasePointerCapture(e.pointerId) } catch(_){} };
     cv.addEventListener("pointerup", stop);
     cv.addEventListener("pointercancel", stop);
+    cv.addEventListener("wheel", e => {
+      e.preventDefault(); reconZoom(e.deltaY > 0 ? 0.92 : 1.08); },
+      {passive: false});
   }
-  addEventListener("resize", redraw);
-  redraw();
 
-  const carve = R.arms.find(a => a.key === "carve");
-  const fusion = R.arms.find(a => a.key === "fusion");
-  const note = document.getElementById("reconstruction-note");
-  if (note) note.innerHTML =
-    `${R.plant}, ${R.species}, from ${R.source}. Twelve virtual views, the same
-     carve and the same fusion the pipeline uses. The views are clean &mdash;
-     exact poses, no sensor noise, no segmentation error &mdash; so this bounds
-     the operator from above rather than estimating what the real captures do.`;
+  const zoomHost = document.getElementById("reconstruction-zoom");
+  if (zoomHost) zoomHost.onclick = e => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.zoom === "reset"){
+      RECON.zoom = 1.15; RECON.yaw = 0.62; RECON.pitch = 0.18; reconDraw();
+    } else reconZoom(Number(b.dataset.zoom));
+  };
 
-  const inv = document.getElementById("reconstruction-inversion");
-  if (inv && carve && fusion) inv.innerHTML =
-    `Against the truth, fusion wins: IoU <strong>${fusion.iou.toFixed(3)}</strong>
-     against ${carve.iou.toFixed(3)}. Scored the usual way, by reprojecting each
-     reconstruction into the silhouettes it came from, carving wins:
-     <strong>${carve.silhouette_iou.toFixed(3)}</strong> against
-     ${fusion.silhouette_iou.toFixed(3)}. Across fourteen plants the two measures
-     disagree on <strong>every one</strong>.`;
+  addEventListener("resize", reconDraw);
+  await reconSelect(R.plants[0]);
 }
 
 reconstructionPanel();

@@ -1,7 +1,7 @@
 """Figures for the results that arrived without any.
 
 The batch holdout, the lettuce transfer and the virtual-view reconstruction all
-produced JSON and tables and no pictures, and one of them -- §7p -- is far more
+produced JSON and tables and no pictures, and one of them, §7p, is far more
 convincing as a picture than as a table. A reader who sees fourteen points on the
 wrong side of a diagonal understands the metric inversion immediately; the same
 reader given a column of numbers has to be told what to conclude.
@@ -145,7 +145,7 @@ def _project(
     ``splat`` widens each point into a square. A laser cloud is dense enough to
     read as a plant one pixel at a time; a voxel grid is not, and drawn as bare
     points a 4.5-pixel voxel looks like a sparse cloud rather than the solid
-    block it is -- which would hide exactly the volume difference the figure
+    block it is, which would hide exactly the volume difference the figure
     exists to show.
     """
     from .architecture import VIRIDIS
@@ -218,7 +218,7 @@ def figure_reconstruction(
 
     # The working volume is 1.5 m across and these plants are under 0.4 m tall,
     # so drawing the whole grid leaves the subject a speck. The frame is cropped
-    # to what the three panels actually occupy -- one extent for all of them, so
+    # to what the three panels actually occupy: one extent for all of them, so
     # the carve's overshoot is visible as size rather than hidden by rescaling.
     spans = [scan.points, centres[carved], centres[fused]]
     reach = max(

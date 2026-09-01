@@ -4,8 +4,8 @@ Adapted from https://github.com/nerfies/nerfies.github.io (CC BY-SA 4.0). The
 template's licence asks for a link back, which the footer carries.
 
 Why that template and not something bespoke: it is the layout an academic reader
-already knows how to scan -- title, authors, a row of links, teaser, abstract,
-then method and results -- so nothing about the page needs learning before the
+already knows how to scan, title, authors, a row of links, teaser, abstract,
+then method and results, so nothing about the page needs learning before the
 content does. It is also plain: Bulma's defaults, two Google fonts, black
 buttons, white ground. Restraint is the point.
 
@@ -327,11 +327,22 @@ BODY = """
     <p class="content">
       Every claim above rests on a criterion that stands in for reference geometry,
       because no laser scan of these specimens exists. This one does not.
-      <a href="https://www.ipb.uni-bonn.de/data/pheno4d/">Pheno4D</a> is a
-      laser-scanned plant; twelve virtual views of it were rendered at the rig&rsquo;s
-      azimuths and put through the same carve and the same fusion. Drag any panel
-      &mdash; all three turn together, so they can be compared at one angle.
+      <a href="https://www.ipb.uni-bonn.de/data/pheno4d/">Pheno4D</a> supplies
+      fourteen laser-scanned plants; twelve virtual views of each were rendered at
+      the rig&rsquo;s azimuths and put through the same carve and the same fusion.
+      Drag any panel to turn all three together, scroll to zoom, and pick a plant
+      below.
     </p>
+
+    <div class="field is-grouped is-grouped-multiline mb-3">
+      <div class="buttons are-small" id="reconstruction-plants"></div>
+    </div>
+
+    <div class="buttons are-small mb-3" id="reconstruction-zoom">
+      <button class="button is-small" data-zoom="1.25">Zoom in</button>
+      <button class="button is-small" data-zoom="0.8">Zoom out</button>
+      <button class="button is-small" data-zoom="reset">Reset view</button>
+    </div>
 
     <div class="columns" id="reconstruction-panels"></div>
 
@@ -344,7 +355,7 @@ BODY = """
         <p class="is-size-7 mt-3">
           A visual hull agrees with the silhouettes it was carved from
           <em>by construction</em>. Reprojecting it therefore measures whether the carve
-          executed, never whether the shape is right &mdash; and a plant is mostly the gaps
+          executed, never whether the shape is right, and a plant is mostly the gaps
           between its leaves, which no view ever sees through.
         </p>
       </div>

@@ -9,7 +9,7 @@ that, and there will be no further capture.
 This runs the same question on somebody else's plants. The 4TU greenhouse lettuce
 set is 388 destructively harvested plants across four cultivars and a seven-week
 growth series, so its mass range is continuous by construction rather than
-clustered into sessions -- 1.4 g to 459.7 g with nothing missing in between.
+clustered into sessions, 1.4 g to 459.7 g with nothing missing in between.
 
 **Three things are reported, in this order, and the order matters.**
 
@@ -28,7 +28,7 @@ clustered into sessions -- 1.4 g to 459.7 g with nothing missing in between.
    the fit survives a cultivar it has never seen, which is the transfer question
    an operational deployment actually faces.
 
-Only the image-only half of our pipeline can run here -- one top-down view means
+Only the image-only half of our pipeline can run here: one top-down view means
 no carve and no fusion. That is not a limitation dodged: `direct 2D` and
 `2D + profile` are the two methods that currently win on our own data, so what is
 being tested externally is what is being claimed.
@@ -46,7 +46,7 @@ from ..config import WORK_DIR
 # A segmentation is accepted when its diameter lands within this factor of the
 # measured one. Fixed before the numbers were looked at, and wide because a
 # destructive "principal diameter" and a top-down projection are related but not
-# the same measurement -- the criterion is meant to catch failures, not to tune.
+# the same measurement: the criterion is meant to catch failures, not to tune.
 DIAMETER_TOLERANCE = 0.40
 
 # Below this the plant is a seedling of a few grams, its projection is a handful
@@ -203,8 +203,8 @@ def run(
 
     # Nested on purpose: each set adds one kind of information to the one above,
     # so the comparison isolates what that kind is worth. The surface set is the
-    # only genuinely three-dimensional one -- it is taken off the back-projected
-    # point cloud rather than off the silhouette -- and whether it earns its place
+    # only genuinely three-dimensional one: it is taken off the back-projected
+    # point cloud rather than off the silhouette, and whether it earns its place
     # is the question our own specimens cannot answer through the batch confound.
     sets = {
         "direct 2D": ["area_cm2", "diameter_cm", "compactness", "elongation"],
@@ -217,7 +217,7 @@ def run(
 
     # The screen uses their measured diameter, which correlates with mass, so a
     # screened score is selected partly on the label. That is the same exposure
-    # our own density criterion has -- implied density is mass over volume -- but
+    # our own density criterion has, implied density is mass over volume, but
     # it means the screened number alone is not reportable. Both are computed and
     # both go in the record.
     everything = np.arange(len(ids))

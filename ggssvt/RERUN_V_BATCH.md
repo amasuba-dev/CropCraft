@@ -61,7 +61,7 @@ cross-section just below a candidate height against the median just above.
 
 | batch | n | confident | rim height |
 |---|---|---|---|
-| E001–E010 | 10 | **1** | — |
+| E001–E010 | 10 | **1** | n/a |
 | E011–E020 | 8 | 8 | 0.240 ± 0.008 m |
 | Mango | 10 | 8 | 0.468 ± 0.055 m |
 | V001–V008 | 8 | 8 | 0.354 ± 0.036 m |

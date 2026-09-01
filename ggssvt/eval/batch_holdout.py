@@ -21,7 +21,7 @@ the optimistic figure and hoping the batch structure is not checked.
 
 ``batch_only`` is the diagnostic that calibrates the pair. It predicts a
 specimen's mass as the mean of the other members of its own batch and nothing
-else -- no geometry, no image, no features. Under leave-one-out it is the
+else: no geometry, no image, no features. Under leave-one-out it is the
 reproduction of the FINDINGS number. Any real method that fails to beat it under
 leave-one-out is doing nothing that batch membership does not already do.
 
@@ -102,7 +102,7 @@ def _folds(
 
     ``groups`` names the group each specimen belongs to. Left out, it is derived
     from the identifiers, which is what our own capture batches are. Passed
-    explicitly, any grouping works -- the lettuce validation set holds out one
+    explicitly, any grouping works: the lettuce validation set holds out one
     cultivar at a time, which is the same question asked of a different nuisance
     variable.
     """
@@ -201,7 +201,7 @@ def batch_only(
     Under leave-one-out this is the FINDINGS section 4 number: the held-out
     specimen is predicted by the mean of the rest of its own batch. Under
     leave-one-batch-out the batch is gone, so the only honest prediction left is
-    the grand mean of the training batches -- which is the point. The information
+    the grand mean of the training batches, which is the point. The information
     that made batch membership powerful is exactly the information the scheme
     removes.
     """
@@ -299,7 +299,7 @@ def run(
     # The descriptor caches were extracted on whatever specimen set was usable at
     # the time, and those sets differ. Conditions fitted on different specimens
     # cannot be compared, so the comparison runs on the intersection and says
-    # which specimens that cost -- the rule label_efficiency already uses.
+    # which specimens that cost: the rule label_efficiency already uses.
     sources: dict[str, tuple[list[str], np.ndarray]] = {}
     for path in sorted(cache_dir.glob("descriptors_*.npz")):
         with np.load(path, allow_pickle=True) as data:

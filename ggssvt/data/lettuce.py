@@ -9,7 +9,7 @@ height, diameter and leaf area measured on every plant.
 confound that no modelling change removes: predicting mass from a specimen's
 capture batch alone beats every method we have (FINDINGS 7l). A seven-week
 growth series in one facility has a continuous mass range by construction --
-1.4 g to 459.7 g here -- which is what V001-V008 was trying to be, at 388 plants
+1.4 g to 459.7 g here, which is what V001-V008 was trying to be, at 388 plants
 instead of eight. It is the external validation set, and our specimens become the
 method-development set.
 
@@ -28,7 +28,7 @@ stronger claim than a fit within either.
 LeafArea were measured destructively on the same plants, so the depth-derived
 versions can be checked against them per plant. A segmentation that fails shows
 up as a diameter that disagrees, and it is screened out on that basis rather than
-being carried silently into the regression -- the same order the rest of the
+being carried silently into the regression: the same order the rest of the
 project uses: screen first, regress second.
 """
 
@@ -44,7 +44,7 @@ DATASET_DIR = Path(__file__).resolve().parents[2] / "dataset_biomass"
 
 # Excess green is kept for reference and reporting, but it is NOT what segments
 # these images. Two of the four cultivars are red-leaf, and a red lettuce has a
-# *negative* excess green -- on Satine it measured -0.02, indistinguishable from
+# *negative* excess green, on Satine it measured -0.02, indistinguishable from
 # the concrete floor. Segmenting on it silently lost an entire cultivar.
 EXG_THRESHOLD = 0.06
 
@@ -168,7 +168,7 @@ def tray_depth(rgb: np.ndarray, depth_m: np.ndarray) -> float:
     """Depth of the tray surface the plant stands in, or 0 if it is not found.
 
     The modal depth of the bright unsaturated pixels around the plant. Two
-    surfaces answer that description -- the tray and the concrete floor -- and
+    surfaces answer that description: the tray and the concrete floor, and
     they are only ~12 cm apart, so which one wins is decided by which fills more
     of the search box. The floor is greyer but not by much: measured on these
     images the tray reads value 172 saturation 0.07 and the concrete 124 and
@@ -178,7 +178,7 @@ def tray_depth(rgb: np.ndarray, depth_m: np.ndarray) -> float:
     essentially the only thing that is not plant, and widens only if that box
     holds too little to take a mode from. Searching the wide box first returns
     the floor whenever the tray is small in frame, and every height then comes
-    out ~12 cm too large -- larger than most of the plants.
+    out ~12 cm too large, larger than most of the plants.
     """
     value = rgb.astype(np.float64).max(axis=2)
     unsaturated = (
@@ -205,7 +205,7 @@ def segment(
     """The plant, as a boolean mask, with the tray depth it was cut against.
 
     Colour alone cannot do this. A red-leaf lettuce and the orange crate the tray
-    stands on overlap on every simple index -- excess green, saturation, and
+    stands on overlap on every simple index, excess green, saturation, and
     green-minus-blue all put them within noise of each other. What separates them
     is that the tray sits *on top of* the crate, so anything raised above the
     tray surface is plant and the crate is below it. Saturation then removes the
@@ -283,7 +283,7 @@ def surface_descriptors(
     ``hull_volume_l`` is the convex hull of the surface points together with
     their shadow on the tray, so a canopy that domes upward encloses more than a
     flat rosette of the same outline. It is an upper bound on the plant, not a
-    measurement of it -- with one view the underside is assumption, not data.
+    measurement of it, with one view the underside is assumption, not data.
     """
     from scipy import ndimage
 

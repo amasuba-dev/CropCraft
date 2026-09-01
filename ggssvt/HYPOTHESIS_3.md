@@ -78,7 +78,7 @@ Over the working extent (128 voxels × 12 mm = 1.536 m):
 | **10 bands @ 2⁸ (current)** | **83.3 cycles/m** | **63** | **19,326,754** |
 | 8 bands @ 2⁷ | **41.7, the grid Nyquist exactly** | 51 | 19,322,146 |
 | 6 bands @ 2⁶ | 20.8 cycles/m | 39 | 19,317,538 |
-| voxel grid Nyquist (12 mm) | 41.7 cycles/m | — | — |
+| voxel grid Nyquist (12 mm) | 41.7 cycles/m | n/a | n/a |
 
 **The current encoding reaches one full octave above what the grid can
 represent.** Everything above 41.7 cycles/m is spent describing detail the

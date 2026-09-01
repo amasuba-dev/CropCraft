@@ -8,7 +8,7 @@ roughly 260 million points hand-labelled at organ level.
 **Why it matters here.** Every reconstruction claim in this project rests on the
 implied bulk density criterion, because no laser scan of our own specimens
 exists and correctness therefore cannot be measured directly. §7f goes further
-and argues that silhouette IoU ranks our reconstructions *backwards* -- an
+and argues that silhouette IoU ranks our reconstructions *backwards*, an
 argument that currently rests on the density screen disagreeing with the metric,
 which is an inference rather than a demonstration.
 
@@ -20,14 +20,14 @@ shown rather than inferred.
 
 **The format**, from the files themselves rather than from the paper: whitespace-
 separated text, millimetres, one point per line. Files ending ``_a`` carry two
-extra integer columns -- a semantic label where 0 is soil, 1 is stem and 2 and
+extra integer columns: a semantic label where 0 is soil, 1 is stem and 2 and
 above are individual leaves, and an instance label. Files without the suffix are
 the same scans unlabelled. The soil points sit at z about 0, so the scanner's
 frame already has its origin on the ground plane, which is this dataset's
 equivalent of our measured pot rim.
 
 **One caveat that shapes the whole experiment.** A laser scan is a *surface*, not
-a solid. At our 12 mm voxels that distinction mostly vanishes -- a maize leaf is
+a solid. At our 12 mm voxels that distinction mostly vanishes: a maize leaf is
 well under a millimetre thick, so the voxels a leaf passes through are the plant
 -- but it is why the truth here is an occupancy grid built from the points and
 not a filled volume. A visual hull's excess over that grid is not a defect of the
@@ -88,8 +88,8 @@ def latest_per_plant(root: Path = DATASET_DIR) -> list[Path]:
     """The last labelled scan of each plant: the largest, most structured one.
 
     A growth series is fourteen plants times a dozen days, and reconstructing all
-    of it is hours. The final scan of each plant is the hardest case -- most
-    leaves, most self-occlusion -- which is the one worth testing a reconstruction
+    of it is hours. The final scan of each plant is the hardest case, most
+    leaves, most self-occlusion, which is the one worth testing a reconstruction
     against.
     """
     by_plant: dict[str, Path] = {}
@@ -152,7 +152,7 @@ def voxelise(
 
     This is the ground truth a reconstruction is scored against. At 12 mm a leaf
     is thinner than a voxel, so the voxels its points pass through are the plant
-    -- an occupancy grid rather than a filled solid, and the right target for a
+   : an occupancy grid rather than a filled solid, and the right target for a
     method whose output is also an occupancy grid.
     """
     extent = resolution * voxel_size_m

@@ -221,7 +221,7 @@ const chartFrame = (extra) => Object.assign({
   stat(s, xs[0], 1.75, cw, "36 / 42", "specimens usable of everything captured. Two dropped by name, four by a failed quality gate.");
   stat(s, xs[1], 1.75, cw, "302", "automated tests passing, on Windows and on the Titan, from the same commit.", { color: PURPLE });
   stat(s, xs[2], 1.75, cw, "29", "pipeline steps that run unattended from one command and record their own gates.", { color: AMBER });
-  stat(s, xs[3], 1.75, cw, "7", "training runs in flight tonight — the first time the learned model is fitted at all.", { color: BLUE });
+  stat(s, xs[3], 1.75, cw, "7", "training runs in flight tonight, the first time the learned model is fitted at all.", { color: BLUE });
 
   card(s, L, 3.95, W, 1.95);
   s.addText("The one caveat that governs everything else", {
@@ -230,7 +230,7 @@ const chartFrame = (extra) => Object.assign({
   });
   body(s, L + 0.35, 4.6, W - 0.7, 1.45,
     "The GG-SSVT model has not yet produced a result. Every number in this deck comes from the geometry pipeline, " +
-    "from frozen pretrained features, or from classical baselines. That is not a gap in the work — it is what made the " +
+    "from frozen pretrained features, or from classical baselines. That is not a gap in the work. It is what made the " +
     "campaign worth running, because the pipeline had to be shown correct before a model trained on its output could mean anything.",
     { size: 14, color: INK, lineSpacing: 21 });
   chrome(s, false);
@@ -358,7 +358,7 @@ const chartFrame = (extra) => Object.assign({
     "There is no laser scan to compare against, so correctness cannot be measured directly. What can be measured is whether the " +
     "reconstruction implies a physically possible plant: mass divided by reconstructed volume must land inside the range fresh tissue occupies.",
     { size: 13, lineSpacing: 18 });
-  stat(s, L, 3.35, 5.1, "200 – 1000", "kg per cubic metre. Outside that band the reconstruction is an envelope, not a plant — and the number it produces is not a measurement.", { h: 1.9, size: 32 });
+  stat(s, L, 3.35, 5.1, "200 – 1000", "kg per cubic metre. Outside that band the reconstruction is an envelope, not a plant, and the number it produces is not a measurement.", { h: 1.9, size: 32 });
   card(s, L, 5.45, 5.1, 1.1);
   body(s, L + 0.28, 5.66, 4.54, 0.75,
     "Applied to twelve views: 8 of 36 land inside. Below twelve views, at most 2 do.",
@@ -392,7 +392,7 @@ const chartFrame = (extra) => Object.assign({
     "Twelve views passed; fewer did not",
     "Depth fusion passed against carving",
     "Intersection refinement passed",
-    "No regressor family resolved — the input, not the estimator, was the constraint",
+    "No regressor family resolved: the input, not the estimator, was the constraint",
   ], { size: 12, gap: 9 });
   chrome(s, false);
   s.addNotes("Stage 4 failing is reported as prominently as the three that passed. That is the feasibility-study discipline borrowed from the Journal of Voice paper.");
@@ -475,7 +475,7 @@ const chartFrame = (extra) => Object.assign({
   const cw = 3.75, gap = 0.34;
   const batchOnly = holdout.rows.find(
     (r) => r.condition === "batch membership only" && r.scheme === "loocv");
-  stat(s, L, 1.95, cw, "R² = 0.887", "explained by knowing only which capture batch a plant came from — more than mesh geometry managed on the same specimens.", { dark: true, h: 2.0, size: 30, color: AMBER });
+  stat(s, L, 1.95, cw, "R² = 0.887", "explained by knowing only which capture batch a plant came from, more than mesh geometry managed on the same specimens.", { dark: true, h: 2.0, size: 30, color: AMBER });
   stat(s, L + cw + gap, 1.95, cw, "R² = 0.697", "after V001–V008 was captured to span a continuous mass range. The confound fell, and the 3D advantage fell with it.", { dark: true, h: 2.0, size: 30, color: AMBER });
   stat(s, L + 2 * (cw + gap), 1.95, cw, batchOnly.rmse_kg.toFixed(3) + " kg", "what batch membership alone predicts mass to, using no geometry and no image. It beats every method in this deck.", { dark: true, h: 2.0, size: 30, color: AMBER });
   card(s, L, 4.25, W, 1.8, true);
@@ -484,7 +484,7 @@ const chartFrame = (extra) => Object.assign({
     fontFace: HEAD, fontSize: 16, bold: true, color: ONDARK,
   });
   body(s, L + 0.35, 4.9, W - 0.7, 1.2,
-    "Reconstructed geometry separates plant size classes — tall and sparse against short and solid. That is supported. " +
+    "Reconstructed geometry separates plant size classes, tall and sparse against short and solid. That is supported. " +
     "\"Estimates biomass\" is not, and the next slide puts a number on why. There will be no further capture, so the confound is " +
     "met by measuring it and by validating on public data rather than by collecting more.",
     { size: 13, color: ONDARK, lineSpacing: 19 });
@@ -526,7 +526,7 @@ const chartFrame = (extra) => Object.assign({
   }));
   caption(s, L, 6.12, 7.3, "Same estimator, same folds-within-folds, only the withholding rule changes. Batch-label-alone has nothing left to predict from once its batch is withheld.");
 
-  stat(s, 8.35, 1.85, 4.28, "351 g", "what knowing only the capture batch achieves. No geometry, no image, no features — and it beats every real method here.", { h: 1.95, size: 34, color: AMBER });
+  stat(s, 8.35, 1.85, 4.28, "351 g", "what knowing only the capture batch achieves. No geometry, no image and no features, yet it beats every real method here.", { h: 1.95, size: 34, color: AMBER });
   card(s, 8.35, 4.0, 4.28, 2.05);
   s.addText("Why both columns, always", {
     x: 8.63, y: 4.2, w: 3.72, h: 0.3, isTextBox: true, margin: 0,
@@ -601,7 +601,7 @@ const chartFrame = (extra) => Object.assign({
   card(s, 8.35, 4.0, 4.28, 2.05);
   body(s, 8.63, 4.25, 3.72, 1.6,
     "This is the claim that survives the sample size. Label efficiency is a ratio inside one experiment, so it does not " +
-    "depend on separating two nearly equal RMSE values — which is exactly where the accuracy half failed.",
+    "depend on separating two nearly equal RMSE values, which is exactly where the accuracy half failed.",
     { size: 12, color: MUTED, lineSpacing: 16 });
   chrome(s, false);
   s.addNotes("Destroying and rebuilding a dataset is expensive; needing a quarter of the labels is the practically useful result even though the accuracy comparison is unresolved.");
@@ -699,7 +699,7 @@ const chartFrame = (extra) => Object.assign({
   }));
   caption(s, L, 6.15, 6.9, "A reconstruction counts as fragmented when the largest connected component holds under half the occupied voxels.");
   stat(s, 8.0, 1.85, 4.63, "33 of 36", "reconstructions fragment once half the views are occluded. Below a quarter, most survive.", { h: 1.75, size: 32, color: AMBER });
-  stat(s, 8.0, 3.8, 4.63, "1 of 36", "fragments under the heaviest depth noise tested. Median volume moves 4.50 L to 3.66 L — a bias, not a failure.", { h: 1.75, size: 32, color: TEAL });
+  stat(s, 8.0, 3.8, 4.63, "1 of 36", "fragments under the heaviest depth noise tested. Median volume moves 4.50 L to 3.66 L, a bias rather than a failure.", { h: 1.75, size: 32, color: TEAL });
   card(s, 8.0, 5.75, 4.63, 0.8);
   body(s, 8.28, 5.92, 4.07, 0.5, "Two thirds of H4 answered. Lighting variation is the untested third.", { size: 12, color: INK, lineSpacing: 16 });
   chrome(s, false);
@@ -748,7 +748,7 @@ const chartFrame = (extra) => Object.assign({
     ["One command, 29 steps", "The whole programme runs unattended, records which gates each step passed, and skips what already finished."],
     ["Preflight before compute", "Torch and CUDA, ground truth integrity, dependencies, disk. An eight-hour run should not fail on a missing file."],
     ["Seeded end to end", "The seed is written into every checkpoint alongside the run config, because a result that cannot be reproduced cannot be defended."],
-    ["Configurable visualisation", "Point clouds, meshes, reconstructions, segmentations and overlays, with layers, views and resolution selectable — including straight into a terminal over SSH."],
+    ["Configurable visualisation", "Point clouds, meshes, reconstructions, segmentations and overlays, with layers, views and resolution selectable, including straight into a terminal over SSH."],
     ["Campaign runner", "Per-run results and completion markers, so a job that dies at 3am restarts where it stopped rather than from the beginning."],
   ];
   const cw = (W - 0.4) / 2;
@@ -775,11 +775,11 @@ const chartFrame = (extra) => Object.assign({
     "Seven runs, ordered so that the ones answering a hypothesis finish first. Whatever survives an interrupted night is the part the write-up needs.",
     { size: 13.5, lineSpacing: 19 });
   bullets(s, L, 2.6, 7.2, 3.7, [
-    "baseline_cnn — the reference condition for every comparison below it",
-    "baseline_fused — does a trained model inherit the fusion's advantage?",
-    "h2_no_geometry — the geometry-grounding ablation",
-    "h1_dinov2 — the backbone comparison, this time end to end rather than as a frozen probe",
-    "h3_fourier_* — the band sweep that tests the 2× over-provisioning prediction",
+    "baseline_cnn: the reference condition for every comparison below it",
+    "baseline_fused: does a trained model inherit the fusion's advantage?",
+    "h2_no_geometry: the geometry-grounding ablation",
+    "h1_dinov2: the backbone comparison, this time end to end rather than as a frozen probe",
+    "h3_fourier_*: the band sweep that tests the 2× over-provisioning prediction",
   ], { size: 12.5, gap: 8 });
   stat(s, 8.3, 1.75, 4.33, "1.11 / 15.57", "GiB reserved on the card at peak. Every out-of-memory failure this week was two jobs colliding, not a real limit.", { h: 1.95, size: 28, color: TEAL });
   card(s, 8.3, 3.9, 4.33, 2.45);
@@ -788,7 +788,7 @@ const chartFrame = (extra) => Object.assign({
     fontFace: HEAD, fontSize: 14.5, bold: true, color: INK,
   });
   bullets(s, 8.58, 4.5, 3.77, 1.7, [
-    "Inference built a graph it never used — 14 GiB of retained activations",
+    "Inference built a graph it never used, 14 GiB of retained activations",
     "The pretrained model stayed on the card through all 38 folds",
     "A five-minute smoke test wrote the marker that says the eight-hour run is done",
   ], { size: 10.5, color: MUTED, gap: 5, lineSpacing: 13 });
@@ -822,7 +822,7 @@ const chartFrame = (extra) => Object.assign({
     fontFace: HEAD, fontSize: 17, bold: true, color: AMBER,
   });
   bullets(s, L + cw + 0.8, 2.68, cw - 0.7, 3.4, [
-    "That the pipeline estimates biomass — batch label alone beats every method under leave-one-out",
+    "That the pipeline estimates biomass: batch label alone beats every method under leave-one-out",
     "That a self-supervised backbone is more accurate; the interval crosses zero",
     "That 3D geometry beats image-only regression on this data",
     "Anything at all about the trained GG-SSVT model, which has produced no result yet",

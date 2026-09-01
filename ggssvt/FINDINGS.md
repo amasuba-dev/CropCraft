@@ -798,7 +798,7 @@ At n=36 the frozen-feature probe's control scored RMSE 0.458, R² **+0.312**. At
 n=38 on the lab machine it scored RMSE 2.981, R² **−26.997**. Adding two
 specimens cannot degrade a baseline sixfold, so the number is an artefact, and
 until it is explained **every DINO comparison measured against it is
-unreportable** — including the four conditions that came back "significant" at
+unreportable**, including the four conditions that came back "significant" at
 dRMSE −2.54 to −2.56 with intervals barely excluding zero. Four backbones
 agreeing to within 0.02 kg is one broken control subtracted four times.
 
@@ -871,17 +871,17 @@ reviewer needs. `eval/batch_holdout.py` supplies it.
 so members of its own capture session in the training fold, carrying that
 session's mean mass. Leave-one-batch-out withholds the whole session, so the
 model has never seen a plant captured on the same day as the one it is scored
-on. Everything else -- estimator, standardisation, PCA, alpha -- is held fixed.
+on. Everything else (estimator, standardisation, PCA, alpha) is held fixed.
 
 | condition | LOOCV RMSE | LOOCV R² | LOBO RMSE | LOBO R² | inflation |
 |---|---|---|---|---|---|
 | geometric, all 36 | 0.458 | +0.312 | 1.151 | −3.339 | **+0.692 kg** |
 | geometric, shared 33 | 0.576 | −0.080 | 1.105 | −2.970 | +0.529 kg |
 | DINOv2 frozen, 33 | 0.385 | +0.518 | 0.921 | −1.758 | +0.536 kg |
-| **batch membership only** | **0.351** | **+0.600** | — | — | — |
+| **batch membership only** | **0.351** | **+0.600** | n/a | n/a | n/a |
 
 **Read the last row first.** Predicting a specimen's mass as the mean of the rest
-of its own batch -- no geometry, no image, no features whatsoever -- scores
+of its own batch, using no geometry, no image and no features whatsoever, scores
 0.351 kg under leave-one-out and **beats every real method on this dataset**. The
 best learned representation (DINOv2 at 0.385) does not reach it. Under
 leave-one-batch-out every condition falls below the mean predictor.
@@ -909,8 +909,8 @@ intersection and the geometric condition is reported on both sets.
 
 ## 7m. The paired tests the designs already earned
 
-Three of this project's comparisons are paired -- the same specimens, the same
-criterion, one thing changed -- and all three were being reported as bare ratios,
+Three of this project's comparisons are paired: the same specimens, the same
+criterion, one thing changed, and all three were being reported as bare ratios,
 which throws away exactly where the power is.
 
 **Carving against fusion.** 8 and 31 plausible of the same 36 reconstructions.
@@ -926,8 +926,8 @@ behind a ratio. `eval/batch_holdout.py:mcnemar`.
 The same treatment applies to the reciprocity rules (8 → 19 of 36, §7g) and to
 the view-count sweep (§7). Neither is done yet; both are one call each.
 
-**Why it matters more than it looks.** Section 7f's finding -- that silhouette
-IoU ranks the worse reconstruction higher -- rests on the density screen
+**Why it matters more than it looks.** Section 7f's finding, that silhouette
+IoU ranks the worse reconstruction higher, rests on the density screen
 disagreeing with the metric. A screen comparison at p = 1.5 × 10⁻⁵ is a much
 firmer foundation for that argument than "8 versus 31".
 
@@ -956,15 +956,15 @@ Diameter and area are solid. **Height is the weak measurement**, and it is weak
 for a reason worth recording: the reference surface is a tray whose height
 changes between growth stages, and a top-down camera sees the canopy top, not the
 attachment point their ruler starts from. The area MAE is large because projected
-area and true leaf area are different quantities -- curled leaves hide area from
-a camera -- so the correlation is what matters there, not the difference.
+area and true leaf area are different quantities (curled leaves hide area from
+a camera), so the correlation is what matters there, not the difference.
 
 **Step 2, the screen.** Agreement with the measured diameter to within 40%,
 fixed before the numbers were read: **378 of 387 pass**. Nine failures out of 387
 is a far better segmentation rate than we achieve on our own captures, which says
 more about a controlled greenhouse than about the segmenter.
 
-**Step 3, the regression**, leave-one-out beside leave-one-cultivar-out -- this
+**Step 3, the regression**, leave-one-out beside leave-one-cultivar-out, this
 dataset's leave-one-batch-out, holding out a variety the fit has never seen:
 
 | condition | LOOCV | held-out cultivar | unscreened, held-out cultivar |
@@ -1002,7 +1002,7 @@ over volume. Reported unscreened, the held-out-cultivar R² moves from +0.782 to
 
 **What is honestly claimed.** Transfer runs across a sensor change (their
 RealSense D415, our Kinect v2), a species change, and a facility change, using
-only the image-only half of the pipeline -- one top-down view means no carve and
+only the image-only half of the pipeline: one top-down view means no carve and
 no fusion. Both those methods are the ones that already won on our data, so the
 thing validated externally is the thing being claimed. What is *not* validated
 here is anything about the reconstruction: the carve, the fusion, the density
@@ -1018,14 +1018,14 @@ scored 0.151 to 0.321, so the check does not discriminate and settles nothing.
 The record is skipped and counted rather than repaired.
 
 **And a segmentation finding that would have cost a cultivar.** Two of the four
-varieties are red-leaf. Satine measures R 80, G 49, B 24 -- an excess green of
+varieties are red-leaf. Satine measures R 80, G 49, B 24: an excess green of
 **−0.02**, indistinguishable from concrete. Segmenting these images with the
 index the rest of this project uses would have silently dropped an entire
 cultivar, and it would have dropped the *heaviest* plants. No colour index fixes
 it: a red lettuce and the orange crate the tray stands on overlap on excess
 green, saturation and green-minus-blue alike. What separates them is that the
 tray sits on top of the crate, so height above the tray surface is the
-discriminator. The lesson generalises to our own work -- the excess-green
+discriminator. The lesson generalises to our own work: the excess-green
 segmenter in `geometry/segment.py` would fail on any red or purple foliage, and
 nothing currently warns about that.
 
@@ -1034,7 +1034,7 @@ nothing currently warns about that.
 ## 7o. Does 3D geometry actually help? On confound-free data, yes
 
 §3 found 3D geometric features **not** beating image-only regression on our
-specimens, and that has sat as an uncomfortable result ever since -- it is the
+specimens, and that has sat as an uncomfortable result ever since: it is the
 premise of the whole project. But that comparison was made inside the batch
 confound (§7l), where the strongest predictor available to any method was which
 session a plant was captured in. It could not settle the question either way.
@@ -1050,7 +1050,7 @@ surface_descriptors`), the informative ones being:
   tissue is folded into a given footprint.
 - **normal_z_mean**, the mean vertical component of the surface normals: a proxy
   for leaf angle.
-- **hull_volume_l**, the convex hull of the surface and its shadow -- an upper
+- **hull_volume_l**, the convex hull of the surface and its shadow: an upper
   bound on the plant, not a measurement of it, because with one view the
   underside is assumption rather than data.
 - height at the 50th and 90th percentiles, its standard deviation, and the fill
@@ -1081,7 +1081,7 @@ surface_descriptors`), the informative ones being:
 
 *The surface adds information the silhouette does not have.* The interval on the
 improvement excludes zero and does not come close to it. By the criterion this
-project applies everywhere else, that is **resolved** -- and it is the first time
+project applies everywhere else, that is **resolved**, and it is the first time
 any 3D-versus-2D comparison here has been.
 
 *The surface does not replace the silhouette.* On its own it is statistically
@@ -1089,7 +1089,7 @@ indistinguishable from `2D + profile` (p = 0.26). The two describe different
 things and the gain is in combining them, which is a more useful finding than
 either winning outright.
 
-**What this does to §3.** It does not overturn it -- §3 is still what our own
+**What this does to §3.** It does not overturn it. §3 is still what our own
 data shows. It explains it. A 3D advantage of about 3.5 g on a 115 g mean is
 roughly 3% of RMSE; a confound that lets batch membership alone beat every method
 will bury an effect that size without trace. The honest reading is that our
@@ -1100,7 +1100,7 @@ reading a null result as a negative one.
 **And the ceiling this exposes.** `hull volume only` is the worst condition
 tested, below even `volume only`. A convex hull over a single-view surface throws
 away the concavity that makes a lettuce a lettuce. That is the same finding as
-§7f in different clothes -- an envelope is not a plant -- and it is the argument
+§7f in different clothes: an envelope is not a plant, and it is the argument
 for the Pheno4D virtual-view experiment, where a real volumetric reconstruction
 can be scored against a known cloud instead of assumed.
 
@@ -1113,7 +1113,7 @@ rested on the density screen disagreeing with the metric, which is an inference:
 if the screen were the thing that was wrong, the argument reverses. Pheno4D
 settles it. Fourteen laser-scanned plants, twelve virtual views each at our
 azimuths and through our camera model, and **our** `carve` and `fuse` run on
-those views -- not reimplementations, the pipeline's own functions.
+those views, not reimplementations, the pipeline's own functions.
 `eval/virtual_views.py`; run with `cli virtual-views`.
 
 **The result is not a tendency. It is total.**
@@ -1136,7 +1136,7 @@ to measure.
 | depth fusion | **2.05×** | 0.494 |
 
 **Why it happens, now measurable rather than argued.** A visual hull agrees with
-the silhouettes it was carved from *by construction* -- that is the definition of
+the silhouettes it was carved from *by construction*: that is the definition of
 a hull, not a property of a good one. Reprojecting it therefore measures whether
 the carve executed correctly, never whether the shape is right. A maize plant is
 mostly gaps between leaves, and no azimuth ever sees through those gaps, so the
@@ -1148,7 +1148,7 @@ density is mass over reconstructed volume, so the 200-1000 kg/m³ band is a band
 on the **volume ratio and nothing else**: at a tissue density ρ it passes
 reconstructions between ρ/1000 and ρ/200 times the true volume, a window of 0.6×
 to 3.0× at ρ = 600. On these fourteen plants it passes fusion **14/14** and carve
-**0/14** -- perfect agreement with the truth-based ranking, on the same cases
+**0/14**, perfect agreement with the truth-based ranking, on the same cases
 where the standard metric is wrong every time.
 
 That is a stronger claim than §7b made. The criterion was adopted because no
@@ -1161,8 +1161,8 @@ rather than ad hoc.
 views are clean: exact poses, no sensor noise, no segmentation error, no missing
 returns. A reconstruction that fails here fails for geometric reasons alone, so
 this is an **upper bound on the operator**, not an estimate of what our Kinect
-captures achieve. The direction is the useful one -- an operator that cannot
-recover a plant from perfect views will not recover one from real returns -- but
+captures achieve. The direction is the useful one: an operator that cannot
+recover a plant from perfect views will not recover one from real returns, but
 it is not a claim about our specimens. Note too that fusion is still 2.05× too
 large: better is not correct, and the remaining factor of two is the honest
 ceiling of what twelve depth views can do on a plant.
@@ -1186,7 +1186,7 @@ through at once.
 
 All seven campaign runs died the same way: pretraining completed its 120 epochs,
 the first evaluation forward allocated **14.19 GiB**, and the next 576 MiB
-request failed. **The tell was that the number did not move** -- a 19.3M CNN and
+request failed. **The tell was that the number did not move**: a 19.3M CNN and
 a 105.9M ViT both failed at 14.19 GiB, so it was activations and not weights.
 Nothing on this machine could have caught it: there is no GPU here, and on CPU
 the same code merely runs slowly.
