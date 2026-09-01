@@ -50,6 +50,31 @@ Every number is read from `work_dirs/ggssvt/reports` at build time, so unlike
 artefacts. Run `python -m ggssvt.cli reciprocity` and the rest of the pipeline
 first; the figure comes from `ggssvt.eval.funnel`, which reads the same reports.
 
+## The results paper
+
+```bash
+node paper/results_paper.js
+```
+
+Ten pages covering everything measured to date, with every number read from
+`work_dirs/ggssvt/reports` at build time. It is a methods and validation paper
+rather than a biomass paper, and that is deliberate: the biomass regression on
+our own specimens does not resolve, section 5 says why in terms of what the
+design could detect, and section 7 tests the same methods on an external set
+where they do resolve.
+
+It needs `virtual_views.json`, `external_lettuce.json`, `batch_holdout.json`,
+`resolution.json`, `pedestal.json` and `pot_mass.json`, so run `cli
+virtual-views`, `cli external`, `cli batch-holdout`, `cli resolution`, `cli
+pedestal` and `cli pot-mass` first. Figures come from `reports/figures`,
+`reports/gallery` and `reports/overlays`, so `cli plots`, `cli gallery` and `cli
+overlay` too.
+
+`docx_common.js` holds the builders both this and `paper.js` use. It was
+extracted when the second document needed them, so a change to a table border or
+a caption style cannot leave two documents from the same project looking
+unrelated.
+
 ## The progress deck
 
 ```bash
