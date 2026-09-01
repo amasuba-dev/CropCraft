@@ -381,3 +381,113 @@ feasibility results is written so that result strengthens it.
 | run marked `blocked` | the gate caught a run that learned nothing | read the named check before re-running |
 | session dies mid-run | no `nohup` | relaunch; it resumes |
 | results look stale on the page | artefact predates the cache | the Experiment log flags it red |
+
+---
+
+## The no-new-data plan
+
+**Decision, 1 September 2026: no further capture.** The 36 specimens are the
+dataset. That closes the route FINDINGS section 10 recommended -- another capture
+campaign spanning a continuous mass range -- so the confound has to be handled by
+measurement and by external data instead of by collection.
+
+Three things replace it. The first two cost nothing and are done; the third is
+the real work.
+
+### 1. Measure the confound instead of inheriting it
+
+```bash
+python -m ggssvt.cli batch-holdout
+```
+
+Leave-one-out keeps the other members of a specimen's own capture batch in the
+training fold, carrying that batch's mean mass. Leave-one-batch-out withholds the
+whole session. Both are now scored side by side, and the **gap between them is
+the number to report**:
+
+| condition | LOOCV RMSE | LOBO RMSE | inflation |
+|---|---|---|---|
+| geometric, all 36 | 0.458 kg (R² +0.312) | 1.151 kg (R² −3.339) | **+0.692 kg** |
+| geometric, shared 33 | 0.576 kg (R² −0.080) | 1.105 kg (R² −2.970) | +0.529 kg |
+| DINOv2 frozen, 33 | 0.385 kg (R² +0.518) | 0.921 kg (R² −1.758) | +0.536 kg |
+| **batch membership only** | **0.351 kg (R² +0.600)** | — | — |
+
+Read the last row first. Predicting a specimen's mass from the mean of the rest
+of its own batch, using no geometry and no image at all, **beats every real
+method under leave-one-out**. Under leave-one-batch-out every method falls below
+the mean predictor. That is the confound stated as plainly as it can be stated,
+and it is far better to publish it than to have it found.
+
+It does not sink the project. It relocates the claim: the reconstruction and
+screening results below are unaffected, because none of them are regressions
+against mass.
+
+### 2. Use the paired tests the designs already earn
+
+The plausibility counts are paired -- the same 36 reconstructions, the same
+criterion, one operator changed. Comparing 8 with 31 as independent samples
+throws the pairing away, and the pairing is where the power is. Exact McNemar
+over the 29 discordant specimens (3 favouring carving, 26 favouring fusion):
+
+**p = 1.5 × 10⁻⁵.**
+
+That is the most decisive statistic in the project, and until now it was reported
+as a bare ratio. `mcnemar()` in `ggssvt/eval/batch_holdout.py`; the same treatment
+applies to the reciprocity rules and the view-count sweep.
+
+### 3. Two public datasets, replacing the capture campaign
+
+Both are ungated and download without registration. Confirm the licence on each
+landing page before committing.
+
+**Reference geometry -- [Pheno4D](https://www.ipb.uni-bonn.de/data/pheno4d/)**
+(Bonn; 7 maize, 7 tomato, ~260M labelled points, organ-level labels).
+
+The move is not to run the pipeline *on* Pheno4D, which has no images. It is to
+**render twelve virtual views from a Pheno4D laser cloud** at our azimuths and
+camera model, run the whole pipeline on them, and compare the output against the
+known cloud. That buys three things nothing in this project has had:
+
+- the implied-density criterion calibrated against ground truth, not defended on
+  physical plausibility alone;
+- the silhouette-IoU inversion *demonstrated* rather than inferred -- with a
+  reference cloud, true IoU and Chamfer distance can be computed and the metric
+  shown ranking backwards;
+- reconstruction error separated from registration error, because the virtual
+  poses are exact.
+
+`ggssvt/eval/viz.py` already rasterises point clouds, so the renderer is mostly
+in place.
+
+**Mass labels -- [3rd Autonomous Greenhouse Challenge lettuce](https://data.4tu.nl/articles/dataset/3rd_Autonomous_Greenhouse_Challenge_Online_Challenge_Lettuce_Images/15023088)**
+(4TU, DOI `10.4121/15023088`): 388 plants, RealSense D415 RGB-D, four cultivars
+across seven weekly stages, with destructively measured fresh weight, dry weight,
+height, diameter and leaf area.
+
+A seven-week growth series in one facility has a continuous mass range by
+construction -- it is what V001–V008 was trying to be, at 388 plants instead of
+8. It is single top-down RGB-D, so the 12-view carve and fusion cannot run on it;
+but `direct 2D` and `2D + profile`, which are currently the two best methods,
+transfer directly. Report the sensor shift (their RealSense against our Kinect
+v2) and the species shift as domain gaps rather than burying them.
+
+### What this does to the thesis
+
+The 36 specimens become the **method-development** set: where the pipeline was
+built, the screening criterion designed, and the operator, reciprocity and
+metric-inversion findings made. The public data becomes the **external-validation**
+set. Both claims then stand on the evidence that actually supports them:
+
+- *"reconstructed geometry separates plant size classes"* -- on our 36, with the
+  LOOCV/LOBO gap quoted;
+- *"the regression transfers to an independent 388-plant set"* -- or it does not,
+  which is also a result worth having.
+
+### Order of work
+
+| | | |
+|---|---|---|
+| done | batch-holdout scorer, McNemar | in `ggssvt/eval/batch_holdout.py` |
+| next | propagate LOBO and McNemar into FINDINGS, the feasibility results, both proposals and the deck | the campaign's numbers land in the same pass |
+| then | Pheno4D virtual-view validation | the experiment an examiner will ask for |
+| after | lettuce external validation | the biomass chapter's honest ending |

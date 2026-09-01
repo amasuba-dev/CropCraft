@@ -266,6 +266,22 @@ def cmd_label_efficiency(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_batch_holdout(args: argparse.Namespace) -> int:
+    """Leave-one-batch-out beside leave-one-out: how much was the confound? No GPU."""
+    from .eval.batch_holdout import run
+
+    report = run(exclude=tuple(args.exclude), verbose=not args.quiet)
+    print()
+    print(f"{report['n_specimens']} specimens in {len(report['batches'])} batches: "
+          + ", ".join(f"{k} ({v})" for k, v in report["batches"].items()))
+    print()
+    print("Inflation is what leave-one-out gained by keeping the rest of a")
+    print("specimen's capture batch in its training fold. A method whose two")
+    print("scores are close generalises across sessions; one that collapses")
+    print("under lobo was reading batch membership.")
+    return 0
+
+
 def cmd_viewpoint(args: argparse.Namespace) -> int:
     """H2: agreement with a view the reconstruction never saw. No GPU."""
     from .eval.viewpoint import run
@@ -1260,6 +1276,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     label_efficiency.add_argument("--quiet", action="store_true")
     label_efficiency.set_defaults(func=cmd_label_efficiency)
+
+    batch_holdout = sub.add_parser(
+        "batch-holdout",
+        help="leave-one-batch-out against leave-one-out (CPU, seconds)",
+    )
+    batch_holdout.add_argument(
+        "--exclude", nargs="*", default=["V010"],
+        help="specimens kept out; V010 fails the plausibility criterion",
+    )
+    batch_holdout.add_argument("--quiet", action="store_true")
+    batch_holdout.set_defaults(func=cmd_batch_holdout)
 
     viewpoint = sub.add_parser(
         "viewpoint", help="H2: held-out-view consistency (CPU, ~25 min)"
