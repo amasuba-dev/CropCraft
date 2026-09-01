@@ -190,3 +190,6 @@ cython_debug/
 
 # The 4TU lettuce set (DOI 10.4121/15023088), ~1 GB. Downloaded, not vendored.
 /dataset_biomass/
+
+# Pheno4D (Bonn), ~12 GB of laser point clouds. Downloaded, not vendored.
+/dataset_pheno4d/

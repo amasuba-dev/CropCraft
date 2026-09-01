@@ -1106,6 +1106,75 @@ can be scored against a known cloud instead of assumed.
 
 ---
 
+## 7p. The metric inversion, demonstrated against known geometry
+
+§7f argued that silhouette IoU ranks our reconstructions backwards. The argument
+rested on the density screen disagreeing with the metric, which is an inference:
+if the screen were the thing that was wrong, the argument reverses. Pheno4D
+settles it. Fourteen laser-scanned plants, twelve virtual views each at our
+azimuths and through our camera model, and **our** `carve` and `fuse` run on
+those views -- not reimplementations, the pipeline's own functions.
+`eval/virtual_views.py`; run with `cli virtual-views`.
+
+**The result is not a tendency. It is total.**
+
+| | agrees with the truth |
+|---|---|
+| truth prefers depth fusion | **14 / 14** |
+| silhouette IoU prefers depth fusion | **0 / 14** |
+| the two disagree | **14 / 14**, exact p = 1.2 × 10⁻⁴ |
+
+Every plant, both species, no exceptions. Mean IoU against the truth: carve
+0.225, fusion 0.494. Mean silhouette IoU: carve 0.483, fusion 0.426. The
+reprojection metric is not noisy on this class of subject; it is **systematically
+inverted**, and it is inverted by a margin as large as the one it is being used
+to measure.
+
+| | median volume, times true | IoU vs truth |
+|---|---|---|
+| silhouette carving | **4.57×** | 0.225 |
+| depth fusion | **2.05×** | 0.494 |
+
+**Why it happens, now measurable rather than argued.** A visual hull agrees with
+the silhouettes it was carved from *by construction* -- that is the definition of
+a hull, not a property of a good one. Reprojecting it therefore measures whether
+the carve executed correctly, never whether the shape is right. A maize plant is
+mostly gaps between leaves, and no azimuth ever sees through those gaps, so the
+hull fills them and reprojects perfectly while being four and a half times too
+large.
+
+**The density criterion, vindicated and explained.** With mass fixed, implied
+density is mass over reconstructed volume, so the 200-1000 kg/m³ band is a band
+on the **volume ratio and nothing else**: at a tissue density ρ it passes
+reconstructions between ρ/1000 and ρ/200 times the true volume, a window of 0.6×
+to 3.0× at ρ = 600. On these fourteen plants it passes fusion **14/14** and carve
+**0/14** -- perfect agreement with the truth-based ranking, on the same cases
+where the standard metric is wrong every time.
+
+That is a stronger claim than §7b made. The criterion was adopted because no
+reference geometry existed; it turns out to be *right* where the conventional
+metric is wrong, and what it is really testing is a volume ratio. Both facts are
+worth stating in the write-up, and the second one is what makes it defensible
+rather than ad hoc.
+
+**What this does not show, and the report says so in its own note field.** These
+views are clean: exact poses, no sensor noise, no segmentation error, no missing
+returns. A reconstruction that fails here fails for geometric reasons alone, so
+this is an **upper bound on the operator**, not an estimate of what our Kinect
+captures achieve. The direction is the useful one -- an operator that cannot
+recover a plant from perfect views will not recover one from real returns -- but
+it is not a claim about our specimens. Note too that fusion is still 2.05× too
+large: better is not correct, and the remaining factor of two is the honest
+ceiling of what twelve depth views can do on a plant.
+
+**And it closes §7o's loose end.** The lettuce work found `hull volume only` the
+worst feature set tested, below even an extruded volume, which suggested a hull
+discards the concavity that defines a plant. This measures that suggestion: the
+hull is 4.57× the true volume because the concavity is exactly what it cannot
+see.
+
+---
+
 ## 8. Bugs found and fixed
 
 **Evaluation tracked gradients.** `predict()` put the model in `.eval()` and

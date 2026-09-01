@@ -305,6 +305,22 @@ def cmd_external(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_virtual_views(args: argparse.Namespace) -> int:
+    """Score carve and fusion against Pheno4D, where the truth is known. No GPU."""
+    from pathlib import Path
+
+    from .eval.virtual_views import run
+
+    run(root=Path(args.root) if args.root else None,
+        subsample=args.subsample, limit=args.limit, verbose=not args.quiet)
+    print()
+    print("Virtual views are clean: exact poses, no sensor noise, no")
+    print("segmentation error. A reconstruction that fails here fails for")
+    print("geometric reasons alone, so this bounds the operator from above")
+    print("rather than estimating what our own captures achieve.")
+    return 0
+
+
 def cmd_viewpoint(args: argparse.Namespace) -> int:
     """H2: agreement with a view the reconstruction never saw. No GPU."""
     from .eval.viewpoint import run
@@ -1324,6 +1340,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     external.add_argument("--quiet", action="store_true")
     external.set_defaults(func=cmd_external)
+
+    virtual = sub.add_parser(
+        "virtual-views",
+        help="carve and fusion against Pheno4D ground truth (CPU, ~10 min)",
+    )
+    virtual.add_argument("--root", default=None, help="where Pheno4D was unpacked")
+    virtual.add_argument("--subsample", type=int, default=2,
+                         help="keep one point in this many when rendering")
+    virtual.add_argument("--limit", type=int, default=None,
+                         help="stop after this many plants")
+    virtual.add_argument("--quiet", action="store_true")
+    virtual.set_defaults(func=cmd_virtual_views)
 
     viewpoint = sub.add_parser(
         "viewpoint", help="H2: held-out-view consistency (CPU, ~25 min)"
