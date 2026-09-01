@@ -1031,6 +1031,81 @@ nothing currently warns about that.
 
 ---
 
+## 7o. Does 3D geometry actually help? On confound-free data, yes
+
+§3 found 3D geometric features **not** beating image-only regression on our
+specimens, and that has sat as an uncomfortable result ever since -- it is the
+premise of the whole project. But that comparison was made inside the batch
+confound (§7l), where the strongest predictor available to any method was which
+session a plant was captured in. It could not settle the question either way.
+
+The lettuce set can. One top-down view cannot be carved or fused, but the depth
+map back-projects to a **metric** point cloud, and that surface carries structure
+a silhouette does not. Eight descriptors are taken off it (`data/lettuce.py:
+surface_descriptors`), the informative ones being:
+
+- **rugosity**, true surface area over the area of its own shadow. A flat leaf
+  scores 1; the crumpled cultivars here score 1.9 to 2.2. This is precisely what a
+  projected area is blind to, and fresh mass is partly a question of how much
+  tissue is folded into a given footprint.
+- **normal_z_mean**, the mean vertical component of the surface normals: a proxy
+  for leaf angle.
+- **hull_volume_l**, the convex hull of the surface and its shadow -- an upper
+  bound on the plant, not a measurement of it, because with one view the
+  underside is assumption rather than data.
+- height at the 50th and 90th percentiles, its standard deviation, and the fill
+  ratio: how the mass is stacked, not merely how tall the plant is.
+
+**Scored on a held-out cultivar, 378 plants:**
+
+| feature set | RMSE | R² | unscreened R² |
+|---|---|---|---|
+| direct 2D | 55.1 g | +0.744 | +0.736 |
+| 2D + profile | 50.9 g | +0.782 | +0.747 |
+| surface only | 52.1 g | +0.771 | +0.755 |
+| **2D + profile + surface** | **47.3 g** | **+0.811** | **+0.790** |
+| volume only | 58.0 g | +0.716 | +0.716 |
+| hull volume only | 61.8 g | +0.678 | +0.680 |
+
+**Paired bootstrap against `2D + profile`, on the held-out cultivar:**
+
+| condition | difference | 95% interval | p |
+|---|---|---|---|
+| **2D + profile + surface** | **−3.5 g** | **[−5.8, −1.4]** | **0.0000** |
+| surface only | +1.3 g | [−0.8, +3.5] | 0.263 |
+| direct 2D | +4.3 g | [+1.5, +6.9] | 0.0044 |
+| volume only | +7.1 g | [+2.9, +11.3] | 0.0004 |
+| hull volume only | +10.9 g | [+6.7, +15.2] | 0.0000 |
+
+**Two statements, and the difference between them matters.**
+
+*The surface adds information the silhouette does not have.* The interval on the
+improvement excludes zero and does not come close to it. By the criterion this
+project applies everywhere else, that is **resolved** -- and it is the first time
+any 3D-versus-2D comparison here has been.
+
+*The surface does not replace the silhouette.* On its own it is statistically
+indistinguishable from `2D + profile` (p = 0.26). The two describe different
+things and the gain is in combining them, which is a more useful finding than
+either winning outright.
+
+**What this does to §3.** It does not overturn it -- §3 is still what our own
+data shows. It explains it. A 3D advantage of about 3.5 g on a 115 g mean is
+roughly 3% of RMSE; a confound that lets batch membership alone beat every method
+will bury an effect that size without trace. The honest reading is that our
+specimens were never able to detect a 3D advantage of the magnitude that actually
+exists, and reporting §3 as evidence *against* 3D geometry would have been
+reading a null result as a negative one.
+
+**And the ceiling this exposes.** `hull volume only` is the worst condition
+tested, below even `volume only`. A convex hull over a single-view surface throws
+away the concavity that makes a lettuce a lettuce. That is the same finding as
+§7f in different clothes -- an envelope is not a plant -- and it is the argument
+for the Pheno4D virtual-view experiment, where a real volumetric reconstruction
+can be scored against a known cloud instead of assumed.
+
+---
+
 ## 8. Bugs found and fixed
 
 **Evaluation tracked gradients.** `predict()` put the model in `.eval()` and

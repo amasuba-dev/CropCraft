@@ -151,8 +151,14 @@ def run(
     verbose: bool = True,
 ) -> dict:
     """Measure, screen, then regress. Nothing here needs a GPU."""
-    from ..data.lettuce import DATASET_DIR, FEATURE_NAMES
+    from ..data.lettuce import (
+        DATASET_DIR,
+        FEATURE_NAMES,
+        OUTLINE_NAMES,
+        SURFACE_NAMES,
+    )
     from .batch_holdout import cross_validate
+    from .metrics import paired_bootstrap_difference
 
     root = root or DATASET_DIR
     data = load_or_extract(root, force=force, verbose=verbose)
@@ -195,10 +201,18 @@ def run(
     kept_varieties = [varieties[i] for i in kept]
     kept_ids = [ids[i] for i in kept]
 
+    # Nested on purpose: each set adds one kind of information to the one above,
+    # so the comparison isolates what that kind is worth. The surface set is the
+    # only genuinely three-dimensional one -- it is taken off the back-projected
+    # point cloud rather than off the silhouette -- and whether it earns its place
+    # is the question our own specimens cannot answer through the batch confound.
     sets = {
         "direct 2D": ["area_cm2", "diameter_cm", "compactness", "elongation"],
-        "2D + profile": list(FEATURE_NAMES),
+        "2D + profile": list(OUTLINE_NAMES),
+        "surface only": list(SURFACE_NAMES),
+        "2D + profile + surface": list(FEATURE_NAMES),
         "volume only": ["volume_l"],
+        "hull volume only": ["hull_volume_l"],
     }
 
     # The screen uses their measured diameter, which correlates with mass, so a
@@ -210,20 +224,22 @@ def run(
     all_targets = data["fresh_weight_g"] / 1000.0
 
     rows, gaps = [], {}
+    predictions: dict[str, np.ndarray] = {}
     for label, columns in sets.items():
         matrix = np.column_stack([column[c][kept] for c in columns])
         loocv, _ = cross_validate(
             matrix, targets, kept_ids, condition=label, scheme="loocv",
-            components=min(8, len(columns)))
-        cultivar, _ = cross_validate(
+            components=min(10, len(columns)))
+        cultivar, cultivar_predictions = cross_validate(
             matrix, targets, kept_ids, condition=label, scheme="lobo",
-            groups=kept_varieties, components=min(8, len(columns)))
+            groups=kept_varieties, components=min(10, len(columns)))
+        predictions[label] = cultivar_predictions
 
         unscreened_matrix = np.column_stack([column[c][everything] for c in columns])
         unscreened, _ = cross_validate(
             unscreened_matrix, all_targets, ids,
             condition=label + ", unscreened", scheme="lobo",
-            groups=varieties, components=min(8, len(columns)))
+            groups=varieties, components=min(10, len(columns)))
         rows.extend([loocv.as_dict(), cultivar.as_dict(), unscreened.as_dict()])
         gaps[label] = {
             "loocv_rmse_kg": loocv.rmse_kg,
@@ -239,8 +255,30 @@ def run(
                   f"   held-out cultivar {cultivar.rmse_kg:.4f} (R2 {cultivar.r2:+.3f})"
                   f"   unscreened {unscreened.rmse_kg:.4f} (R2 {unscreened.r2:+.3f})")
 
+    # Does the surface earn its place, or is the improvement sampling noise?
+    # The project's standing rule: an interval on the paired difference, not two
+    # point estimates side by side. Scored on the held-out cultivar, because a
+    # feature set that only helps in-distribution has not helped.
+    reference = "2D + profile"
+    comparisons = {}
+    for label, predicted in predictions.items():
+        if label == reference:
+            continue
+        paired = paired_bootstrap_difference(
+            predicted, predictions[reference], targets)
+        comparisons[label] = {
+            k: round(v, 4) for k, v in paired.items()
+            if isinstance(v, (int, float))
+        }
+        if verbose:
+            print(f"    {label:24s} vs {reference}: "
+                  f"{paired['difference'] * 1000:+.1f} g "
+                  f"[{paired['low'] * 1000:+.1f}, {paired['high'] * 1000:+.1f}], "
+                  f"p = {paired['p_direction']:.4f}")
+
     result = {
         "dataset": "3rd Autonomous Greenhouse Challenge lettuce, DOI 10.4121/15023088",
+        "paired_vs_2d_profile": comparisons,
         "n_plants": len(ids),
         "skipped_no_image": [str(m) for m in data.get("missing", [])],
         "n_after_screen": int(kept.size),

@@ -131,3 +131,63 @@ def test_ground_truth_reads_in_numeric_order_and_converts_to_kilograms(tmp_path)
 def test_a_missing_download_says_where_to_get_it(tmp_path):
     with pytest.raises(FileNotFoundError, match="10.4121/15023088"):
         load_ground_truth(tmp_path)
+
+
+def test_a_flat_surface_has_rugosity_one_and_a_crumpled_one_has_more():
+    from ggssvt.data.lettuce import surface_descriptors
+
+    flat_rgb, flat_depth = scene(plant_radius=150, plant_height_m=0.10)
+    depth_m = flat_depth.astype(np.float64) * CAMERA.depth_scale
+    mask, tray = segment(flat_rgb, depth_m)
+    flat = surface_descriptors(
+        mask, depth_m, tray, projected_area_m2=float(mask.sum()) * 1e-6)
+
+    # A disc at one depth is a plane: its surface is its own shadow.
+    assert flat["rugosity"] == pytest.approx(1.0, abs=0.05)
+    assert flat["normal_z_mean"] == pytest.approx(1.0, abs=0.05)
+
+    # Corrugate it and the same outline now covers more surface.
+    rough_rgb, rough_depth = scene(plant_radius=150, plant_height_m=0.10)
+    rows = np.arange(rough_depth.shape[0])[:, None]
+    ripple = (6 * np.sin(rows / 4.0)).astype(np.int16)
+    plant = rough_depth < 900
+    rough_depth = np.where(plant, rough_depth + ripple, rough_depth).astype(np.uint16)
+
+    depth_m = rough_depth.astype(np.float64) * CAMERA.depth_scale
+    mask, tray = segment(rough_rgb, depth_m)
+    rough = surface_descriptors(
+        mask, depth_m, tray, projected_area_m2=float(mask.sum()) * 1e-6)
+
+    assert rough["rugosity"] > flat["rugosity"] + 0.1
+    assert rough["normal_z_mean"] < flat["normal_z_mean"]
+
+
+def test_the_point_cloud_is_metric_and_sits_on_the_tray_plane():
+    from ggssvt.data.lettuce import point_cloud
+
+    rgb, depth = scene(plant_radius=120, plant_height_m=0.15)
+    depth_m = depth.astype(np.float64) * CAMERA.depth_scale
+    mask, tray = segment(rgb, depth_m)
+    points = point_cloud(mask, depth_m, tray)
+
+    assert points.shape[1] == 3
+    assert points.shape[0] == mask.sum()
+    # z is height above the tray, so a plant raised 15 cm sits at 0.15 m.
+    assert points[:, 2].max() == pytest.approx(0.15, abs=0.01)
+    # x and y span the disc's true width, through the real intrinsics.
+    metres_per_px = (0.980 - 0.15) / CAMERA.fx
+    assert np.ptp(points[:, 0]) == pytest.approx(2 * 120 * metres_per_px, rel=0.1)
+
+
+def test_hull_volume_grows_when_the_canopy_domes_at_the_same_outline():
+    from ggssvt.data.lettuce import surface_descriptors
+
+    volumes = []
+    for height in (0.05, 0.15):
+        rgb, depth = scene(plant_radius=120, plant_height_m=height)
+        depth_m = depth.astype(np.float64) * CAMERA.depth_scale
+        mask, tray = segment(rgb, depth_m)
+        volumes.append(surface_descriptors(
+            mask, depth_m, tray, projected_area_m2=1.0)["hull_volume_l"])
+
+    assert volumes[1] > volumes[0]

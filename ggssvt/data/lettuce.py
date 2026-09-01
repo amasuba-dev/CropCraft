@@ -239,6 +239,114 @@ def segment(
     return plant, tray
 
 
+def point_cloud(
+    mask: np.ndarray,
+    depth_m: np.ndarray,
+    tray: float,
+    *,
+    intrinsics: Intrinsics = CAMERA,
+) -> np.ndarray:
+    """The plant's visible surface as metric points, x-y-z in metres.
+
+    z is height above the tray, so the cloud sits on the plane the plant grows
+    from rather than being referenced to the camera. This is a 2.5D surface and
+    not a reconstruction: one view sees the top of the canopy and nothing under
+    it. What it does carry, which a projected area does not, is how that surface
+    is shaped.
+    """
+    rows, cols = np.nonzero(mask)
+    z_camera = depth_m[rows, cols]
+    x = (cols - intrinsics.ppx) * z_camera / intrinsics.fx
+    y = (rows - intrinsics.ppy) * z_camera / intrinsics.fy
+    return np.column_stack([x, y, np.clip(tray - z_camera, 0.0, None)])
+
+
+def surface_descriptors(
+    mask: np.ndarray,
+    depth_m: np.ndarray,
+    tray: float,
+    *,
+    intrinsics: Intrinsics = CAMERA,
+    projected_area_m2: float,
+    max_hull_points: int = 6000,
+) -> dict[str, float]:
+    """Shape descriptors of the visible surface, beyond its outline.
+
+    ``rugosity`` is the ratio of true surface area to the area of its shadow. A
+    flat leaf scores 1; a crumpled Salanova head scores well above it. It is the
+    quantity a projected area is blind to, and fresh mass is partly a question of
+    how much tissue is folded into a given footprint.
+
+    ``normal_z_mean`` is the mean vertical component of the surface normals,
+    which falls as leaves stand up: a proxy for leaf angle.
+
+    ``hull_volume_l`` is the convex hull of the surface points together with
+    their shadow on the tray, so a canopy that domes upward encloses more than a
+    flat rosette of the same outline. It is an upper bound on the plant, not a
+    measurement of it -- with one view the underside is assumption, not data.
+    """
+    from scipy import ndimage
+
+    # Surface area from the depth gradient: each pixel's ground footprint,
+    # stretched by the tilt of the surface over it. dz/dx and dz/dy are metres
+    # per metre, so the stretch factor is the usual sqrt(1 + |grad z|^2).
+    height = np.where(mask, np.clip(tray - depth_m, 0.0, None), 0.0)
+    metre_per_px_x = depth_m / intrinsics.fx
+    metre_per_px_y = depth_m / intrinsics.fy
+    grad_row, grad_col = np.gradient(height)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        slope_x = np.where(metre_per_px_x > 0, grad_col / metre_per_px_x, 0.0)
+        slope_y = np.where(metre_per_px_y > 0, grad_row / metre_per_px_y, 0.0)
+
+    # Only interior pixels: the gradient across the silhouette edge is the drop
+    # to the tray, which is a boundary, not a surface the plant has.
+    interior = ndimage.binary_erosion(mask, structure=np.ones((3, 3)))
+    if not interior.any():
+        interior = mask
+
+    stretch = np.sqrt(1.0 + slope_x[interior] ** 2 + slope_y[interior] ** 2)
+    footprint = intrinsics.pixel_area_m2(depth_m[interior])
+    surface_m2 = float((footprint * stretch).sum())
+    shadow_m2 = float(footprint.sum())
+
+    normal_z = float(np.mean(1.0 / stretch)) if stretch.size else 0.0
+
+    points = point_cloud(mask, depth_m, tray, intrinsics=intrinsics)
+    heights = points[:, 2]
+
+    hull_volume_m3 = 0.0
+    if points.shape[0] >= 8:
+        sample = points
+        if sample.shape[0] > max_hull_points:
+            step = sample.shape[0] // max_hull_points
+            sample = sample[::step]
+        # The surface and its shadow, so the hull is a solid rather than a sheet.
+        floor = sample.copy()
+        floor[:, 2] = 0.0
+        from scipy.spatial import ConvexHull, QhullError
+        try:
+            hull_volume_m3 = float(ConvexHull(np.vstack([sample, floor])).volume)
+        except QhullError:           # degenerate: coplanar, or too few points
+            hull_volume_m3 = 0.0
+
+    return {
+        "surface_area_cm2": surface_m2 * 1e4,
+        "rugosity": surface_m2 / max(shadow_m2, 1e-12),
+        "normal_z_mean": normal_z,
+        "hull_volume_l": hull_volume_m3 * 1e3,
+        # How the height is distributed, not just how tall the plant is.
+        "height_p50_cm": float(np.percentile(heights, 50)) * 100.0,
+        "height_p90_cm": float(np.percentile(heights, 90)) * 100.0,
+        "height_sd_cm": float(heights.std()) * 100.0,
+        # Fill of the smallest upright cylinder the canopy sweeps: a dome fills
+        # more of it than a rosette with the same outline and peak.
+        "fill_ratio": float(
+            (heights.mean() * projected_area_m2)
+            / max(heights.max() * projected_area_m2, 1e-12)
+        ),
+    }
+
+
 def measure(
     rgb: np.ndarray,
     depth_raw: np.ndarray,
@@ -257,10 +365,10 @@ def measure(
 
     n_pixels = int(mask.sum())
     if n_pixels < 50:
-        return {"n_pixels": float(n_pixels), "valid": 0.0, "area_cm2": 0.0,
-                "volume_l": 0.0, "height_cm": 0.0, "diameter_cm": 0.0,
-                "mean_height_cm": 0.0, "compactness": 0.0, "elongation": 0.0,
-                "exg_mean": 0.0, "tray_depth_m": 0.0}
+        empty = dict.fromkeys(FEATURE_NAMES, 0.0)
+        empty.update({"n_pixels": float(n_pixels), "valid": 0.0,
+                      "tray_depth_m": 0.0})
+        return empty
 
     plant_depth = depth_m[mask]
     pixel_area = intrinsics.pixel_area_m2(plant_depth)
@@ -279,7 +387,11 @@ def measure(
     extent_m = float(max(span_row, span_col)) * metres_per_px
     minor_m = float(min(span_row, span_col)) * metres_per_px
 
+    surface = surface_descriptors(
+        mask, depth_m, tray, intrinsics=intrinsics, projected_area_m2=area_m2)
+
     return {
+        **surface,
         "n_pixels": float(n_pixels),
         "valid": 1.0,
         "area_cm2": area_m2 * 1e4,
@@ -298,10 +410,21 @@ def measure(
     }
 
 
-FEATURE_NAMES = (
+# What a silhouette and one height statistic give: the "2D + profile" set.
+OUTLINE_NAMES = (
     "area_cm2", "volume_l", "height_cm", "mean_height_cm",
     "diameter_cm", "compactness", "elongation", "exg_mean",
 )
+
+# What the back-projected surface gives on top of that. Kept separate so the
+# experiment can ask whether the surface adds anything, which is the question
+# H2 asks and which our own specimens cannot answer through the batch confound.
+SURFACE_NAMES = (
+    "surface_area_cm2", "rugosity", "normal_z_mean", "hull_volume_l",
+    "height_p50_cm", "height_p90_cm", "height_sd_cm", "fill_ratio",
+)
+
+FEATURE_NAMES = OUTLINE_NAMES + SURFACE_NAMES
 
 
 def feature_vector(measured: dict[str, float]) -> np.ndarray:
@@ -314,14 +437,18 @@ __all__ = [
     "EXG_THRESHOLD",
     "FEATURE_NAMES",
     "MIN_HEIGHT_M",
+    "OUTLINE_NAMES",
     "SATURATION_THRESHOLD",
+    "SURFACE_NAMES",
     "Intrinsics",
     "LettuceRecord",
     "excess_green",
     "feature_vector",
     "load_ground_truth",
     "measure",
+    "point_cloud",
     "saturation",
     "segment",
+    "surface_descriptors",
     "tray_depth",
 ]
