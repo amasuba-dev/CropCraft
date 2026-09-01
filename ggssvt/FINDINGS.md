@@ -1247,6 +1247,105 @@ python -m ggssvt.cli resolution
 
 ---
 
+## 7r. The staging defect, and what it explains
+
+Aaron pointed out that E001 and E003 to E010, and the Mango batch, were staged on
+an inverted pot used as a pedestal, with the plant in a plastic bag standing on
+top of it, and asked why the camera cannot pick up the stem and the leaves.
+
+**It can. The segmentation finds them. The carve discards them.**
+`eval/pedestal.py`, run with `cli pedestal`.
+
+On E001 the carve stops at 0.456 m while the segmentation reaches 1.257 m, and
+24,020 masked points sit above the carve in a column whose median radius about
+the plant axis is 5.8 cm. That is a seedling roughly 66 cm tall, deleted. Across
+the set:
+
+| | |
+|---|---|
+| specimens losing more than 15 cm of segmented plant | **17 of 36** |
+| of those, a narrow column rather than mask leak | **14** |
+| median height discarded | **0.805 m** |
+
+The worst are E010 at 1.016 m lost, E008 at 0.960 m, E007 at 0.914 m, E019 at
+0.897 m and M008 at 0.819 m with 139,600 points thrown away.
+
+**Why a thin stem cannot survive this carve.** A stem two centimetres across is
+thinner than a 12 mm voxel, so most of the twelve cameras look straight past it
+and return the background behind, which votes the voxel free. A voxel survives
+only when at most three of twelve dissent. Broad Mango leaves clear that bar;
+Eucalyptus seedlings do not.
+
+**This explains most of §7l.** The ten pedestal specimens report 3.72 to 4.26 L
+for masses spanning 0.40 to 0.70 kg. They are measuring the same stand ten times,
+so within that batch the reconstruction holds nothing about the plant for a model
+to use, and batch membership is the only signal left. The confound is a
+consequence of this defect rather than a property of the dataset.
+
+### The two defects are coupled
+
+A first sweep of the carve thresholds scored zero at every setting. The reason is
+instructive: it measured volume above the rim the cache carries, and on exactly
+these specimens that rim is the 0.28 m fallback, which sits *inside* the stand.
+The stand was being counted as plant, so no carve setting could bring the density
+inside the band.
+
+Scoring above the top of the stand instead, one hand-checked setting on E001,
+`max_carve_votes = 5` with `min_informative_views = 8`, gives 2.32 L at 237 kg/m³,
+inside the plausibility band where the current setting gives 0.01 L. **Fixing the
+carve without fixing the rim changes nothing, and the reverse is equally true.**
+That single setting on one specimen is a direction, not a result;
+`eval/recarve.py` runs the sweep with the criterion fixed in advance and positive
+controls included.
+
+---
+
+## 7s. The pot masses, and why they cannot be reverse-estimated
+
+Thirty-one of the forty-two captures have an estimated rather than weighed pot,
+and the reported plant mass is the total minus that estimate. Eleven were weighed,
+all in the V batch, so there is something to calibrate against.
+`eval/pot_mass.py`, run with `cli pot-mass`.
+
+The check is §7b's implied-density argument turned on the pot: mass over the
+volume the reconstruction puts below the rim.
+
+| batch | source | implied pot density |
+|---|---|---|
+| V001 to V008 | weighed | **312 to 485 kg/m³** |
+| E011 to E020 | estimated | **249 to 321 kg/m³** |
+| E001 to E010 | estimated | **42 to 80 kg/m³** |
+| M001 to M010 | estimated | **36 to 80 kg/m³** |
+
+Damp potting medium in a plastic pot is a real material. The weighed pots land
+where they should, and **E011 to E020 land with them**, so those estimates need no
+correction. E001 to E010 and the Mango batch land where no potting medium can be.
+
+**But they cannot be corrected from this, and the reason matters.** Those are
+exactly the specimens raised on a stand, and their below-rim hull contains that
+stand. The stand was never weighed, because it is not part of the specimen, so
+the density is low for a reason that has nothing to do with the estimate. Reverse
+estimating a pot mass from a volume containing unweighed furniture would replace
+one error with a larger one.
+
+Mass does follow volume where the geometry is clean, at **r = +0.871** across the
+eight weighed pots, 250 g per litre with a residual of 2.19 kg. The method is
+sound. It is not identifiable for the specimens that raised the question, and it
+will not be until the stand can be separated from the pot, which is the same
+unsolved problem as finding the rim.
+
+### A separate hazard in the V batch
+
+The V batch pot is **10.5 to 46.4 times the plant**, so plant mass is a small
+difference between two large weighings. At 50 g of scale error on each, V002's
+500 g plant carries 14% uncertainty and V008's 600 g plant 12%, before any
+reconstruction is attempted. The batch collected specifically to break the
+confound carries a target noise floor that no method can get beneath, and the
+error propagation should be reported alongside its results rather than left
+implicit.
+
+---
+
 ## 8. Bugs found and fixed
 
 **Evaluation tracked gradients.** `predict()` put the model in `.eval()` and

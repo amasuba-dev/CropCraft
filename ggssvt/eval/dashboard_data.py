@@ -80,6 +80,7 @@ class DashboardPayload:
     reconstruction: dict | None = None
     resolution: dict | None = None
     pedestal: dict | None = None
+    pot_mass: dict | None = None
     batch_holdout: dict | None = None
     external: dict | None = None
 
@@ -93,6 +94,7 @@ class DashboardPayload:
                 "reconstruction": self.reconstruction,
                 "resolution": self.resolution,
                 "pedestal": self.pedestal,
+                "pot_mass": self.pot_mass,
                 "batch_holdout": self.batch_holdout,
                 "external": self.external,
             },
@@ -314,6 +316,7 @@ def build_payload(
         specimens=specimens, methods=methods, summary=summary, notes=notes,
         resolution=report("resolution.json"),
         pedestal=report("pedestal.json"),
+        pot_mass=report("pot_mass.json"),
         reconstruction=report("reconstruction_clouds.json"),
         batch_holdout=report("batch_holdout.json"),
         external=report("external_lettuce.json"),

@@ -355,6 +355,40 @@ BODY = """
 </section>
 
 
+<section class="section" id="potmass">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3">Can the pot masses be checked?</h2>
+    <p class="content">
+      Most of these pots were estimated rather than weighed, and the plant mass is
+      the total minus that estimate, so a wrong estimate is a wrong target. Eleven
+      pots were weighed, which gives something to calibrate against: a pot of damp
+      medium has a real density, so the mass it was given and the volume the
+      reconstruction puts below its rim have to agree.
+    </p>
+
+    <div id="potfacts" class="keyfacts mb-4"></div>
+
+    <div class="table-container">
+      <table class="table is-fullwidth is-narrow" id="pottable"></table>
+    </div>
+
+    <article class="message is-warning">
+      <div class="message-header"><p>Sound where the geometry is clean, not identifiable where it is not</p></div>
+      <div class="message-body">
+        <p id="potverdict"></p>
+        <p class="is-size-7 mt-3">
+          The specimens that fail this check are the ones raised on a stand, and
+          their below-rim hull contains that stand. It was never weighed, because
+          it is not part of the specimen, so the low density says nothing about
+          whether the estimate was right. Reverse estimating from a volume that
+          holds unweighed furniture would replace one error with a larger one.
+        </p>
+      </div>
+    </article>
+  </div>
+</section>
+
+
 <section class="section" id="ledger">
   <div class="container is-max-desktop">
     <h2 class="title is-3">What settled, and what is still open</h2>

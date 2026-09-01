@@ -820,3 +820,59 @@ function pedestalSection(){
 }
 
 pedestalSection();
+
+/* The pot check. Grouped by whether the pot was weighed, because that is what
+   decides whether the row is evidence or a question. */
+function potMassSection(){
+  const R = D.pot_mass, section = document.getElementById("potmass");
+  if (!R || !R.rows){ if (section) section.remove(); return; }
+
+  const cal = R.calibration || {};
+  document.getElementById("potfacts").innerHTML = [
+    [`${R.n_measured} / ${R.n_specimens}`, "pots actually weighed"],
+    [`r = ${cal.pearson_r != null ? cal.pearson_r : "n/a"}`,
+     "mass against volume, weighed pots"],
+    [String(R.n_correctable), "estimates the reconstruction can correct"],
+  ].map(([n, l]) =>
+    `<div class="keyfact"><div class="num">${n}</div><div class="lab">${l}</div></div>`
+  ).join("");
+
+  const rows = [...R.rows]
+    .sort((a, b) => a.implied_density - b.implied_density)
+    .map(r => `<tr${r.plausible ? "" : ' class="pending"'}>
+      <td><strong>${r.plant_id}</strong></td>
+      <td>${r.source === "measured"
+        ? '<span class="tag is-small is-success">weighed</span>'
+        : '<span class="tag is-small is-light">estimated</span>'}</td>
+      <td>${r.pot_g.toFixed(0)}</td>
+      <td>${r.plant_g.toFixed(0)}</td>
+      <td>${r.below_rim_l.toFixed(1)}</td>
+      <td>${r.plausible ? "" : "<strong>"}${r.implied_density.toFixed(0)}${
+        r.plausible ? "" : "</strong>"}</td>
+      <td>${r.pot_to_plant.toFixed(1)}&times;</td>
+      <td>${(r.plant_uncertainty["50g"] * 100).toFixed(0)}%</td>
+      <td class="is-size-7">${r.verdict}</td></tr>`).join("");
+
+  document.getElementById("pottable").innerHTML =
+    `<thead><tr><th>Specimen</th><th>Pot mass</th><th>Pot g</th><th>Plant g</th>
+     <th>Below rim L</th><th>kg/m&sup3;</th><th>Pot / plant</th>
+     <th>Plant error at 50 g</th><th>Verdict</th></tr></thead><tbody>${rows}</tbody>`;
+
+  const worst = [...R.rows].sort(
+    (a, b) => b.plant_uncertainty["50g"] - a.plant_uncertainty["50g"])[0];
+  const v = document.getElementById("potverdict");
+  if (v) v.innerHTML =
+    `Across the ${cal.n} weighed pots, mass follows the reconstructed volume at
+     <strong>r = ${cal.pearson_r}</strong>, ${cal.slope_g_per_l} g per litre with a
+     residual of ${(cal.residual_rmse_g / 1000).toFixed(2)} kg, so the calibration
+     is real. It clears the E011 to E020 estimates, which land at the same density
+     as the weighed pots. It cannot be applied to the
+     ${R.n_implausible - R.n_correctable} specimens raised on a stand, which are
+     the ones that raised the question.` +
+    (worst ? ` Separately, on ${worst.plant_id} the pot is
+     ${worst.pot_to_plant.toFixed(1)} times the plant, so 50 g of scale error on
+     each weighing is <strong>${(worst.plant_uncertainty["50g"] * 100).toFixed(0)}%</strong>
+     of the plant mass before any reconstruction is attempted.` : "");
+}
+
+potMassSection();

@@ -355,6 +355,18 @@ def cmd_pedestal(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_pot_mass(args: argparse.Namespace) -> int:
+    """Check every pot's mass against the volume the reconstruction gives it."""
+    from .eval.pot_mass import run
+
+    run(verbose=not args.quiet)
+    print()
+    print("A pot of damp medium has a real density. Where the below-rim hull")
+    print("holds an unweighed stand the check says nothing, which is every")
+    print("specimen whose rim detection fell back to the constant.")
+    return 0
+
+
 def cmd_viewpoint(args: argparse.Namespace) -> int:
     """H2: agreement with a view the reconstruction never saw. No GPU."""
     from .eval.viewpoint import run
@@ -1406,6 +1418,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pedestal.add_argument("--quiet", action="store_true")
     pedestal.set_defaults(func=cmd_pedestal)
+
+    pot_mass = sub.add_parser(
+        "pot-mass", help="check pot masses against the reconstruction (CPU, ~1 min)")
+    pot_mass.add_argument("--quiet", action="store_true")
+    pot_mass.set_defaults(func=cmd_pot_mass)
 
     viewpoint = sub.add_parser(
         "viewpoint", help="H2: held-out-view consistency (CPU, ~25 min)"
