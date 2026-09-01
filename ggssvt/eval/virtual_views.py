@@ -434,8 +434,67 @@ def run(
     return report
 
 
+def export_meshes(
+    plant: str = "Maize01",
+    *,
+    out_dir: Path | None = None,
+    subsample: int = 2,
+    smoothing: int = 2,
+    verbose: bool = True,
+) -> dict[str, Path]:
+    """Write the truth, the carve and the fusion of one plant as OBJ files.
+
+    Deliberately a format nothing here is precious about. `.obj` is what
+    MeshLab, Blender, three.js and EasyPBR all read, so exporting it decouples
+    the question of *what we reconstructed* from the question of *what renders
+    it*. The figures in `eval/plots.py` stay dependency-free and deterministic;
+    anything prettier can start from these files.
+
+    The truth is meshed from the same voxelisation the scoring uses rather than
+    from the raw points, so the three meshes are commensurable: any volume
+    difference between them is the operator's, not the mesher's.
+    """
+    from ..data.pheno4d import DATASET_DIR, latest_per_plant, load_scan, voxelise
+    from ..geometry.carving import carve, largest_connected_component
+    from ..geometry.fusion import FUSION_VOXEL_M, fuse
+    from ..geometry.mesh import mesh_from_occupancy
+
+    out_dir = out_dir or WORK_DIR / "reports" / "meshes"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    path = next(p for p in latest_per_plant(DATASET_DIR) if p.parent.name == plant)
+    scan = load_scan(path, subsample=subsample)
+
+    rendered = render(scan.points, target_z_m=max(scan.height_m / 2.0, 0.1))
+    rig, segmentations = _rig_and_segmentations(scan.scan_id, rendered)
+
+    grids = {
+        "truth": voxelise(scan.points, resolution=VOXEL_RESOLUTION,
+                          voxel_size_m=VOXEL_SIZE_M),
+        "carve": largest_connected_component(
+            carve(rig, segmentations, plant_id=scan.scan_id).occupancy),
+        "fusion": largest_connected_component(_downsample(
+            fuse(rendered.depth_m, rendered.rotation, rendered.centre,
+                 mask=rendered.mask).interior,
+            round(VOXEL_SIZE_M / FUSION_VOXEL_M))),
+    }
+
+    written: dict[str, Path] = {}
+    for name, grid in grids.items():
+        mesh = mesh_from_occupancy(grid, voxel_size_m=VOXEL_SIZE_M,
+                                   smoothing=smoothing)
+        target = out_dir / f"{plant.lower()}_{name}.obj"
+        target.write_text(mesh.to_obj(), encoding="utf-8")
+        written[name] = target
+        if verbose:
+            print(f"  {name:7s} {mesh.n_vertices:6d} vertices  "
+                  f"{mesh.n_faces:6d} faces  -> {target.name}")
+    return written
+
+
 __all__ = [
     "ASSUMED_DENSITY_KG_M3", "CAMERA_DISTANCE_M", "CAMERA_HEIGHT_M", "N_VIEWS",
-    "Rendered", "ScanResult", "camera_poses", "reconstruct", "render", "run",
+    "Rendered", "ScanResult", "camera_poses", "export_meshes", "reconstruct",
+    "render", "run",
     "silhouette_iou", "voxel_iou",
 ]
