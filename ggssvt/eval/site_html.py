@@ -347,8 +347,10 @@ BODY = """
     <p class="content">
       Leave-one-out withholds a specimen and leaves the other members of its own
       capture session in the training fold, carrying that session&rsquo;s mean mass.
-      Leave-one-batch-out withholds the whole session. Everything else is held
-      fixed, so the gap between the two columns is what the confound was worth.
+      Leave-one-batch-out, LOBO, withholds the whole session. Everything else is
+      held fixed, so the gap between the two columns is what the confound was
+      worth. The transfer section below runs the same design on the lettuce set,
+      holding out a cultivar instead of a capture batch.
     </p>
 
     <div class="table-container">
@@ -398,9 +400,10 @@ BODY = """
 
     <h3 class="title is-5">Then the regression, on a cultivar it never saw</h3>
     <p class="content is-size-7">
-      Holding out a whole cultivar is this dataset&rsquo;s version of holding out a
-      capture batch. The unscreened column is there because the screen uses their
-      measured diameter, which correlates with mass, so a screened score is
+      This is the same LOBO design as the section above, with cultivar as the
+      grouping variable in place of capture batch: the fit is scored on a variety
+      it has never seen. The unscreened column is there because the screen uses
+      their measured diameter, which correlates with mass, so a screened score is
       selected partly on the label.
     </p>
     <div class="table-container">

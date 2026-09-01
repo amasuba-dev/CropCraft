@@ -689,8 +689,11 @@ function holdoutSection(){
   }).join("");
 
   document.getElementById("holdouttable").innerHTML =
-    `<thead><tr><th>Condition</th><th>LOOCV RMSE kg</th><th>LOOCV R&sup2;</th>
-     <th>Batch held out, RMSE kg</th><th>R&sup2;</th><th>Inflation kg</th></tr></thead>
+    `<thead><tr><th>Condition</th>
+     <th>LOOCV<br><span class="is-size-7 has-text-grey">one specimen out</span><br>RMSE kg</th>
+     <th>R&sup2;</th>
+     <th>LOBO<br><span class="is-size-7 has-text-grey">one capture batch out</span><br>RMSE kg</th>
+     <th>R&sup2;</th><th>Inflation kg</th></tr></thead>
      <tbody>${rows}</tbody>`;
 
   const batch = by.get("batch membership only");
@@ -733,9 +736,12 @@ function externalSection(){
   const bestKey = order.reduce((a, b) =>
     R.gaps[a].held_out_cultivar_rmse_kg <= R.gaps[b].held_out_cultivar_rmse_kg ? a : b);
   document.getElementById("externaltable").innerHTML =
-    `<thead><tr><th>Feature set</th><th>LOOCV RMSE g</th><th>R&sup2;</th>
-     <th>Cultivar held out, RMSE g</th><th>R&sup2;</th>
-     <th>Unscreened R&sup2;</th></tr></thead><tbody>` +
+    `<thead><tr><th>Feature set</th>
+     <th>LOOCV<br><span class="is-size-7 has-text-grey">one plant out</span><br>RMSE g</th>
+     <th>R&sup2;</th>
+     <th>LOBO<br><span class="is-size-7 has-text-grey">one cultivar out</span><br>RMSE g</th>
+     <th>R&sup2;</th>
+     <th>LOBO unscreened<br>R&sup2;</th></tr></thead><tbody>` +
     order.map(k => {
       const g = R.gaps[k], win = k === bestKey;
       return `<tr>

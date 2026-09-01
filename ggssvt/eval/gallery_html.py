@@ -225,7 +225,7 @@ TEMPLATE_BODY = """<div class="wrap">
   <div class="layout">
     <div class="stage">
       <div class="stage-head">
-        <h2 id="title">&mdash;</h2>
+        <h2 id="title"></h2>
         <span class="chip" id="species"></span>
         <span class="spacer"></span>
         <span class="hint" id="sub"></span>
@@ -242,7 +242,7 @@ TEMPLATE_BODY = """<div class="wrap">
 
   <div class="note">
     <p><strong>Read these before trusting a volume.</strong> The pot is part of
-    every carved hull &mdash; it is opaque and the cameras see it, so space carving
+    every carved hull, because it is opaque and the cameras see it, so space carving
     keeps it. The above-ground figure subtracts a fixed
     <code>POT_HEIGHT_M = 0.28 m</code>, which sits <em>below</em> the actual rim on
     the E001&ndash;E010 pots, so their above-ground volume still contains a slab of
