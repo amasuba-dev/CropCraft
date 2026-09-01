@@ -79,6 +79,7 @@ class DashboardPayload:
     # section rather than showing an empty frame.
     reconstruction: dict | None = None
     resolution: dict | None = None
+    pedestal: dict | None = None
     batch_holdout: dict | None = None
     external: dict | None = None
 
@@ -91,6 +92,7 @@ class DashboardPayload:
                 "notes": self.notes,
                 "reconstruction": self.reconstruction,
                 "resolution": self.resolution,
+                "pedestal": self.pedestal,
                 "batch_holdout": self.batch_holdout,
                 "external": self.external,
             },
@@ -311,6 +313,7 @@ def build_payload(
     return DashboardPayload(
         specimens=specimens, methods=methods, summary=summary, notes=notes,
         resolution=report("resolution.json"),
+        pedestal=report("pedestal.json"),
         reconstruction=report("reconstruction_clouds.json"),
         batch_holdout=report("batch_holdout.json"),
         external=report("external_lettuce.json"),

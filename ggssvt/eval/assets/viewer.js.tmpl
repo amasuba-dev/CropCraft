@@ -771,3 +771,52 @@ function externalSection(){
 
 holdoutSection(); externalSection();
 resolutionSection();
+
+/* Plant the carve discarded. Ranked by how much height was lost, because that is
+   the quantity a reader should judge the reconstruction on, and the flagged rows
+   are the ones whose reported volume should not be read as a plant. */
+function pedestalSection(){
+  const R = D.pedestal, section = document.getElementById("pedestal");
+  if (!R || !R.rows){ if (section) section.remove(); return; }
+
+  document.getElementById("pedestalfacts").innerHTML = [
+    [`${R.n_flagged} / ${R.n_specimens}`, "specimens with plant above the carve"],
+    [String(R.n_recoverable), "a narrow column, so recoverable"],
+    [`${R.median_height_lost_m} m`, "median height discarded"],
+  ].map(([n, l]) =>
+    `<div class="keyfact"><div class="num">${n}</div><div class="lab">${l}</div></div>`
+  ).join("");
+
+  const flagged = new Set(R.flagged);
+  const rows = [...R.rows]
+    .sort((a, b) => b.height_lost_m - a.height_lost_m)
+    .map(r => `<tr${flagged.has(r.plant_id) ? ' class="pending"' : ""}>
+      <td><strong>${r.plant_id}</strong> ${r.rim_measured
+        ? "" : '<span class="tag is-small is-warning">rim not found</span>'}</td>
+      <td>${r.mass_kg.toFixed(2)}</td>
+      <td>${r.reported_volume_l.toFixed(2)}</td>
+      <td>${r.carved_top_m.toFixed(3)}</td>
+      <td>${r.segmented_top_m.toFixed(3)}</td>
+      <td>${flagged.has(r.plant_id)
+        ? `<strong>${r.height_lost_m.toFixed(3)}</strong>` : r.height_lost_m.toFixed(3)}</td>
+      <td>${r.discarded_points.toLocaleString()}</td>
+      <td class="is-size-7">${r.verdict}</td></tr>`).join("");
+
+  document.getElementById("pedestaltable").innerHTML =
+    `<thead><tr><th>Specimen</th><th>Mass kg</th><th>Reported L</th>
+     <th>Carve stops m</th><th>Segmentation reaches m</th><th>Height lost m</th>
+     <th>Points discarded</th><th>Verdict</th></tr></thead><tbody>${rows}</tbody>`;
+
+  const worst = [...R.rows].sort((a, b) => b.discarded_points - a.discarded_points)[0];
+  const v = document.getElementById("pedestalverdict");
+  if (v && worst) v.innerHTML =
+    `On ${R.n_flagged} of ${R.n_specimens} specimens the segmentation reaches
+     higher than the carve by more than 15 cm, with a median of
+     <strong>${R.median_height_lost_m} m</strong> of plant discarded. On
+     ${worst.plant_id} the carve stops at ${worst.carved_top_m.toFixed(3)} m while
+     the segmentation reaches ${worst.segmented_top_m.toFixed(3)} m, throwing away
+     <strong>${worst.discarded_points.toLocaleString()}</strong> points the camera
+     had already recorded.`;
+}
+
+pedestalSection();

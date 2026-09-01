@@ -321,6 +321,40 @@ BODY = """
 </section>
 
 
+<section class="section" id="pedestal">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3">Plant the carve threw away</h2>
+    <p class="content">
+      Most of these specimens were staged on an inverted pot, with the plant in a
+      bag standing on top of it. The camera photographed the plant and the
+      segmenter found it. The carve then stopped at the top of the stand and kept
+      almost none of it, so the reported volume for those captures is furniture.
+    </p>
+
+    <div id="pedestalfacts" class="keyfacts mb-4"></div>
+
+    <div class="table-container">
+      <table class="table is-fullwidth is-narrow" id="pedestaltable"></table>
+    </div>
+
+    <article class="message is-danger">
+      <div class="message-header"><p>Why a thin stem does not survive a carve</p></div>
+      <div class="message-body">
+        <p id="pedestalverdict"></p>
+        <p class="is-size-7 mt-3">
+          A stem a couple of centimetres across is thinner than a voxel, so most
+          of the twelve cameras look straight past it and return the background
+          behind, which votes the voxel empty. A voxel survives only when at most
+          three of twelve dissent. Broad mango leaves clear that bar; eucalyptus
+          seedlings do not. The loss is the operator&rsquo;s, not the capture&rsquo;s,
+          which is why it is recoverable.
+        </p>
+      </div>
+    </article>
+  </div>
+</section>
+
+
 <section class="section" id="ledger">
   <div class="container is-max-desktop">
     <h2 class="title is-3">What settled, and what is still open</h2>

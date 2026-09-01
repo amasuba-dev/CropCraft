@@ -343,6 +343,18 @@ def cmd_resolution(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_pedestal(args: argparse.Namespace) -> int:
+    """Where the carve discarded plant the camera had already photographed."""
+    from .eval.pedestal import run
+
+    report = run(verbose=not args.quiet)
+    print()
+    print(f"{report['n_flagged']} of {report['n_specimens']} specimens have plant")
+    print("above the carve. The reported volume for those is the stand they were")
+    print("raised on, so it should not be read as a plant until the carve is fixed.")
+    return 0
+
+
 def cmd_viewpoint(args: argparse.Namespace) -> int:
     """H2: agreement with a view the reconstruction never saw. No GPU."""
     from .eval.viewpoint import run
@@ -1387,6 +1399,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     resolution.add_argument("--quiet", action="store_true")
     resolution.set_defaults(func=cmd_resolution)
+
+    pedestal = sub.add_parser(
+        "pedestal",
+        help="plant the carve discarded, per specimen (CPU, ~1 min)",
+    )
+    pedestal.add_argument("--quiet", action="store_true")
+    pedestal.set_defaults(func=cmd_pedestal)
 
     viewpoint = sub.add_parser(
         "viewpoint", help="H2: held-out-view consistency (CPU, ~25 min)"
