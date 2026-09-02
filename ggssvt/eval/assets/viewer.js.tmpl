@@ -1595,24 +1595,43 @@ function backboneSection(){
   }
 
   const pick = document.getElementById("bbpick");
+  const side = document.getElementById("bbview");
   pick.innerHTML = V.specimens.map((s, i) =>
     `<option value="${i}">${s.plant_id}, ${s.species}, ${
       s.mass_kg.toFixed(2)} kg</option>`).join("");
 
-  const show = () => {
+  /* The side is chosen by azimuth rather than by index, and kept across
+     specimens: someone comparing two plants at the same angle should not have
+     to re-pick it each time. Falls back to the first side a specimen has if it
+     does not carry the one currently selected. */
+  let azimuth = null;
+
+  const draw = () => {
     const s = V.specimens[Number(pick.value) || 0];
+    const angles = s.views.map(v => v.azimuth_deg);
+    if (azimuth === null || !angles.includes(azimuth)) azimuth = angles[0];
+
+    side.innerHTML = angles.map(a =>
+      `<option value="${a}"${a === azimuth ? " selected" : ""}>${a}&deg;</option>`
+    ).join("");
+
+    const index = angles.indexOf(azimuth);
+    const frame = s.views[index];
     const tile = (src, alt) =>
       `<img src="./static/backbone_viz/${src}" alt="${alt}" loading="lazy"
             style="width:100%;border-radius:3px;display:block">`;
+
     const cells = [`
       <div class="column">
-        ${tile(s.frame, `${s.plant_id} frame`)}
-        <p class="is-size-7 has-text-grey has-text-centered mt-1">the frame</p>
+        ${tile(frame.frame, `${s.plant_id} frame`)}
+        <p class="is-size-7 has-text-grey has-text-centered mt-1">the frame
+          &middot; ${frame.azimuth_deg}&deg;</p>
       </div>`];
     for (const [kind, b] of Object.entries(s.backbones)){
+      const pv = b.per_view[index] || b.per_view[0];
       cells.push(`
         <div class="column">
-          ${tile(b.features, `${s.plant_id} ${kind} features`)}
+          ${tile(pv.features, `${s.plant_id} ${kind} features`)}
           <p class="is-size-7 has-text-grey has-text-centered mt-1">${kind}
             &middot; ${b.patch_grid[0]}&times;${b.patch_grid[1]} patches</p>
         </div>
@@ -1624,16 +1643,22 @@ function backboneSection(){
     }
     document.getElementById("backbonepanels").innerHTML = cells.join("");
 
-    const parts = Object.entries(s.backbones).map(([kind, b]) =>
-      `<strong>${kind}</strong> puts ${(b.upper_fraction * 100).toFixed(0)}% of the
-       points in the upper cluster, centred at ${b.upper_mean_height_m.toFixed(2)} m,
-       and its feature foreground recovers ${(b.recall_of_segmenter * 100).toFixed(0)}%
-       of the segmenter's own mask`);
-    document.getElementById("backbonenote").innerHTML =
-      parts.join(". ") + ".";
+    const parts = Object.entries(s.backbones).map(([kind, b]) => {
+      const pv = b.per_view[index] || b.per_view[0];
+      return `<strong>${kind}</strong> puts ${(b.upper_fraction * 100).toFixed(0)}%
+        of the points in the upper cluster, centred at
+        ${b.upper_mean_height_m.toFixed(2)} m, and at this angle its feature
+        foreground recovers ${(pv.recall_of_segmenter * 100).toFixed(0)}% of the
+        segmenter's own mask`;
+    });
+    document.getElementById("backbonenote").innerHTML = parts.join(". ") +
+      `. The clustering is lifted from all twelve views at once, so it is the
+       same whichever side is shown; only the feature panels change.`;
   };
-  pick.onchange = show;
-  show();
+
+  pick.onchange = draw;
+  side.onchange = e => { azimuth = Number(e.target.value); draw(); };
+  draw();
 }
 
 backboneSection();

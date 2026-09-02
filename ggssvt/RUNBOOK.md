@@ -23,7 +23,10 @@ sequence does not already contain.
 > See [RERUN_V_BATCH.md](RERUN_V_BATCH.md).
 
 **Hardware note.** This was first written for an RTX 4060 (8 GB). The lab card is
-an **RTX 4080: 16 GB and roughly three times the compute**. Same Ada
+an **RTX 4080: 16 GB and roughly three times the compute**. For the Titan
+session, read [The Titan session: what has never run](#the-titan-session-what-has-never-run)
+first: it lists the arms that have no result at all and how to start them in
+parallel without repeating the collision that caused the earlier OOM. Same Ada
 architecture, so the `cu121` torch install is unchanged, but the VRAM ceiling
 that shaped the original settings is gone, and the epoch counts below are raised
 accordingly.
@@ -628,6 +631,121 @@ before the ridge. Do not quote an ordering from it.
 
 Decide the framing now rather than at examination:
 [RERUN_V_BATCH.md](RERUN_V_BATCH.md) §3 has the argument and the numbers.
+
+---
+
+## The Titan session: what has never run
+
+**Checked 2026-09-02 against `work_dirs/`.** Everything classical is done and
+every trained arm is not. `work_dirs/ggssvt/campaign/` does not exist, so no
+condition in the campaign has ever produced a result, and two further GPU steps
+have no report file.
+
+| Arm | State |
+| --- | --- |
+| A, B, C space carving and fusion | run |
+| F frozen backbones, both DINOv2 and DINOv3 | run, and it is a null |
+| H surface voxels after Nombambela | run |
+| **E GG-SSVT, all ten campaign conditions** | **never run** |
+| **D pose-free reconstruction** | **never run**, no `posefree.json` |
+| **Neural field** | **never run**, no `neural_field.json` |
+| G single-image generative | not implemented, scoped only |
+
+The ten conditions, from `campaign.py`:
+
+```
+baseline_cnn  baseline_fused  h2_no_geometry  h1_dinov2
+h3_bands_8_freq7  h3_bands_6_freq6  h3_bands_16_freq10
+sam3d_cnn  sam3d_dinov2  h1_dinov3
+```
+
+`h1_dinov3` is now runnable: access was granted on 2026-09-02 to account
+`aamsb`. **Use `env -u HF_TOKEN`** on that machine if it also carries an
+`HF_TOKEN` for a different account, because `huggingface_hub` prefers the
+environment variable over the cached login and the run will report DINOv3 as
+gated while looking otherwise healthy.
+
+### Start it, then leave it
+
+```bash
+python -m ggssvt.run_all --device cuda --plan full --workers 8
+```
+
+That is the whole programme including the campaign, the pose-free step and the
+neural field. It resumes rather than restarts, it tees each step to its own log,
+and an optional step that fails does not stop the night. If the classical steps
+are already fresh it skips straight to the GPU work.
+
+### Running the conditions in parallel
+
+`--only` takes a list, so the campaign shards across processes:
+
+```bash
+python -m ggssvt.campaign --plan full --device cuda --batch-size 4 \
+  --only baseline_cnn baseline_fused h2_no_geometry > shard_a.log 2>&1 &
+
+python -m ggssvt.campaign --plan full --device cuda --batch-size 4 \
+  --only h1_dinov2 h1_dinov3 sam3d_cnn > shard_b.log 2>&1 &
+
+python -m ggssvt.campaign --plan full --device cuda --batch-size 4 \
+  --only h3_bands_8_freq7 h3_bands_6_freq6 h3_bands_16_freq10 sam3d_dinov2 \
+  > shard_c.log 2>&1 &
+```
+
+**Three shards, not ten, and the reason is the OOM you already debugged.** That
+failure was job collisions rather than a memory ceiling: the card reported
+1.11 GiB reserved of 15.57 when it failed. Independent processes on one GPU each
+size their allocator against the *whole* card, so four jobs that each fit
+comfortably alone will still evict each other's cached blocks and fail at a
+point none of them would fail at on their own. More shards is not more
+throughput once they start contending; it is the same work plus a crash.
+
+If you want a hard guarantee rather than a rule of thumb, cap each process:
+
+```bash
+PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128 \
+  python -m ggssvt.campaign ... &
+```
+
+and give each shard a fraction of the card by setting
+`torch.cuda.set_per_process_memory_fraction(0.30)` at the top of the run. Three
+shards at 0.30 leaves headroom for fragmentation, which is what actually bites.
+
+### Measured, so you can size it yourself
+
+On a 4 GiB RTX 2050, one forward and backward of the GG-SSVT model at twelve
+views and 224 pixels peaks at:
+
+| batch | tokens/view | peak |
+| --- | --- | --- |
+| 1 | 16 | 0.73 GiB |
+| 4 | 16 | 1.09 GiB |
+| 4 | 32 | 1.50 GiB |
+| 8 | 32 | 2.55 GiB |
+
+DINOv3 uses marginally *less* than DINOv2 at every setting. On a 15.57 GiB Titan
+batch 8 at 32 tokens leaves about 13 GiB spare for one job, which is why three
+concurrent shards is comfortable and ten is not.
+
+### What a week buys, and what it does not
+
+The campaign at default epochs is roughly 112 hours of finetuning per condition
+on a small card, less on the Titan. A week is enough. But two of these are worth
+running for the record rather than for the answer, and it is better to know that
+before you start:
+
+- **`h1_dinov3` cannot resolve what it is asking.** The frozen probe bounds
+  DINOv3 against DINOv2 at 0.030 kg, and the resolution ledger puts the smallest
+  detectable effect at n=36 at 0.138 kg. Finetuning would have to amplify the
+  difference more than fourfold before this sample could see it. Run it to close
+  the arm, not expecting a result.
+- **The comparison that can pay** is `baseline_cnn` against `baseline_fused`. It
+  asks whether a trained model inherits the 0.209 kg the classical features
+  gained when the reconstruction operator changed, and that effect is larger than
+  the detection floor.
+
+`posefree` and the neural field are different: both are unrun and neither has a
+prior result to compare against, so anything they produce is new.
 
 ---
 

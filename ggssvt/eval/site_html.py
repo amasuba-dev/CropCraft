@@ -392,6 +392,52 @@ BODY = """
 </section>
 
 
+<section class="section" id="backbone">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3">Does a stronger backbone help?</h2>
+    <p class="content">
+      DINOv3 was gated for most of this project, which made it the obvious
+      suspect for the gap between what the method should do and what it does.
+      Access was granted and the answer is no. Read against the no-DINO control
+      the two backbones are indistinguishable, and read against each other they
+      are closer still: the interval is tight enough to rule out a difference
+      worth chasing, rather than merely too wide to see one.
+    </p>
+
+    <div id="backbonefacts" class="keyfacts mb-4"></div>
+
+    <p class="tablecap" id="probetablecap"></p>
+    <div class="tablewrap">
+      <table class="data booktabs" id="probetable"></table>
+    </div>
+    <p class="tablenote" id="probetablenote"></p>
+
+    <h3 class="title is-5 mt-6">What each one sees</h3>
+    <p class="is-size-7 has-text-grey mb-3">
+      Patch features projected onto their own principal components and read as
+      RGB. The projection is fitted on the subject rather than on the whole
+      frame: these captures are a lit floor against a dark surround, and a fit
+      over everything spends its first component on that and returns the plant
+      as a smooth gradient. Read the boundaries the features draw, not the
+      colours they take, which are arbitrary and only sign-aligned between the
+      two panels.
+    </p>
+    <div class="field is-grouped is-grouped-multiline mb-3">
+      <div class="control">
+        <label class="label is-small" for="bbpick">Specimen</label>
+        <div class="select is-small"><select id="bbpick"></select></div>
+      </div>
+      <div class="control">
+        <label class="label is-small" for="bbview">Side</label>
+        <div class="select is-small"><select id="bbview"></select></div>
+      </div>
+    </div>
+    <div class="columns" id="backbonepanels"></div>
+    <p class="is-size-7 has-text-grey" id="backbonenote"></p>
+  </div>
+</section>
+
+
 <section class="section" id="stages">
   <div class="container is-max-desktop">
     <h2 class="title is-3">One specimen, every stage</h2>
@@ -816,48 +862,6 @@ BODY = """
     </p>
     <div class="keyfacts mb-5" id="progressfacts"></div>
     <div class="tablewrap"><table class="data" id="progress"></table></div>
-  </div>
-</section>
-
-
-<section class="section" id="backbone">
-  <div class="container is-max-desktop">
-    <h2 class="title is-3">Does a stronger backbone help?</h2>
-    <p class="content">
-      DINOv3 was gated for most of this project, which made it the obvious
-      suspect for the gap between what the method should do and what it does.
-      Access was granted and the answer is no. Read against the no-DINO control
-      the two backbones are indistinguishable, and read against each other they
-      are closer still: the interval is tight enough to rule out a difference
-      worth chasing, rather than merely too wide to see one.
-    </p>
-
-    <div id="backbonefacts" class="keyfacts mb-4"></div>
-
-    <p class="tablecap" id="probetablecap"></p>
-    <div class="tablewrap">
-      <table class="data booktabs" id="probetable"></table>
-    </div>
-    <p class="tablenote" id="probetablenote"></p>
-
-    <h3 class="title is-5 mt-6">What each one sees</h3>
-    <p class="is-size-7 has-text-grey mb-3">
-      Patch features projected onto their own principal components and read as
-      RGB. The projection is fitted on the subject rather than on the whole
-      frame: these captures are a lit floor against a dark surround, and a fit
-      over everything spends its first component on that and returns the plant
-      as a smooth gradient. Read the boundaries the features draw, not the
-      colours they take, which are arbitrary and only sign-aligned between the
-      two panels.
-    </p>
-    <div class="field is-grouped is-grouped-multiline mb-3">
-      <div class="control">
-        <label class="label is-small" for="bbpick">Specimen</label>
-        <div class="select is-small"><select id="bbpick"></select></div>
-      </div>
-    </div>
-    <div class="columns" id="backbonepanels"></div>
-    <p class="is-size-7 has-text-grey" id="backbonenote"></p>
   </div>
 </section>
 

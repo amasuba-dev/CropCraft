@@ -36,6 +36,13 @@ from ..config import WORK_DIR, voxel_grid_centres
 PANEL_PX = 320
 BACKBONES = ("dinov2", "dinov3")
 
+# Which sides to render. Four of the twelve, ninety degrees apart, because the
+# question a reader has here is whether the features hold up as the plant turns,
+# and four answers it without quadrupling a page that already carries a
+# filmstrip. The clustering is a property of the specimen rather than of the
+# view, so it is computed once however many sides are drawn.
+VIEW_STRIDE = 3
+
 
 def _components(features: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Centred patch features and their principal directions."""
@@ -205,10 +212,17 @@ def compare(
     *,
     cache_dir: Path,
     out_dir: Path,
-    view: int = 0,
+    views: tuple[int, ...] | None = None,
     variant: str = "base",
+    backbones: dict | None = None,
 ) -> dict:
-    """Render both backbones' features and clusterings for one specimen."""
+    """Render both backbones' features on several sides, and their clusterings.
+
+    ``backbones`` lets a caller hand in already-constructed encoders. Building a
+    DINOv3 base takes the better part of a minute, and rebuilding it once per
+    specimen dominated the run: for 36 specimens that was over an hour of loading
+    weights to do a few seconds of arithmetic each time.
+    """
     import torch
 
     from ..data.preprocess import load_cached
@@ -219,80 +233,120 @@ def compare(
     here = out_dir / plant_id
     rel = lambda name: f"{plant_id}/{name}"
 
-    _save(_upsample(_rgb_tile(cached, view), PANEL_PX), here / "frame.jpg")
+    n_views = int(np.asarray(cached.mask).shape[0])
+    if views is None:
+        views = tuple(range(0, n_views, VIEW_STRIDE))
 
     entry = {"plant_id": plant_id, "species": cached.species,
              "mass_kg": round(float(cached.target_kg), 3),
-             "view": view, "frame": rel("frame.jpg"), "backbones": {}}
+             "views": [], "backbones": {}}
 
-    reference = None
+    for view in views:
+        name = f"frame_{view:02d}.jpg"
+        _save(_upsample(_rgb_tile(cached, view), PANEL_PX), here / name)
+        entry["views"].append({
+            "view": int(view),
+            "azimuth_deg": int(round(view * 360.0 / n_views)),
+            "frame": rel(name),
+        })
+
+    if backbones is None:
+        backbones = {k: build_backbone(k, variant=variant) for k in BACKBONES}
+
     rgb = torch.from_numpy(cached.rgb).float().permute(0, 3, 1, 2) / 255.0
-    for kind in BACKBONES:
-        backbone = build_backbone(kind, variant=variant)
-        with torch.no_grad():
-            tokens, grid_h, grid_w = backbone.patch_tokens(rgb[view:view + 1])
-        features = tokens.reshape(grid_h, grid_w, -1).cpu().numpy()
+    reference = None
+    for kind, backbone in backbones.items():
+        per_view = []
+        for view in views:
+            with torch.no_grad():
+                tokens, grid_h, grid_w = backbone.patch_tokens(rgb[view:view + 1])
+            features = tokens.reshape(grid_h, grid_w, -1).cpu().numpy()
 
-        image, basis, subject = _pca_rgb(features, reference=reference)
-        if reference is None:
-            reference = basis
-        _save(_upsample(image, PANEL_PX), here / f"{kind}_features.jpg")
-        overlap = mask_agreement(subject, cached, view)
+            image, basis, subject = _pca_rgb(features, reference=reference)
+            if reference is None:
+                reference = basis
+            name = f"{kind}_features_{view:02d}.jpg"
+            _save(_upsample(image, PANEL_PX), here / name)
+            per_view.append({
+                "view": int(view),
+                "features": rel(name),
+                **mask_agreement(subject, cached, view),
+            })
 
+        # One clustering per specimen: it is lifted from every view at once, so
+        # it does not change with the side being drawn.
         clustered, stats = _cluster_render(cached, backbone)
         _save(clustered, here / f"{kind}_cluster.jpg")
 
         entry["backbones"][kind] = {
-            "features": rel(f"{kind}_features.jpg"),
             "cluster": rel(f"{kind}_cluster.jpg"),
             "patch_grid": [int(grid_h), int(grid_w)],
             "dim": int(features.shape[-1]),
-            **overlap,
+            "per_view": per_view,
             **stats,
         }
     return entry
 
 
 def run(
-    plant_ids: tuple[str, ...] = ("E001", "E002", "E018", "V004"),
+    plant_ids: tuple[str, ...] | None = None,
     *,
     cache_dir: Path | None = None,
     out_dir: Path | None = None,
     out: Path = WORK_DIR / "reports" / "backbone_viz.json",
-    view: int = 0,
+    views: tuple[int, ...] | None = None,
+    variant: str = "base",
+    limit: int | None = None,
     verbose: bool = True,
 ) -> dict:
-    """Render the comparison for a handful of specimens chosen to be different.
+    """Render the comparison for every usable specimen.
 
-    The default set is not arbitrary. E001 is a capture where the rim detector
-    refuses and DINOv3 measurably outperforms; E002 is the same rig with a
-    confident rim, where the two tie at 0.9997; E018 is the one specimen where
-    DINOv3 rescues a DINOv2 failure, 0.578 to 0.968; V004 is a Vachellia, where
-    DINOv3 is the worse of the two.
+    It used to default to four hand-picked specimens, chosen because each
+    illustrated something: one where the rim detector refuses, one where it does
+    not, the one DINOv3 rescues, and one where DINOv3 is the worse of the two.
+    That is a fine set of examples and a poor default. A reader who wants to
+    check a specimen that is not on the list cannot, and a chosen subset invites
+    exactly the suspicion that the examples were picked to suit the argument.
     """
+    from ..data.preprocess import usable_plant_ids
+    from ..models.backbones import build_backbone
+
     cache_dir = cache_dir or WORK_DIR / "cache"
     out_dir = out_dir or WORK_DIR / "reports" / "backbone_viz"
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    plant_ids = tuple(plant_ids or sorted(usable_plant_ids(cache_dir)))
+    if limit:
+        plant_ids = plant_ids[:limit]
+
+    # Once, not once per specimen.
+    if verbose:
+        print(f"  loading {', '.join(BACKBONES)} ({variant})", flush=True)
+    backbones = {k: build_backbone(k, variant=variant) for k in BACKBONES}
+
     specimens = []
     for plant_id in plant_ids:
-        entry = compare(plant_id, cache_dir=cache_dir, out_dir=out_dir, view=view)
+        entry = compare(plant_id, cache_dir=cache_dir, out_dir=out_dir,
+                        views=views, variant=variant, backbones=backbones)
         specimens.append(entry)
         if verbose:
             bits = "  ".join(
                 f"{k} upper {v['upper_fraction']:.2f} at {v['upper_mean_height_m']:.2f} m"
                 for k, v in entry["backbones"].items())
-            print(f"  {plant_id:6s} {bits}", flush=True)
+            print(f"  {plant_id:6s} {len(entry['views'])} sides  {bits}", flush=True)
 
     report = {
         "note": "patch features projected onto their first three principal "
-                "components and read as RGB, with component signs aligned "
-                "between the two backbones so a sign flip does not read as a "
-                "different segmentation",
+                "components and read as RGB, fitted on the subject rather than "
+                "on the whole frame, with component signs aligned between the "
+                "two backbones so a sign flip does not read as a different "
+                "segmentation",
         "caveat": "the colours are not comparable between panels in any "
                   "stronger sense; read the boundaries the features draw, not "
-                  "the hues they take",
-        "view": view,
+                  "the hues they take. The clustering is lifted from all twelve "
+                  "views at once, so it does not change with the side shown",
+        "view_stride": VIEW_STRIDE,
+        "n_specimens": len(specimens),
         "specimens": specimens,
     }
     out.parent.mkdir(parents=True, exist_ok=True)

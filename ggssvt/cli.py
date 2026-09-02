@@ -862,7 +862,8 @@ def cmd_backbone_viz(args: argparse.Namespace) -> int:
     """Render what DINOv2 and DINOv3 each see, side by side."""
     from .eval.backbone_viz import run
 
-    run(plant_ids=tuple(args.plants), view=args.view, verbose=not args.quiet)
+    run(plant_ids=tuple(args.plants) if args.plants else None,
+        limit=args.limit, verbose=not args.quiet)
     print()
     print("Patch features projected onto their own principal components, fitted")
     print("on the subject rather than the whole frame. Read the boundaries the")
@@ -1729,8 +1730,9 @@ def build_parser() -> argparse.ArgumentParser:
         "backbone-viz",
         help="what DINOv2 and DINOv3 each see, as feature maps and clusterings")
     backbone_viz.add_argument(
-        "--plants", nargs="*", default=["E001", "E002", "E018", "V004"])
-    backbone_viz.add_argument("--view", type=int, default=0)
+        "--plants", nargs="*", default=None,
+        help="default is every usable specimen")
+    backbone_viz.add_argument("--limit", type=int, default=None)
     backbone_viz.add_argument("--quiet", action="store_true")
     backbone_viz.set_defaults(func=cmd_backbone_viz)
 
