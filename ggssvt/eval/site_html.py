@@ -796,6 +796,21 @@ BODY = """
 </section>
 
 
+<section class="section" id="references">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3">What this borrows, and where</h2>
+    <p class="content">
+      Each work is listed against the stage it informs and what is actually
+      taken from it. Two supply a method, one supplies a metric this project had
+      been missing, and one is a precedent rather than a source: it reached two
+      of the same evaluation decisions independently, which is worth more as
+      corroboration than it would be as an authority.
+    </p>
+    <div id="reflist"></div>
+  </div>
+</section>
+
+
 <section class="section" id="BibTeX">
   <div class="container is-max-desktop content">
     <h2 class="title is-3">BibTeX</h2>
@@ -806,6 +821,8 @@ BODY = """
   year    = {2026},
   note    = {Work in progress}
 }</code></pre>
+    <p class="is-size-7 has-text-grey">The works cited above, for pasting:</p>
+    <pre><code id="refbibtex"></code></pre>
   </div>
 </section>
 

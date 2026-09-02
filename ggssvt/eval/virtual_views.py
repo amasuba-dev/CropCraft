@@ -38,7 +38,7 @@ not recover one from Kinect returns, but it is not a claim about our captures.
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -281,8 +281,16 @@ class ScanResult:
     fused_density_passes: bool
     inverted: bool              # silhouette IoU ranks them opposite to the truth
 
+    # The grids themselves, kept so a caller can score them another way without
+    # carving the scan a second time. Excluded from as_dict because a boolean
+    # volume is not JSON and the report is the same report it always was.
+    carve_occupancy: np.ndarray | None = field(default=None, repr=False)
+    fused_occupancy: np.ndarray | None = field(default=None, repr=False)
+    truth_occupancy: np.ndarray | None = field(default=None, repr=False)
+
     def as_dict(self) -> dict:
-        return asdict(self)
+        skip = {"carve_occupancy", "fused_occupancy", "truth_occupancy"}
+        return {k: v for k, v in asdict(self).items() if k not in skip}
 
 
 def reconstruct(scan, *, verbose: bool = True) -> ScanResult:
@@ -344,6 +352,9 @@ def reconstruct(scan, *, verbose: bool = True) -> ScanResult:
         carve_density_passes=passes(carve_volume_l),
         fused_density_passes=passes(fused_volume_l),
         inverted=bool((fused_iou > carve_iou) != (fused_sil > carve_sil)),
+        carve_occupancy=carve_occupancy,
+        fused_occupancy=fused_occupancy,
+        truth_occupancy=truth,
     )
     if verbose:
         print(f"  {result.plant_id:9s} true {true_volume_l:6.3f} L | "

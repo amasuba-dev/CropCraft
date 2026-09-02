@@ -843,6 +843,21 @@ def cmd_dino_segment(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_recon_metrics(args: argparse.Namespace) -> int:
+    """Distance metrics on Pheno4D, where reference geometry exists."""
+    from .eval.recon_metrics import run
+
+    report = run(verbose=not args.quiet)
+    print()
+    print("Accuracy, completeness and F-score, after the form DUSt3R reports")
+    print("for DTU. These need reference geometry, so they apply to Pheno4D and")
+    print("to none of the 36 captures; the density screen is still the only")
+    print("measure that transfers to those.")
+    print(f"F-score and voxel IoU agree on {report['f_score_agrees_with_voxel_iou']}"
+          f" of {report['n_scans']} scans.")
+    return 0
+
+
 def cmd_backbone_viz(args: argparse.Namespace) -> int:
     """Render what DINOv2 and DINOv3 each see, side by side."""
     from .eval.backbone_viz import run
@@ -1703,6 +1718,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--out", type=Path, default=WORK_DIR / "reports" / "dino_segment.json"
     )
     dino_seg.set_defaults(func=cmd_dino_segment)
+
+    recon_metrics = sub.add_parser(
+        "recon-metrics",
+        help="accuracy, completeness and F-score on Pheno4D (needs virtual-views)")
+    recon_metrics.add_argument("--quiet", action="store_true")
+    recon_metrics.set_defaults(func=cmd_recon_metrics)
 
     backbone_viz = sub.add_parser(
         "backbone-viz",

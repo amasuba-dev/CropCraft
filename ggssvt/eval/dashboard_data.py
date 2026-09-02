@@ -41,6 +41,13 @@ def _batch_of(plant_id: str) -> str | None:
     return None
 
 
+def _references() -> dict:
+    """The bibliography, generated rather than kept as markup."""
+    from .references import payload
+
+    return payload()
+
+
 def _quantise(occupancy: np.ndarray, downsample: int = 2, max_points: int = 18000,
               voxel_size_m: float = VOXEL_SIZE_M) -> dict:
     """Occupied voxels as base64 zlib-compressed uint8 triples.
@@ -102,6 +109,7 @@ class DashboardPayload:
     pot_mass: dict | None = None
     stages: dict | None = None
     filmstrip: dict | None = None
+    references: dict | None = None
     batch_holdout: dict | None = None
     external: dict | None = None
 
@@ -118,6 +126,7 @@ class DashboardPayload:
                 "pot_mass": self.pot_mass,
                 "stages": self.stages,
                 "filmstrip": self.filmstrip,
+                "references": self.references,
                 "batch_holdout": self.batch_holdout,
                 "external": self.external,
             },
@@ -342,6 +351,7 @@ def build_payload(
         pot_mass=report("pot_mass.json"),
         stages=report("stages.json"),
         filmstrip=report("filmstrip.json"),
+        references=_references(),
         reconstruction=report("reconstruction_clouds.json"),
         batch_holdout=report("batch_holdout.json"),
         external=report("external_lettuce.json"),

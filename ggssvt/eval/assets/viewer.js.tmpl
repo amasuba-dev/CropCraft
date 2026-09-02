@@ -1443,3 +1443,53 @@ async function stagesSection(){
 }
 
 stagesSection();
+
+/* -------------------------------------------------------------- references
+
+   Grouped by the stage each work informs rather than listed alphabetically,
+   because the question a reader has here is "where did this method come from",
+   not "what is the third author's surname". */
+function referencesSection(){
+  const R = D.references, section = document.getElementById("references");
+  if (!R || !R.references || !R.references.length){
+    if (section) section.remove(); return;
+  }
+
+  const tone = {
+    "method": "is-link",
+    "metric": "is-info",
+    "method and metric": "is-info",
+    "visualisation": "is-primary",
+    "precedent": "is-warning",
+  };
+
+  const stages = [];
+  for (const r of R.references){
+    let group = stages.find(g => g.stage === r.stage);
+    if (!group){ group = {stage: r.stage, items: []}; stages.push(group); }
+    group.items.push(r);
+  }
+
+  document.getElementById("reflist").innerHTML = stages.map(group => `
+    <div class="mb-5">
+      <p class="is-size-7 has-text-grey mb-2"><strong>${group.stage}</strong></p>
+      ${group.items.map(r => `
+        <div class="mb-4">
+          <p class="mb-1">
+            ${r.arxiv
+              ? `<a href="${r.url}" target="_blank" rel="noopener"><strong>${r.title}</strong></a>`
+              : `<strong>${r.title}</strong>`}
+            <span class="tag is-small ${tone[r.relation] || "is-light"} ml-2">${r.relation}</span>
+          </p>
+          <p class="is-size-7 has-text-grey mb-1">
+            ${r.authors}, ${r.year}. ${r.venue}${r.arxiv ? `, arXiv:${r.arxiv}` : ""}.
+          </p>
+          <p class="is-size-7">${r.borrowed}</p>
+        </div>`).join("")}
+    </div>`).join("");
+
+  const bib = document.getElementById("refbibtex");
+  if (bib) bib.textContent = R.bibtex;
+}
+
+referencesSection();
