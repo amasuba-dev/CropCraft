@@ -379,6 +379,18 @@ def cmd_stages(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_surface_mesh(args: argparse.Namespace) -> int:
+    """A third operator: volume as occupied surface voxels, after Nombambela."""
+    from .eval.surface_mesh import run
+
+    run(verbose=not args.quiet)
+    print()
+    print("The volume this operator reports scales with the view count, so it is")
+    print("comparable only between specimens captured the same way. His ground")
+    print("truth is plant and pot together; ours is plant alone.")
+    return 0
+
+
 def cmd_viewpoint(args: argparse.Namespace) -> int:
     """H2: agreement with a view the reconstruction never saw. No GPU."""
     from .eval.viewpoint import run
@@ -1442,6 +1454,12 @@ def build_parser() -> argparse.ArgumentParser:
                         help="stop after this many specimens")
     stages.add_argument("--quiet", action="store_true")
     stages.set_defaults(func=cmd_stages)
+
+    surface_mesh = sub.add_parser(
+        "surface-mesh",
+        help="surface-voxel volume against the carve (CPU, ~2 min)")
+    surface_mesh.add_argument("--quiet", action="store_true")
+    surface_mesh.set_defaults(func=cmd_surface_mesh)
 
     viewpoint = sub.add_parser(
         "viewpoint", help="H2: held-out-view consistency (CPU, ~25 min)"

@@ -1346,6 +1346,66 @@ implicit.
 
 ---
 
+## 7t. A third operator, after Nombambela (2025)
+
+Odwa Nombambela's EPR402 report, *Plant Mass Estimation Using 3D Modelling*
+(University of Pretoria, November 2025, same study leader), reconstructs from
+four Kinect v2 views and takes the volume as **the count of occupied voxels in
+the registered surface point cloud** at 7 mm. No carving, no signed distance
+field. `eval/surface_mesh.py`, run with `cli surface-mesh`.
+
+His sensor and intrinsics are identical to ours, so the operator transfers
+directly. It is reimplemented here rather than copied: the operator is one line
+of arithmetic once stated, this repository is public and his report is
+unpublished coursework. Verified against his own output, where plant 1's
+0.00349071 m³ is exactly 10,177 voxels of 7 mm.
+
+**On our 36 specimens, at the same rim and the same density band:**
+
+| operator | inside 200 to 1000 kg/m³ |
+|---|---|
+| silhouette carving | 8 of 36 |
+| **surface voxels, his four views** | **13 of 36** |
+| surface voxels, our twelve views | 7 of 36 |
+
+Paired over the same specimens, surface-at-four-views beats the carve on 5 and
+loses on none, exact p = 0.063. Suggestive, not resolved, which at 5 discordant
+pairs is the most the design can say.
+
+### The finding that matters more than the count
+
+**The volume this operator reports is a property of the sampling, not of the
+plant.** Twelve views give a median of **2.00 times** the volume four views give,
+range 1.67 to 2.40. Every additional view lays down more surface points and more
+points fall in more voxels; nothing about the plant changed.
+
+That is not fatal to his result and it is worth saying why. His protocol fixes
+the view count at four for every specimen, so the bias is a constant scale factor
+across his set and a regressor fitted on those features absorbs it. It does mean
+the figure is not a volume in any transferable sense, and that two studies using
+this operator at different view counts cannot be compared to each other.
+
+It is also the mirror image of our own failure. A hull is too large because it
+fills what it cannot see; a surface count is whatever the sampling makes it. Both
+are wrong in ways the implied-density criterion catches and silhouette agreement
+does not.
+
+### What cannot be borrowed
+
+**His ground truth is the plant and its pot together** ("place plant (including
+pot) on scale", report p. 72), and no pot is subtracted anywhere in his pipeline.
+That is why his 40 masses span only 0.85 to 1.75 kg. His trained regressor
+therefore cannot be applied to our specimens at all, and any comparison of
+reported accuracy between the two projects is meaningless without stating it.
+
+**His dataset is one plant.** `weights.txt` carries 40 labels; `data_collection`
+holds all four depth views for plant 1 alone, and a single RGB array each for
+plants 8 to 12. The workflow runs and reproduces his published numbers exactly,
+which is more than most shared code manages, but the 40-plant result cannot be
+re-derived from what was shared.
+
+---
+
 ## 8. Bugs found and fixed
 
 **Evaluation tracked gradients.** `predict()` put the model in `.eval()` and
