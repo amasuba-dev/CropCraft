@@ -326,9 +326,12 @@ BODY = """
     <h2 class="title is-3">One specimen, every stage</h2>
     <p class="content">
       The pipeline segments, then carves, then fuses, then meshes, and each stage
-      was previously only inspectable on its own. Here they share one camera and
-      one voxel grid, so they can be read against each other. Pick a specimen,
-      drag any panel to turn all of them, and scroll to zoom.
+      was previously only inspectable on its own. Here they share one camera, one
+      voxel grid and one vertical scale, so a reconstruction that reaches lower is
+      drawn lower and the four can be read against each other. Each panel gives
+      the estimate produced by the method that consumes that stage. Pick a
+      specimen and drag any panel to turn all of them. Shift-scroll or the buttons
+      zoom; a plain scroll moves the page.
     </p>
 
     <div class="field is-horizontal mb-3">
@@ -543,8 +546,8 @@ BODY = """
       <a href="https://www.ipb.uni-bonn.de/data/pheno4d/">Pheno4D</a> supplies
       fourteen laser-scanned plants; twelve virtual views of each were rendered at
       the rig&rsquo;s azimuths and put through the same carve and the same fusion.
-      Drag any panel to turn all three together, scroll to zoom, and pick a plant
-      below.
+      Drag any panel to turn all three together, shift-scroll or use the buttons
+      to zoom, and pick a plant below.
     </p>
 
     <div class="field is-grouped is-grouped-multiline mb-3">

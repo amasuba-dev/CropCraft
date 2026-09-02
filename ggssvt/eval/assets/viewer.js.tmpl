@@ -44,7 +44,7 @@ async function cloud(id, seg){
 /* The same bytes-to-points step, without the specimen lookup. The Pheno4D
    arms are not specimens and have no quality record or pot rim, so they
    cannot go through cloud(). */
-async function decodeCloud(e, id){
+async function decodeCloud(e, id, sharedFrame){
   const bytes = await inflate(e.data);
   let out = null;
   if (bytes){
@@ -53,8 +53,15 @@ async function decodeCloud(e, id){
     let lo=[255,255,255], hi=[0,0,0];
     for(let i=0;i<n;i++) for(let a=0;a<3;a++){
       const v=bytes[i*3+a]; if(v<lo[a])lo[a]=v; if(v>hi[a])hi[a]=v; }
-    const span = Math.max(1, hi[0]-lo[0], hi[1]-lo[1], hi[2]-lo[2]);
-    const mid = [(lo[0]+hi[0])/2,(lo[1]+hi[1])/2,(lo[2]+hi[2])/2];
+    /* Per-cloud extent is right for one specimen on its own and wrong for
+       panels read against each other: a carve half the height of its own
+       segmentation would fill its panel just as fully, and the comparison the
+       panels exist for would be lost. sharedFrame scales every cloud by the
+       grid instead, so a shorter reconstruction draws shorter. */
+    const span = sharedFrame ? 255
+      : Math.max(1, hi[0]-lo[0], hi[1]-lo[1], hi[2]-lo[2]);
+    const mid = sharedFrame ? [127.5, 127.5, 127.5]
+      : [(lo[0]+hi[0])/2,(lo[1]+hi[1])/2,(lo[2]+hi[2])/2];
     // z byte 0..255 maps to 0..(resolution*voxel) metres over the working volume
     const metresPerByte = (e.resolution * 0.024) / 255;
     for(let i=0;i<n;i++){
@@ -633,6 +640,7 @@ async function reconstructionPanel(){
     cv.addEventListener("pointerup", stop);
     cv.addEventListener("pointercancel", stop);
     cv.addEventListener("wheel", e => {
+      if (!(e.ctrlKey || e.metaKey || e.shiftKey)) return;   // let the page scroll
       e.preventDefault(); reconZoom(e.deltaY > 0 ? 0.92 : 1.08); },
       {passive: false});
   }
@@ -884,7 +892,18 @@ potMassSection();
    segmentation reaches most of a metre higher than the carve does, and that gap
    is the subject of section 7r. Two numbers in a table make it an inference; two
    panels make it obvious. */
-const STAGE = { yaw: 0.62, pitch: 0.18, zoom: 1.15, entry: null, clouds: new Map() };
+const STAGE = { yaw: 0.62, pitch: 0.18, zoom: 1.4, entry: null, clouds: new Map() };
+
+/* Which regression consumes which stage, so each panel can show the estimate
+   that stage actually produces rather than a single number repeated four times.
+   The segmentation feeds the image-only methods, the carve and the fusion feed
+   their own geometric features, and the mesh feeds the mesh descriptors. */
+const STAGE_METHOD = {
+  segmentation: "2D + profile",
+  carve: "geometric features",
+  fusion: "fused geometry",
+  mesh: "mesh geometry",
+};
 
 function stageDraw(){
   const entry = STAGE.entry;
@@ -905,21 +924,36 @@ function stageZoom(f){
 async function stageSelect(entry){
   STAGE.entry = entry;
 
+  const specimen = byId.get(entry.plant_id);
+  const predictions = (specimen && specimen.predictions) || {};
+
   const host = document.getElementById("stagepanels");
-  host.innerHTML = entry.stages.map(st => `
-    <div class="column is-half">
+  host.innerHTML = entry.stages.map(st => {
+    const method = STAGE_METHOD[st.key];
+    const estimate = predictions[method];
+    const error = estimate != null ? estimate - entry.mass_kg : null;
+    return `
+    <div class="column is-one-quarter">
       <canvas class="recon" id="stage-${st.key}"
               style="width:100%;aspect-ratio:1;touch-action:none;cursor:grab"></canvas>
       <p class="mt-2"><strong>${st.title}</strong><br>
         <span class="is-size-7 has-text-grey">${st.detail}</span></p>
-      <p class="is-size-7">reaches ${st.top_m.toFixed(3)} m${
-        st.volume_l ? ` &middot; ${st.volume_l.toFixed(2)} L` : ""}</p>
-    </div>`).join("");
+      <p class="is-size-7">${entry.species} &middot; weighed
+        ${entry.mass_kg.toFixed(2)} kg<br>
+        ${estimate != null
+          ? `<strong>estimated ${estimate.toFixed(2)} kg</strong>
+             <span class="has-text-grey">(${error >= 0 ? "+" : ""}${
+               error.toFixed(2)} kg, ${method})</span>`
+          : '<span class="has-text-grey">no estimate from this stage</span>'}<br>
+        <span class="has-text-grey">reaches ${st.top_m.toFixed(3)} m${
+          st.volume_l ? ` &middot; ${st.volume_l.toFixed(2)} L` : ""}</span></p>
+    </div>`;
+  }).join("");
 
   for (const st of entry.stages){
     const key = entry.plant_id + "/" + st.key;
     if (!STAGE.clouds.has(key))
-      STAGE.clouds.set(key, await decodeCloud(st.cloud, key));
+      STAGE.clouds.set(key, await decodeCloud(st.cloud, key, true));
   }
 
   /* One camera across every panel, rebound each time because the canvases are
@@ -941,6 +975,7 @@ async function stageSelect(entry){
     cv.addEventListener("pointerup", stop);
     cv.addEventListener("pointercancel", stop);
     cv.addEventListener("wheel", e => {
+      if (!(e.ctrlKey || e.metaKey || e.shiftKey)) return;   // let the page scroll
       e.preventDefault(); stageZoom(e.deltaY > 0 ? 0.92 : 1.08); }, {passive: false});
   }
 
@@ -989,7 +1024,7 @@ async function stagesSection(){
     const b = e.target.closest("button");
     if (!b) return;
     if (b.dataset.zoom === "reset"){
-      STAGE.zoom = 1.15; STAGE.yaw = 0.62; STAGE.pitch = 0.18; stageDraw();
+      STAGE.zoom = 1.4; STAGE.yaw = 0.62; STAGE.pitch = 0.18; stageDraw();
     } else stageZoom(Number(b.dataset.zoom));
   };
 
