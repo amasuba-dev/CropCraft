@@ -280,6 +280,24 @@ BODY = """
       staging is plain in the first row and invisible in every number on this
       page. Tiles load only for the specimen you select.
     </p>
+
+    <div class="field is-grouped is-grouped-multiline mb-4" id="stripcontrols">
+      <div class="control">
+        <label class="label is-small" for="stripseg">Segmentation</label>
+        <div class="select is-small"><select id="stripseg"></select></div>
+      </div>
+      <div class="control">
+        <label class="label is-small" for="stripview">Turntable shows</label>
+        <div class="select is-small">
+          <select id="stripview">
+            <option value="measured" selected>the measured points</option>
+            <option value="shaded">the mesh, lit</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <p class="is-size-7 has-text-grey mb-3" id="stripsegnote"></p>
+
     <div id="filmstrip"></div>
 
     <h3 class="title is-5 mt-6">Horizontal slices</h3>
@@ -472,9 +490,11 @@ BODY = """
 
     <div id="pedestalfacts" class="keyfacts mb-4"></div>
 
-    <div class="table-container">
-      <table class="table is-fullwidth is-narrow" id="pedestaltable"></table>
+    <p class="tablecap" id="pedestaltablecap"></p>
+    <div class="tablewrap">
+      <table class="data booktabs" id="pedestaltable"></table>
     </div>
+    <p class="tablenote" id="pedestaltablenote"></p>
 
     <article class="message is-danger">
       <div class="message-header"><p>Why a thin stem does not survive a carve</p></div>
@@ -507,9 +527,11 @@ BODY = """
 
     <div id="potfacts" class="keyfacts mb-4"></div>
 
-    <div class="table-container">
-      <table class="table is-fullwidth is-narrow" id="pottable"></table>
+    <p class="tablecap" id="pottablecap"></p>
+    <div class="tablewrap">
+      <table class="data booktabs" id="pottable"></table>
     </div>
+    <p class="tablenote" id="pottablenote"></p>
 
     <article class="message is-warning">
       <div class="message-header"><p>Sound where the geometry is clean, not identifiable where it is not</p></div>

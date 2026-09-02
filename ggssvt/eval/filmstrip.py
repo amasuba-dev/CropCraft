@@ -48,6 +48,26 @@ TILE_H = 150          # thumbnail height in pixels; width follows the frame
 SHADED_PX = 460       # the one large render
 SPLAT_RADIUS = 1      # half-width of a vertex splat, in output pixels
 
+# The turntable. Eight is enough that a drag reads as rotation rather than as a
+# slideshow, and few enough that one specimen's frames come to about 180 KB.
+TURNTABLE_STEPS = 8
+TURNTABLE_PX = 380
+
+# Which segmenters the strip can offer, and what each one actually is. The
+# answer to "is this SAM or DINO" is neither by default: the reference condition
+# is a geometric rule with no learned model in it, and saying so plainly here
+# stops the page implying otherwise.
+SEGMENTER_LABELS = {
+    "geometric": ("Geometric",
+                  "excess green and depth gating inside a cylinder about the "
+                  "plant axis, with no learned model"),
+    "sam3d": ("SAM, back-projected",
+              "Segment Anything masks per view, back-projected and intersected. "
+              "Not SAM 3D Objects, which is access gated"),
+    "dinov2": ("DINOv2 features",
+               "self-supervised patch features thresholded into a mask"),
+}
+
 # Light in view space: up, slightly left, slightly toward the camera. Chosen so
 # a leaf facing the viewer is bright and the underside of the canopy is not
 # black, because a black region reads as absence rather than as shadow.
@@ -250,52 +270,109 @@ def _save(image: np.ndarray, path: Path, *, quality: int = 82) -> int:
     return path.stat().st_size
 
 
-def strip_for(
-    plant_id: str,
-    *,
-    cache_dir: Path,
-    fused_dir: Path | None,
-    out_dir: Path,
-    n_views: int = N_VIEWS,
-) -> dict:
-    """Render every tile for one specimen and return its manifest."""
-    from ..data.preprocess import load_cached
+
+
+def points_render(points: np.ndarray, *, size: int = TURNTABLE_PX,
+                  yaw: float = 0.62, pitch: float = 0.18,
+                  dot: int | None = None) -> np.ndarray:
+    """The measured points themselves, depth cued, one dot each.
+
+    This is the honest answer to "the leaves are not clear". They are not clear
+    in the mesh because the carve runs on a 12 mm grid and a eucalyptus leaf is
+    one or two voxels across, so the surface it extracts cannot resolve one. The
+    points have no such limit: they are the segmenter's own output at sensor
+    resolution, and a stem two centimetres across is dozens of them.
+
+    So the two renders answer different questions. The lit mesh shows what the
+    reconstruction believes. This shows what was measured. Where they disagree,
+    the disagreement is the finding.
+    """
+    if points.shape[0] == 0:
+        return np.full((size, size, 3), 255, dtype=np.uint8)
+
+    from .render import viridis
+
+    view = _rotate(points - points.mean(axis=0), yaw, pitch)
+    half = max(float(np.abs(view[:, :2]).max()), 1e-6) * 1.06
+    px = np.round(size / 2 + view[:, 0] / half * (size / 2)).astype(np.int64)
+    py = np.round(size / 2 - view[:, 1] / half * (size / 2)).astype(np.int64)
+
+    # Height above the floor, not depth from the camera, so a leaf keeps its
+    # colour as the turntable turns.
+    height = points[:, 2]
+    span = max(float(np.ptp(height)), 1e-6)
+    colour = viridis((height - height.min()) / span).astype(np.float64)
+
+    # One pixel per point once the cloud is dense. A 3 by 3 splat on 134,000
+    # points buries the structure it exists to show: E001's canopy came back as
+    # one blob because every point was painted nine times the size it needed.
+    if dot is None:
+        dot = 0 if points.shape[0] > size * size // 8 else 1
+    offsets = [(dx, dy) for dy in range(-dot, dot + 1)
+               for dx in range(-dot, dot + 1)]
+    xs = np.concatenate([px + dx for dx, _ in offsets])
+    ys = np.concatenate([py + dy for _, dy in offsets])
+    zs = np.tile(view[:, 2], len(offsets))
+    cs = np.tile(colour, (len(offsets), 1))
+
+    inside = (xs >= 0) & (xs < size) & (ys >= 0) & (ys < size)
+    xs, ys, zs, cs = xs[inside], ys[inside], zs[inside], cs[inside]
+
+    order = np.argsort(zs, kind="stable")
+    image = np.full((size * size, 3), 255.0)
+    image[ys[order] * size + xs[order]] = cs[order]
+    return image.reshape(size, size, 3).astype(np.uint8)
+
+
+def _turntable(mesh, here: Path, folder: str, *, n: int = TURNTABLE_STEPS) -> dict:
+    """The mesh rendered all the way round, as frames a browser can flip through.
+
+    Shading in the page would need vertices and normals in the payload, which is
+    megabytes per specimen for a view most readers will glance at once. Frames
+    cost about twenty kilobytes each, load only when someone drags, and let the
+    render stay the offline one that already has its depth ordering right.
+    """
+    frames = []
+    for step in range(n):
+        yaw = 0.62 + step * 2.0 * np.pi / n
+        name = f"{folder}/shaded_{step:02d}.jpg"
+        _save(shaded_render(mesh, size=TURNTABLE_PX, yaw=yaw), here / name)
+        frames.append(name)
+    return {
+        "frames": frames,
+        "n_vertices": mesh.n_vertices,
+        "n_faces": mesh.n_faces,
+        "area_m2": round(mesh.surface_area_m2(), 4),
+    }
+
+
+def _segmenter_strip(cached, *, views: list[int], here: Path, folder: str,
+                     rel, fused=None) -> dict:
+    """Masks, depth, volumes and a turntable for one segmenter's take."""
     from ..geometry.mesh import mesh_from_occupancy
     from .render import render_volume
 
-    cached = load_cached(plant_id, cache_dir)
-    here = out_dir / plant_id
-    rel = lambda name: f"{plant_id}/{name}"
-
-    views = _view_indices(np.asarray(cached.mask).shape[0], n_views)
     frames = []
     for view in views:
         names = {}
         for kind, tile, suffix in (
-            ("rgb", _rgb_tile(cached, view), ".jpg"),
             ("mask", _mask_tile(cached, view), ".jpg"),
             ("depth", _depth_tile(cached, view), ".png"),
         ):
-            name = f"{kind}_{view:02d}{suffix}"
+            name = f"{folder}/{kind}_{view:02d}{suffix}"
             _save(tile, here / name)
             names[kind] = rel(name)
-        names["azimuth_deg"] = int(round(view * 360.0 / len(cached.position_ids)))
         frames.append(names)
 
-    # What each operator built, in the projection the rest of the page uses.
-    volumes = []
     grids = [("carve", cached.occupancy, "silhouette carving")]
-    if fused_dir is not None and (fused_dir / "quality.json").exists():
-        try:
-            volumes_source = load_cached(plant_id, fused_dir)
-        except (FileNotFoundError, KeyError):
-            volumes_source = None
-        if volumes_source is not None:
-            grids.append(("fusion", volumes_source.occupancy, "depth fusion"))
+    if fused is not None:
+        grids.append(("fusion", fused.occupancy, "depth fusion"))
 
+    volumes = []
     for key, grid, title in grids:
-        name = f"volume_{key}.png"
-        _save(render_volume(grid, view="front", size=300, point_radius=1), here / name)
+        name = f"{folder}/volume_{key}.png"
+        _save(render_volume(grid, view="front", size=300, point_radius=1),
+              here / name)
         volumes.append({"key": key, "title": title, "image": rel(name)})
 
     shaded = None
@@ -303,31 +380,99 @@ def strip_for(
         mesh = mesh_from_occupancy(cached.occupancy,
                                    voxel_size_m=float(cached.voxel_size_m))
         if mesh.n_faces:
-            _save(shaded_render(mesh), here / "shaded.png")
-            shaded = {
-                "image": rel("shaded.png"),
-                "n_vertices": mesh.n_vertices,
-                "n_faces": mesh.n_faces,
-                "area_m2": round(mesh.surface_area_m2(), 4),
-            }
+            shaded = _turntable(mesh, here, folder)
+            shaded["frames"] = [rel(name) for name in shaded["frames"]]
     except Exception:
         # A missing scikit-image costs the illustration and nothing else.
         shaded = None
 
+    # The same turn, on the measured points rather than the extracted surface.
+    from .pedestal import masked_points
+
+    points = masked_points(cached)
+    measured = None
+    if points.shape[0]:
+        names = []
+        for step in range(TURNTABLE_STEPS):
+            yaw = 0.62 + step * 2.0 * np.pi / TURNTABLE_STEPS
+            name = f"{folder}/points_{step:02d}.jpg"
+            _save(points_render(points, yaw=yaw), here / name)
+            names.append(rel(name))
+        measured = {"frames": names, "n_points": int(points.shape[0]),
+                    "top_m": round(float(points[:, 2].max()), 3)}
+
+    return {"frames": frames, "volumes": volumes, "shaded": shaded,
+            "measured": measured}
+
+
+def strip_for(
+    plant_id: str,
+    *,
+    cache_dirs: dict[str, Path],
+    fused_dir: Path | None,
+    out_dir: Path,
+    n_views: int = N_VIEWS,
+) -> dict:
+    """Render every tile for one specimen, for every segmenter that has it.
+
+    The colour frames are a property of the capture rather than of the segmenter,
+    so they are rendered once and shared. Everything downstream of the mask is
+    rendered per segmenter, because that is the whole point of being able to
+    switch: the same photograph, two opinions about which pixels are plant.
+    """
+    from ..data.preprocess import load_cached
+
+    here = out_dir / plant_id
+    rel = lambda name: f"{plant_id}/{name}"
+
+    primary_name = next(iter(cache_dirs))
+    primary = load_cached(plant_id, cache_dirs[primary_name])
+    n_total = int(np.asarray(primary.mask).shape[0])
+    views = _view_indices(n_total, n_views)
+
+    frames = []
+    for view in views:
+        name = f"rgb_{view:02d}.jpg"
+        _save(_rgb_tile(primary, view), here / name)
+        frames.append({"rgb": rel(name),
+                       "azimuth_deg": int(round(view * 360.0 / n_total))})
+
+    fused = None
+    if fused_dir is not None and (fused_dir / "quality.json").exists():
+        try:
+            fused = load_cached(plant_id, fused_dir)
+        except (FileNotFoundError, KeyError):
+            fused = None
+
+    segmenters = {}
+    for name, directory in cache_dirs.items():
+        try:
+            cached = (primary if name == primary_name
+                      else load_cached(plant_id, directory))
+        except (FileNotFoundError, KeyError):
+            continue
+        label, detail = SEGMENTER_LABELS.get(name, (name, ""))
+        entry = _segmenter_strip(
+            cached, views=views, here=here, folder=name, rel=rel,
+            fused=fused if name == primary_name else None)
+        entry["label"] = label
+        entry["detail"] = detail
+        entry["mask_px_per_view"] = int(np.asarray(cached.mask).sum() // n_total)
+        segmenters[name] = entry
+
     return {
         "plant_id": plant_id,
-        "species": cached.species,
-        "mass_kg": round(float(cached.target_kg), 3),
-        "n_views_total": int(np.asarray(cached.mask).shape[0]),
+        "species": primary.species,
+        "mass_kg": round(float(primary.target_kg), 3),
+        "n_views_total": n_total,
         "frames": frames,
-        "volumes": volumes,
-        "shaded": shaded,
+        "segmenters": segmenters,
     }
 
 
 def run(
     *,
-    cache_dir: Path | None = None,
+    cache_dirs: dict[str, Path] | None = None,
     fused_dir: Path | None = None,
     out_dir: Path | None = None,
     out: Path = WORK_DIR / "reports" / "filmstrip.json",
@@ -335,37 +480,46 @@ def run(
     n_views: int = N_VIEWS,
     verbose: bool = True,
 ) -> dict:
-    """Render the strip for every usable specimen and index it."""
+    """Render the strip for every usable specimen, for every segmenter present."""
     from ..data.preprocess import usable_plant_ids
 
-    cache_dir = cache_dir or WORK_DIR / "cache"
+    if cache_dirs is None:
+        candidates = {"geometric": WORK_DIR / "cache",
+                      "sam3d": WORK_DIR / "cache_sam3d"}
+        cache_dirs = {k: v for k, v in candidates.items() if v.is_dir()}
     fused_dir = fused_dir or WORK_DIR / "cache_tsdf"
     out_dir = out_dir or WORK_DIR / "reports" / "filmstrip"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    plant_ids = sorted(usable_plant_ids(cache_dir))
+    primary = next(iter(cache_dirs.values()))
+    plant_ids = sorted(usable_plant_ids(primary))
     if limit:
         plant_ids = plant_ids[:limit]
 
     specimens = []
     for plant_id in plant_ids:
-        entry = strip_for(plant_id, cache_dir=cache_dir, fused_dir=fused_dir,
+        entry = strip_for(plant_id, cache_dirs=cache_dirs, fused_dir=fused_dir,
                           out_dir=out_dir, n_views=n_views)
         specimens.append(entry)
         if verbose:
-            print(f"  {plant_id:6s} {len(entry['frames'])} views, "
-                  f"{len(entry['volumes'])} volumes"
-                  + (", shaded" if entry["shaded"] else ""), flush=True)
+            names = ", ".join(entry["segmenters"])
+            print(f"  {plant_id:6s} {len(entry['frames'])} views  [{names}]",
+                  flush=True)
 
     total = sum(f.stat().st_size for f in out_dir.rglob("*") if f.is_file())
+    coverage = {name: sum(1 for s in specimens if name in s["segmenters"])
+                for name in cache_dirs}
     report = {
-        "note": "raw frames, masks, depth and volumes per specimen, written as "
-                "files rather than embedded so the page stays small and the "
-                "tiles load on demand",
-        "caveat": "the shaded render is an illustration, not evidence: a lit "
+        "note": "raw frames, masks, depth, volumes and a turntable per specimen, "
+                "written as files rather than embedded so the page stays small "
+                "and the tiles load on demand",
+        "caveat": "the shaded turntable is an illustration, not evidence: a lit "
                   "surface reads as solid everywhere, which is the property a "
                   "carved hull does not have",
         "n_views": n_views,
+        "turntable_steps": TURNTABLE_STEPS,
+        "segmenter_labels": SEGMENTER_LABELS,
+        "coverage": coverage,
         "n_specimens": len(specimens),
         "bytes_on_disk": total,
         "specimens": specimens,
@@ -373,8 +527,12 @@ def run(
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, separators=(",", ":")), encoding="utf-8")
     if verbose:
-        print(f"\n  wrote {out} and {total // 1024} KB of tiles under {out_dir}")
+        print("\n  coverage: " + "  ".join(f"{k} {v}" for k, v in coverage.items()))
+        print(f"  wrote {out} and {total // 1024} KB of tiles under {out_dir}")
     return report
 
 
-__all__ = ["N_VIEWS", "SHADED_PX", "run", "shaded_render", "strip_for"]
+__all__ = [
+    "N_VIEWS", "SEGMENTER_LABELS", "SHADED_PX", "TURNTABLE_STEPS",
+    "run", "shaded_render", "strip_for",
+]

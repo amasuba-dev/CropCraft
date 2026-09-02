@@ -496,48 +496,122 @@ async function select(id){
    fetches only the specimen someone selected, about four hundred kilobytes, and
    loading="lazy" defers even that until the row scrolls into view. */
 const FILM_ROWS = [
-  ["rgb", "Capture", "the frame as the camera returned it, uncropped"],
-  ["mask", "Segmentation", "subject mask outlined over a dimmed frame"],
-  ["depth", "Depth", "what the sensor measured, near is bright"],
+  ["rgb", "Capture", "the frame as the camera returned it, uncropped", true],
+  ["mask", "Segmentation", "subject mask outlined over a dimmed frame", false],
+  ["depth", "Depth", "what the sensor measured, near is bright", false],
 ];
+
+/* Which segmenter's opinion the strip is showing, and which turntable. Held
+   outside the render so switching specimens does not silently reset them. */
+const FILM = {seg: null, view: "measured", turn: 0};
+
+function filmEntry(id){
+  const R = D.filmstrip;
+  return R && R.specimens ? R.specimens.find(s => s.plant_id === id) : null;
+}
+
+function filmSegmenters(){
+  const entry = filmEntry(current);
+  return entry ? Object.keys(entry.segmenters) : [];
+}
+
+/* The turntable. Eight pre-rendered azimuths flipped by dragging, rather than a
+   shaded renderer in the page: shading in the browser needs vertices and normals
+   in the payload, megabytes per specimen, for a view most readers will glance at
+   once. Frames are about twenty kilobytes and load as they are reached. */
+function filmTurn(host, frames){
+  const img = host.querySelector("#turnimg");
+  if (!img || !frames.length) return;
+  const show = () => {
+    const k = ((FILM.turn % frames.length) + frames.length) % frames.length;
+    img.src = "./static/filmstrip/" + frames[k];
+  };
+  show();
+
+  let drag = false, lx = 0, acc = 0;
+  img.style.cursor = "grab";
+  img.addEventListener("pointerdown", e => {
+    drag = true; lx = e.clientX; acc = 0;
+    img.setPointerCapture(e.pointerId); img.style.cursor = "grabbing";
+    e.preventDefault(); });
+  img.addEventListener("pointermove", e => {
+    if (!drag) return;
+    acc += e.clientX - lx; lx = e.clientX;
+    // One frame per 28 px of drag, which reads as rotation rather than as a
+    // slideshow at the eight azimuths that were rendered.
+    while (Math.abs(acc) >= 28){
+      FILM.turn += acc > 0 ? 1 : -1;
+      acc -= acc > 0 ? 28 : -28;
+      show();
+    } });
+  const stop = e => { drag = false; img.style.cursor = "grab";
+    try { img.releasePointerCapture(e.pointerId) } catch(_){} };
+  img.addEventListener("pointerup", stop);
+  img.addEventListener("pointercancel", stop);
+
+  const step = host.querySelector("#turnstep");
+  if (step) step.onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    FILM.turn += Number(b.dataset.step); show(); };
+}
 
 function filmstrip(id){
   const host = document.getElementById("filmstrip");
   if (!host) return;
-  const R = D.filmstrip;
-  const entry = R && R.specimens
-    ? R.specimens.find(s => s.plant_id === id) : null;
+  const entry = filmEntry(id);
+  const pick = document.getElementById("stripseg");
+
   if (!entry){
     host.innerHTML = `<p class="is-size-7 has-text-grey">No frames rendered for
       this specimen. Run <code>cli filmstrip</code>.</p>`;
+    if (pick) pick.innerHTML = "";
     return;
   }
+
+  const names = Object.keys(entry.segmenters);
+  if (!names.includes(FILM.seg)) FILM.seg = names[0];
+  const seg = entry.segmenters[FILM.seg];
+
+  if (pick){
+    pick.innerHTML = names.map(n =>
+      `<option value="${n}"${n === FILM.seg ? " selected" : ""}>${
+        entry.segmenters[n].label}</option>`).join("");
+  }
+  const segnote = document.getElementById("stripsegnote");
+  if (segnote) segnote.innerHTML =
+    `<strong>${seg.label}.</strong> ${seg.detail}. Keeping
+     ${seg.mask_px_per_view.toLocaleString()} pixels per view on this specimen.`
+    + (names.length > 1 ? "" :
+       ` Only one segmenter has run on this capture.`);
 
   const tile = (src, alt) =>
     `<img src="./static/filmstrip/${src}" alt="${alt}" loading="lazy"
           style="width:100%;border-radius:3px;display:block">`;
 
-  const rows = FILM_ROWS.map(([key, title, detail]) => `
+  const rows = FILM_ROWS.map(([key, title, detail, shared]) => {
+    const source = shared ? entry.frames : seg.frames;
+    return `
     <div class="mb-4">
       <p class="mb-1"><strong>${title}</strong>
-        <span class="is-size-7 has-text-grey">&nbsp;${detail}</span></p>
+        <span class="is-size-7 has-text-grey">&nbsp;${detail}${
+          shared ? "" : `, ${seg.label.toLowerCase()}`}</span></p>
       <div class="columns is-mobile is-variable is-1">
-        ${entry.frames.map(fr => `
+        ${source.map((fr, k) => `
           <div class="column">
-            ${tile(fr[key], `${id} ${title} at ${fr.azimuth_deg} degrees`)}
+            ${tile(fr[key], `${id} ${title}`)}
             <p class="is-size-7 has-text-grey has-text-centered">${
-              fr.azimuth_deg}&deg;</p>
+              entry.frames[k].azimuth_deg}&deg;</p>
           </div>`).join("")}
       </div>
-    </div>`).join("");
+    </div>`; }).join("");
 
-  const volumes = entry.volumes.length ? `
+  const volumes = seg.volumes.length ? `
     <div class="mb-4">
       <p class="mb-1"><strong>What each operator built</strong>
         <span class="is-size-7 has-text-grey">&nbsp;depth-cued projection, near
         is bright. This is the evidence.</span></p>
       <div class="columns is-mobile is-variable is-1">
-        ${entry.volumes.map(vol => `
+        ${seg.volumes.map(vol => `
           <div class="column is-one-quarter">
             ${tile(vol.image, `${id} ${vol.title}`)}
             <p class="is-size-7 has-text-grey has-text-centered">${vol.title}</p>
@@ -545,36 +619,65 @@ function filmstrip(id){
       </div>
     </div>` : "";
 
-  /* Labelled as an illustration on purpose. render.py declines to shade its
-     projections because a lit surface reads as solid everywhere, which is the
-     one property a carved hull does not have: it hides the hollows and the
-     space no camera ever saw. It earns its place by showing shape faster than
-     anything else here, and it carries no verdict. */
-  const shaded = entry.shaded ? `
+  /* Two turntables of the same specimen, and the choice between them is the
+     point. The measured points are the segmenter's own output at sensor
+     resolution, where a stem is dozens of points and a leaf is a leaf. The mesh
+     is built on a 12 mm grid, and a eucalyptus leaf is one or two voxels across,
+     so it cannot resolve one. If the leaves look like blobs in the lit view and
+     like leaves in the point view, that is not a rendering fault; it is the
+     resolution of the reconstruction, shown. */
+  const table = FILM.view === "shaded" ? seg.shaded : seg.measured;
+  const turntable = table ? `
     <div class="columns">
       <div class="column is-half">
-        ${tile(entry.shaded.image, `${id} shaded mesh`)}
+        <img id="turnimg" alt="${id} turntable" loading="lazy"
+             style="width:100%;border-radius:3px;display:block;touch-action:none">
+        <div class="buttons are-small mt-2" id="turnstep">
+          <button class="button is-small" data-step="-1">&larr; Turn</button>
+          <button class="button is-small" data-step="1">Turn &rarr;</button>
+          <span class="is-size-7 has-text-grey ml-2" style="align-self:center">
+            or drag the image</span>
+        </div>
       </div>
       <div class="column is-half">
-        <p><strong>The surface, lit</strong></p>
-        <p class="is-size-7 has-text-grey">
-          The marching-cubes mesh of the carve, Lambert shaded instead of
-          depth cued: ${entry.shaded.n_vertices.toLocaleString()} vertices,
-          ${entry.shaded.n_faces.toLocaleString()} faces,
-          ${entry.shaded.area_m2.toFixed(3)} m&sup2; of surface.
-        </p>
-        <p class="is-size-7 has-text-grey">
-          Read this one as an illustration. Every other panel on this page is
-          depth cued rather than lit, and deliberately so: shading makes a
-          surface read as solid everywhere, which is exactly what a carved hull
-          is not. It hides the hollows and the space no camera reached. It is
-          here because it carries shape to a reader faster than a projection
-          does, and it carries no verdict.
-        </p>
+        ${FILM.view === "shaded" ? `
+          <p><strong>The extracted surface, lit</strong></p>
+          <p class="is-size-7 has-text-grey">
+            Marching cubes over the carve, Lambert shaded:
+            ${table.n_vertices.toLocaleString()} vertices,
+            ${table.n_faces.toLocaleString()} faces,
+            ${table.area_m2.toFixed(3)} m&sup2; of surface.
+          </p>
+          <p class="is-size-7 has-text-grey">
+            Read this one as an illustration. Every other panel here is depth
+            cued rather than lit, deliberately: shading makes a surface read as
+            solid everywhere, which is exactly what a carved hull is not. It
+            hides the hollows and the space no camera reached.
+          </p>
+          <p class="is-size-7 has-text-grey">
+            If the leaves and the stem look like blobs, that is the
+            reconstruction rather than the render. The carve runs on a 12 mm
+            grid and a eucalyptus leaf is one or two voxels across, so no
+            surface extracted from it can resolve one. Switch the turntable to
+            the measured points to see what was actually recorded.
+          </p>` : `
+          <p><strong>The measured points</strong></p>
+          <p class="is-size-7 has-text-grey">
+            ${table.n_points.toLocaleString()} points, reaching
+            ${table.top_m.toFixed(3)} m, coloured by height above the floor so a
+            leaf keeps its colour as the turntable turns.
+          </p>
+          <p class="is-size-7 has-text-grey">
+            This is the segmenter's own output at sensor resolution, before any
+            voxel grid. It is where the stem and the leaves are legible, and
+            where the discarded plant in the section below is visible as a plant
+            rather than as a row in a table.
+          </p>`}
       </div>
     </div>` : "";
 
-  host.innerHTML = rows + volumes + shaded;
+  host.innerHTML = rows + volumes + turntable;
+  if (table) filmTurn(host, table.frames);
 }
 
 function attach(){
@@ -610,6 +713,11 @@ function attach(){
   const dotSel = document.getElementById("viewerdot");
   if (dotSel) dotSel.onchange = async e => {
     viewerDot = Number(e.target.value); await render(); };
+
+  const segSel = document.getElementById("stripseg");
+  if (segSel) segSel.onchange = e => { FILM.seg = e.target.value; filmstrip(current); };
+  const viewSel = document.getElementById("stripview");
+  if (viewSel) viewSel.onchange = e => { FILM.view = e.target.value; filmstrip(current); };
 
   addEventListener("resize",()=>cloud(current,segmenter).then(c=>draw(document.getElementById("stage"),c,{dot:viewerDot,cmap:viewerCmap,rim:potHeight(c)})));
 }
@@ -929,6 +1037,44 @@ resolutionSection();
 /* Plant the carve discarded. Ranked by how much height was lost, because that is
    the quantity a reader should judge the reconstruction on, and the flagged rows
    are the ones whose reported volume should not be read as a plant. */
+/* ------------------------------------------------- research table furniture
+
+   These tables are read by an examiner as well as by a browser, so they carry
+   what a dissertation table carries: a number, a caption above, units in the
+   column heads rather than repeated down every row, and a note beneath that
+   explains any coded column.
+
+   The coded column is the substantive change. A verdict spelled out in prose and
+   repeated down seventeen rows is not a column, it is a paragraph set in a grid,
+   and it pushes the numbers off the side of the page. A letter with a legend
+   says the same thing and lets the eye stay on the figures. */
+let TABLE_N = 0;
+
+function tableFrame(id, title, notes){
+  const cap = document.getElementById(id + "cap");
+  const note = document.getElementById(id + "note");
+  if (cap){
+    TABLE_N += 1;
+    cap.innerHTML = `<span class="num">Table ${TABLE_N}.</span> ${title}`;
+  }
+  if (note) note.innerHTML = notes;
+}
+
+/* Distinct verdict strings, in the order they first appear, mapped to letters.
+   Derived rather than hard coded, so a new verdict in the report earns a letter
+   and a legend entry instead of silently reading as one of the old ones. */
+function verdictCodes(rows, field){
+  const seen = new Map();
+  for (const r of rows)
+    if (!seen.has(r[field])) seen.set(r[field], String.fromCharCode(97 + seen.size));
+  return seen;
+}
+
+function legendFrom(codes){
+  return [...codes].map(([text, letter]) => `<b>${letter}</b> ${text}`)
+    .join(". &nbsp;") + ".";
+}
+
 function pedestalSection(){
   const R = D.pedestal, section = document.getElementById("pedestal");
   if (!R || !R.rows){ if (section) section.remove(); return; }
@@ -942,11 +1088,11 @@ function pedestalSection(){
   ).join("");
 
   const flagged = new Set(R.flagged);
-  const rows = [...R.rows]
-    .sort((a, b) => b.height_lost_m - a.height_lost_m)
-    .map(r => `<tr${flagged.has(r.plant_id) ? ' class="pending"' : ""}>
-      <td><strong>${r.plant_id}</strong> ${r.rim_measured
-        ? "" : '<span class="tag is-small is-warning">rim not found</span>'}</td>
+  const ordered = [...R.rows].sort((a, b) => b.height_lost_m - a.height_lost_m);
+  const codes = verdictCodes(ordered, "verdict");
+
+  const rows = ordered.map(r => `<tr${flagged.has(r.plant_id) ? ' class="pending"' : ""}>
+      <td><strong>${r.plant_id}</strong>${r.rim_measured ? "" : "<sup>*</sup>"}</td>
       <td>${r.mass_kg.toFixed(2)}</td>
       <td>${r.reported_volume_l.toFixed(2)}</td>
       <td>${r.carved_top_m.toFixed(3)}</td>
@@ -954,12 +1100,29 @@ function pedestalSection(){
       <td>${flagged.has(r.plant_id)
         ? `<strong>${r.height_lost_m.toFixed(3)}</strong>` : r.height_lost_m.toFixed(3)}</td>
       <td>${r.discarded_points.toLocaleString()}</td>
-      <td class="is-size-7">${r.verdict}</td></tr>`).join("");
+      <td class="sym">${codes.get(r.verdict)}</td></tr>`).join("");
 
   document.getElementById("pedestaltable").innerHTML =
-    `<thead><tr><th>Specimen</th><th>Mass kg</th><th>Reported L</th>
-     <th>Carve stops m</th><th>Segmentation reaches m</th><th>Height lost m</th>
-     <th>Points discarded</th><th>Verdict</th></tr></thead><tbody>${rows}</tbody>`;
+    `<thead>
+       <tr>
+         <th rowspan="2" class="nospan">Specimen</th>
+         <th rowspan="2" class="nospan">Mass<br>(kg)</th>
+         <th rowspan="2" class="nospan">Reported<br>volume (L)</th>
+         <th colspan="3" class="spanner">Vertical extent (m)</th>
+         <th rowspan="2" class="nospan">Points<br>discarded</th>
+         <th rowspan="2" class="nospan sym">Note</th>
+       </tr>
+       <tr><th>Carve top</th><th>Segmentation top</th><th>Difference</th></tr>
+     </thead><tbody>${rows}</tbody>`;
+
+  tableFrame("pedestaltable",
+    `Reconstructed against segmented vertical extent for all ${R.n_specimens}
+     specimens, ordered by the height the carve discarded.`,
+    `<b>*</b> the rim detector found no step on this capture, so the reported
+     volume is measured from the 0.280 m fallback, which on a specimen raised on
+     a stand lies inside the stand. Reported volume is the volume above that rim,
+     the figure quoted elsewhere on this page. Difference is segmentation top
+     less carve top, and a specimen is flagged above 0.15 m. ` + legendFrom(codes));
 
   const worst = [...R.rows].sort((a, b) => b.discarded_points - a.discarded_points)[0];
   const v = document.getElementById("pedestalverdict");
@@ -991,26 +1154,43 @@ function potMassSection(){
     `<div class="keyfact"><div class="num">${n}</div><div class="lab">${l}</div></div>`
   ).join("");
 
-  const rows = [...R.rows]
-    .sort((a, b) => a.implied_density - b.implied_density)
-    .map(r => `<tr${r.plausible ? "" : ' class="pending"'}>
-      <td><strong>${r.plant_id}</strong></td>
-      <td>${r.source === "measured"
-        ? '<span class="tag is-small is-success">weighed</span>'
-        : '<span class="tag is-small is-light">estimated</span>'}</td>
+  const ordered = [...R.rows].sort((a, b) => a.implied_density - b.implied_density);
+  const codes = verdictCodes(ordered, "verdict");
+
+  const rows = ordered.map(r => `<tr${r.plausible ? "" : ' class="pending"'}>
+      <td><strong>${r.plant_id}</strong>${r.source === "measured" ? "" : "<sup>*</sup>"}</td>
       <td>${r.pot_g.toFixed(0)}</td>
       <td>${r.plant_g.toFixed(0)}</td>
+      <td>${r.pot_to_plant.toFixed(1)}</td>
       <td>${r.below_rim_l.toFixed(1)}</td>
       <td>${r.plausible ? "" : "<strong>"}${r.implied_density.toFixed(0)}${
         r.plausible ? "" : "</strong>"}</td>
-      <td>${r.pot_to_plant.toFixed(1)}&times;</td>
-      <td>${(r.plant_uncertainty["50g"] * 100).toFixed(0)}%</td>
-      <td class="is-size-7">${r.verdict}</td></tr>`).join("");
+      <td>${(r.plant_uncertainty["50g"] * 100).toFixed(0)}</td>
+      <td class="sym">${codes.get(r.verdict)}</td></tr>`).join("");
 
   document.getElementById("pottable").innerHTML =
-    `<thead><tr><th>Specimen</th><th>Pot mass</th><th>Pot g</th><th>Plant g</th>
-     <th>Below rim L</th><th>kg/m&sup3;</th><th>Pot / plant</th>
-     <th>Plant error at 50 g</th><th>Verdict</th></tr></thead><tbody>${rows}</tbody>`;
+    `<thead>
+       <tr>
+         <th rowspan="2" class="nospan">Specimen</th>
+         <th colspan="3" class="spanner">Recorded mass</th>
+         <th colspan="2" class="spanner">Reconstruction below the rim</th>
+         <th rowspan="2" class="nospan">Plant error at<br>50 g bias (%)</th>
+         <th rowspan="2" class="nospan sym">Note</th>
+       </tr>
+       <tr><th>Pot (g)</th><th>Plant (g)</th><th>Ratio</th>
+           <th>Volume (L)</th><th>Density (kg m<sup>&minus;3</sup>)</th></tr>
+     </thead><tbody>${rows}</tbody>`;
+
+  tableFrame("pottable",
+    `Recorded pot mass against the volume the reconstruction places below the pot
+     rim, ordered by implied bulk density. ${R.n_measured} of ${R.n_specimens}
+     pots were weighed and the remainder estimated.`,
+    `<b>*</b> pot mass estimated rather than weighed. Ratio is pot mass divided by
+     plant mass. Density is pot mass over the volume below the rim; damp growing
+     medium falls between 200 and 1000 kg m<sup>&minus;3</sup>, and values in bold
+     fall outside that band. The last column is the share of plant mass that a
+     50 g bias on each of the two weighings would represent, since plant mass is
+     recorded as their difference. ` + legendFrom(codes));
 
   const worst = [...R.rows].sort(
     (a, b) => b.plant_uncertainty["50g"] - a.plant_uncertainty["50g"])[0];

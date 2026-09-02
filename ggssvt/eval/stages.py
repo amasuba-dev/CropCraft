@@ -173,20 +173,39 @@ def stages_for(
     litres = VOXEL_SIZE_M ** 3 * 1000.0
 
     # Where "pot" stops and "plant" starts, for the panels that colour the two
-    # apart. It is not always the rim the cache carries. On the specimens raised
-    # on an inverted pot the rim detector found no step and fell back to the
-    # 0.28 m constant, which sits *inside* the stand, so colouring at that height
-    # paints 16 cm of plastic as canopy. The stand's own top is the honest split
-    # there, and it is not a guess: the carve on those captures is the stand and
-    # nothing else, and its top clusters at 0.444 to 0.492 m across the nine
-    # Eucalyptus staged this way, with E002's detector independently finding
-    # 0.444 on the same rig.
+    # apart. It is not always the rim the cache carries: on the specimens raised
+    # on an inverted pot the detector found no step and fell back to the 0.28 m
+    # constant, which lies inside the staging, so colouring there paints 16 cm of
+    # plastic as plant.
+    #
+    # The carve's own vertical profile says where the rim is, and it is a
+    # cleaner reading than the constant it replaces. On E001 the occupied
+    # cross-section falls smoothly from 645 voxels at the floor to 258 at
+    # 0.300 m, steps down to 158 by 0.324 m, then holds flat near 143 to
+    # 0.420 m before collapsing to nothing by 0.444 m. That is two stacked
+    # objects with a junction between them: the tapering inverted pot to about
+    # 0.31 m, then the plant's own straight-sided pot above it. The flat section
+    # is the pot, and the split belongs at its top.
+    #
+    # So 0.44 m is the *pot rim*, not the top of the stand, and the carve on
+    # these captures keeps the entire rigid assembly and none of the plant. A
+    # profile rule reading the top of the broad section reproduces the detector
+    # to within one voxel on eight of the ten Eucalyptus where the detector did
+    # work, and returns 0.432 to 0.444 m on the nine where it did not.
+    #
+    # M008 and M009 are the exception and are treated as assumptions rather than
+    # measurements. Their canopies are wider than their pots, so the profile rule
+    # collapses to the first slab and measures nothing; they take the same
+    # constant on the grounds that they were staged on the same rig, which is
+    # weaker evidence than the Eucalyptus have.
     from .recarve import STAND_TOP_M
 
     rim_measured = abs(cached.pot_height_m - 0.28) > 1e-6
     split_m = float(cached.pot_height_m) if rim_measured else STAND_TOP_M
-    split_source = ("the detected pot rim" if rim_measured
-                    else "the top of the inverted-pot stand, because no rim was found")
+    split_source = (
+        "the detected pot rim" if rim_measured
+        else "the rim of the pot standing on the stand, read off the carve's "
+             "own vertical profile because no step was detected")
 
     return {
         "plant_id": plant_id,

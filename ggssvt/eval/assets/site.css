@@ -414,3 +414,70 @@ table.data tr.best td {
   word-break: break-all;
   white-space: normal;
 }
+
+/* ---------------------------------------------------------- research tables
+
+   Booktabs, near enough: a rule above, a rule under the header, a rule at the
+   foot, and nothing else. Vertical rules and per-row lines are what make a web
+   table look like a spreadsheet, and a dissertation examiner reads a spreadsheet
+   as unfinished. Everything a reader needs to interpret the numbers travels with
+   the table itself: a numbered caption above it, units in the column heads
+   rather than repeated down the rows, and a note beneath carrying the legend for
+   any coded column. */
+.tablecap {
+  font-family: 'Google Sans', 'Noto Sans', sans-serif;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: #363636;
+  margin: 1.6rem 0 0.5rem;
+}
+
+.tablecap .num { font-weight: 700; }
+
+.tablenote {
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: #7a7a7a;
+  margin-top: 0.5rem;
+  max-width: 62rem;
+}
+
+.tablenote b { color: #4a4a4a; font-weight: 600; }
+
+table.data.booktabs {
+  border-top: 1.5px solid #363636;
+  border-bottom: 1.5px solid #363636;
+}
+
+table.data.booktabs th {
+  border-bottom: 1px solid #363636;
+  color: #363636;
+}
+
+/* A spanner sits over a group of columns and takes a lighter rule, so the
+   header reads as two levels rather than two competing rules. */
+table.data.booktabs th.spanner {
+  text-align: center;
+  font-weight: 600;
+  border-bottom: 1px solid #dbdbdb;
+}
+
+table.data.booktabs th.nospan { border-bottom: none; }
+
+table.data.booktabs td { border-bottom: none; }
+
+table.data.booktabs tbody tr:hover td { background: #fafafa; }
+
+/* The coded column: a letter, centred, explained in the note. Prose repeated
+   down thirty rows is not a column, it is a paragraph in disguise. */
+table.data.booktabs th.sym,
+table.data.booktabs td.sym {
+  text-align: center;
+  color: #4a4a4a;
+  font-weight: 600;
+  width: 2.5rem;
+}
+
+table.data.booktabs tbody tr.divider td {
+  border-top: 1px solid #dbdbdb;
+}
