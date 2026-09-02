@@ -199,6 +199,24 @@ BODY = """
     <h2 class="title is-3">Method</h2>
     <p class="mb-4 has-text-grey">Six stages, each one auditable on its own.</p>
     <div class="stages" id="pipe"></div>
+
+    <h3 class="title is-5 mt-6">Every methodology, drawn</h3>
+    <p class="is-size-7 has-text-grey mb-3">
+      Each arm of this project as its own flow, drawn from the configuration and
+      the measured results rather than by hand, so a figure cannot drift out of
+      date the way a hand-made one does. The citations further down name these
+      stages, so this is where to look up the one a reference points at.
+    </p>
+    <div class="field is-grouped is-grouped-multiline mb-3">
+      <div class="control">
+        <label class="label is-small" for="archpick">Methodology</label>
+        <div class="select is-small"><select id="archpick"></select></div>
+      </div>
+    </div>
+    <p class="is-size-7 has-text-grey mb-2" id="archnote"></p>
+    <div class="tablewrap"><img id="archimg" alt="methodology diagram"
+         style="width:100%;max-width:900px;display:block"></div>
+    <p class="is-size-7 mt-3" id="archoutcome"></p>
   </div>
 </section>
 
@@ -682,6 +700,12 @@ BODY = """
 
     <p class="is-size-7 has-text-grey" id="reconstruction-note"></p>
 
+    <p class="tablecap" id="disttablecap"></p>
+    <div class="tablewrap">
+      <table class="data booktabs" id="disttable"></table>
+    </div>
+    <p class="tablenote" id="disttablenote"></p>
+
     <article class="message is-warning mt-4">
       <div class="message-header"><p>The usual metric ranks these backwards</p></div>
       <div class="message-body">
@@ -796,6 +820,48 @@ BODY = """
 </section>
 
 
+<section class="section" id="backbone">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3">Does a stronger backbone help?</h2>
+    <p class="content">
+      DINOv3 was gated for most of this project, which made it the obvious
+      suspect for the gap between what the method should do and what it does.
+      Access was granted and the answer is no. Read against the no-DINO control
+      the two backbones are indistinguishable, and read against each other they
+      are closer still: the interval is tight enough to rule out a difference
+      worth chasing, rather than merely too wide to see one.
+    </p>
+
+    <div id="backbonefacts" class="keyfacts mb-4"></div>
+
+    <p class="tablecap" id="probetablecap"></p>
+    <div class="tablewrap">
+      <table class="data booktabs" id="probetable"></table>
+    </div>
+    <p class="tablenote" id="probetablenote"></p>
+
+    <h3 class="title is-5 mt-6">What each one sees</h3>
+    <p class="is-size-7 has-text-grey mb-3">
+      Patch features projected onto their own principal components and read as
+      RGB. The projection is fitted on the subject rather than on the whole
+      frame: these captures are a lit floor against a dark surround, and a fit
+      over everything spends its first component on that and returns the plant
+      as a smooth gradient. Read the boundaries the features draw, not the
+      colours they take, which are arbitrary and only sign-aligned between the
+      two panels.
+    </p>
+    <div class="field is-grouped is-grouped-multiline mb-3">
+      <div class="control">
+        <label class="label is-small" for="bbpick">Specimen</label>
+        <div class="select is-small"><select id="bbpick"></select></div>
+      </div>
+    </div>
+    <div class="columns" id="backbonepanels"></div>
+    <p class="is-size-7 has-text-grey" id="backbonenote"></p>
+  </div>
+</section>
+
+
 <section class="section" id="references">
   <div class="container is-max-desktop">
     <h2 class="title is-3">What this borrows, and where</h2>
@@ -894,6 +960,21 @@ def build_site(
     tiles = WORK_DIR / "reports" / "filmstrip"
     if tiles.is_dir():
         shutil.copytree(tiles, out_dir / "static" / "filmstrip", dirs_exist_ok=True)
+
+    # The methodology diagrams, as SVG so the text in them stays selectable and
+    # stays sharp when an examiner zooms in on one box.
+    diagrams = WORK_DIR / "reports" / "architecture"
+    if diagrams.is_dir():
+        target = out_dir / "static" / "architecture"
+        target.mkdir(parents=True, exist_ok=True)
+        for svg in diagrams.glob("*.svg"):
+            shutil.copyfile(svg, target / svg.name)
+
+    # The backbone feature panels.
+    panels = WORK_DIR / "reports" / "backbone_viz"
+    if panels.is_dir():
+        shutil.copytree(panels, out_dir / "static" / "backbone_viz",
+                        dirs_exist_ok=True)
 
     links = "\n              ".join(
         [

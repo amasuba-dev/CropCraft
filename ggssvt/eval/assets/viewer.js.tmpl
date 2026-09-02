@@ -1052,16 +1052,21 @@ resolutionSection();
    repeated down seventeen rows is not a column, it is a paragraph set in a grid,
    and it pushes the numbers off the side of the page. A letter with a legend
    says the same thing and lets the eye stay on the figures. */
-let TABLE_N = 0;
-
 function tableFrame(id, title, notes){
   const cap = document.getElementById(id + "cap");
   const note = document.getElementById(id + "note");
-  if (cap){
-    TABLE_N += 1;
-    cap.innerHTML = `<span class="num">Table ${TABLE_N}.</span> ${title}`;
-  }
+  // The caption is stored, not numbered. Sections render in whatever order
+  // their scripts run, which is not the order a reader meets them: numbering
+  // here put Table 4 above Table 3 on the page. renumberTables() assigns the
+  // numbers once, from the document.
+  if (cap) cap.dataset.caption = title;
   if (note) note.innerHTML = notes;
+}
+
+function renumberTables(){
+  document.querySelectorAll(".tablecap[data-caption]").forEach((cap, i) => {
+    cap.innerHTML = `<span class="num">Table ${i + 1}.</span> ${cap.dataset.caption}`;
+  });
 }
 
 /* Distinct verdict strings, in the order they first appear, mapped to letters.
@@ -1497,3 +1502,189 @@ function referencesSection(){
 }
 
 referencesSection();
+
+/* ---------------------------------------------------- methodology diagrams
+
+   SVG rather than PNG: the text in these is the substance, and an examiner
+   zooming in on one box should get type rather than pixels. They are files
+   under static/architecture, not inline markup, because the same figures go
+   into the write-up and there should be one copy of each. */
+function architectureSection(){
+  const R = D.architecture, pick = document.getElementById("archpick");
+  if (!R || !R.length || !pick){
+    const wrap = document.getElementById("archimg");
+    if (wrap) wrap.closest(".tablewrap").remove();
+    return;
+  }
+
+  pick.innerHTML = R.map((a, i) =>
+    `<option value="${i}">${a.title}</option>`).join("");
+
+  const show = () => {
+    const a = R[Number(pick.value) || 0];
+    document.getElementById("archimg").src = a.image;
+    document.getElementById("archnote").textContent =
+      `${a.subtitle}  ${a.n_stages} stages.`;
+    document.getElementById("archoutcome").innerHTML =
+      `<strong>Outcome.</strong> ${a.outcome}`;
+  };
+  pick.onchange = show;
+  show();
+}
+
+architectureSection();
+
+/* ------------------------------------------------------- the backbone arm */
+function backboneSection(){
+  const P = D.dino_probe, V = D.backbone_viz;
+  const section = document.getElementById("backbone");
+  if (!P || !P.conditions){ if (section) section.remove(); return; }
+
+  const rows = Object.entries(P.conditions)
+    .filter(([, c]) => !c.skipped)
+    .map(([label, c]) => ({label, ...c}));
+  const paired = P.paired_vs_control || {};
+
+  const best = Math.min(...rows.map(r => r.rmse_kg));
+  document.getElementById("backbonefacts").innerHTML = [
+    [`${rows.length}`, "conditions compared, all 36 specimens"],
+    [`${(best).toFixed(3)} kg`, "best RMSE, any backbone"],
+    ["none", "significantly better than the control"],
+  ].map(([n, l]) =>
+    `<div class="keyfact"><div class="num">${n}</div><div class="lab">${l}</div></div>`
+  ).join("");
+
+  document.getElementById("probetable").innerHTML =
+    `<thead>
+       <tr>
+         <th rowspan="2" class="nospan">Condition</th>
+         <th colspan="4" class="spanner">Leave-one-out error</th>
+         <th colspan="3" class="spanner">Paired against the control</th>
+       </tr>
+       <tr><th>RMSE (kg)</th><th>MAE (kg)</th><th>MARE (%)</th><th>R&sup2;</th>
+           <th>&Delta;RMSE (kg)</th><th>95% CI</th><th>p</th></tr>
+     </thead><tbody>${rows.map(r => {
+       const d = paired[r.label];
+       return `<tr${r.rmse_kg === best ? ' class="best"' : ""}>
+         <td><strong>${r.label}</strong></td>
+         <td>${r.rmse_kg.toFixed(3)}</td>
+         <td>${r.mae_kg.toFixed(3)}</td>
+         <td>${(r.mare * 100).toFixed(1)}</td>
+         <td>${r.r2.toFixed(3)}</td>
+         <td>${d ? (d.difference >= 0 ? "+" : "") + d.difference.toFixed(3) : "&mdash;"}</td>
+         <td>${d ? `[${d.low >= 0 ? "+" : ""}${d.low.toFixed(3)}, ${
+           d.high >= 0 ? "+" : ""}${d.high.toFixed(3)}]` : "&mdash;"}</td>
+         <td>${d ? d.p_direction.toFixed(2) : "&mdash;"}</td></tr>`;
+     }).join("")}</tbody>`;
+
+  tableFrame("probetable",
+    `Frozen-feature probe over all ${P.n_specimens} specimens, leave-one-out.
+     The control is the seven geometric descriptors with no DINO features.`,
+    `Every interval crosses zero, so no condition is distinguishable from the
+     control. The comparison the access unblocked is DINOv2 against DINOv3
+     directly, which is tighter than either against the control because their
+     predictions correlate at 0.977: &Delta;RMSE +0.0018 kg, 95% CI [&minus;0.025,
+     +0.030]. That bounds the difference at about 30 g on masses of 0.40 to
+     2.35 kg, against a smallest detectable effect at this sample size of
+     0.138 kg. p is the bootstrap probability that the sign is the reported one,
+     not a null-hypothesis test.`);
+
+  if (!V || !V.specimens || !V.specimens.length){
+    document.getElementById("bbpick").closest(".field").remove();
+    return;
+  }
+
+  const pick = document.getElementById("bbpick");
+  pick.innerHTML = V.specimens.map((s, i) =>
+    `<option value="${i}">${s.plant_id}, ${s.species}, ${
+      s.mass_kg.toFixed(2)} kg</option>`).join("");
+
+  const show = () => {
+    const s = V.specimens[Number(pick.value) || 0];
+    const tile = (src, alt) =>
+      `<img src="./static/backbone_viz/${src}" alt="${alt}" loading="lazy"
+            style="width:100%;border-radius:3px;display:block">`;
+    const cells = [`
+      <div class="column">
+        ${tile(s.frame, `${s.plant_id} frame`)}
+        <p class="is-size-7 has-text-grey has-text-centered mt-1">the frame</p>
+      </div>`];
+    for (const [kind, b] of Object.entries(s.backbones)){
+      cells.push(`
+        <div class="column">
+          ${tile(b.features, `${s.plant_id} ${kind} features`)}
+          <p class="is-size-7 has-text-grey has-text-centered mt-1">${kind}
+            &middot; ${b.patch_grid[0]}&times;${b.patch_grid[1]} patches</p>
+        </div>
+        <div class="column">
+          ${tile(b.cluster, `${s.plant_id} ${kind} clustering`)}
+          <p class="is-size-7 has-text-grey has-text-centered mt-1">${kind}
+            lifted and clustered</p>
+        </div>`);
+    }
+    document.getElementById("backbonepanels").innerHTML = cells.join("");
+
+    const parts = Object.entries(s.backbones).map(([kind, b]) =>
+      `<strong>${kind}</strong> puts ${(b.upper_fraction * 100).toFixed(0)}% of the
+       points in the upper cluster, centred at ${b.upper_mean_height_m.toFixed(2)} m,
+       and its feature foreground recovers ${(b.recall_of_segmenter * 100).toFixed(0)}%
+       of the segmenter's own mask`);
+    document.getElementById("backbonenote").innerHTML =
+      parts.join(". ") + ".";
+  };
+  pick.onchange = show;
+  show();
+}
+
+backboneSection();
+
+/* --------------------------------- distance metrics on the Pheno4D scans */
+function distanceMetricsSection(){
+  const R = D.recon_metrics;
+  const cap = document.getElementById("disttablecap");
+  if (!R || !R.rows || !cap) return;
+
+  const rows = R.rows.filter(r => r.carve && r.fused);
+  if (!rows.length){ cap.remove(); return; }
+
+  document.getElementById("disttable").innerHTML =
+    `<thead>
+       <tr>
+         <th rowspan="2" class="nospan">Scan</th>
+         <th colspan="3" class="spanner">Silhouette carving</th>
+         <th colspan="3" class="spanner">Depth fusion</th>
+       </tr>
+       <tr><th>Acc. (mm)</th><th>Comp. (mm)</th><th>F-score</th>
+           <th>Acc. (mm)</th><th>Comp. (mm)</th><th>F-score</th></tr>
+     </thead><tbody>${rows.map(r => `
+       <tr>
+         <td><strong>${r.scan_id}</strong></td>
+         <td>${r.carve.accuracy_mean_mm.toFixed(1)}</td>
+         <td>${r.carve.completeness_mean_mm.toFixed(1)}</td>
+         <td>${r.carve.f_score.toFixed(3)}</td>
+         <td>${r.fused.accuracy_mean_mm.toFixed(1)}</td>
+         <td>${r.fused.completeness_mean_mm.toFixed(1)}</td>
+         <td><strong>${r.fused.f_score.toFixed(3)}</strong></td>
+       </tr>`).join("")}</tbody>`;
+
+  tableFrame("disttable",
+    `Distance metrics against the laser-scanned ground truth for all
+     ${rows.length} Pheno4D scans, after the form DUSt3R reports for DTU.`,
+    `Accuracy is the mean distance from each reconstructed point to the nearest
+     true point, and completeness the reverse; the F-score counts points within
+     one voxel, a threshold fixed in advance rather than tuned. These matter
+     because overlap is a harsh test for thin structure: a stem under two voxels
+     wide, recovered one voxel across, scores near zero overlap while being
+     12 mm from correct. Fusion wins on every scan, and F-score and voxel
+     intersection over union rank the same operator first on
+     <b>${R.f_score_agrees_with_voxel_iou} of ${R.n_scans}</b>. Silhouette
+     intersection over union, which is inverted on all fourteen, now dissents
+     against three agreeing measures. These need reference geometry, so they
+     apply here and to none of the 36 captured specimens.`);
+}
+
+distanceMetricsSection();
+
+/* Numbers assigned last, from document order, so they ascend as a reader
+   meets them rather than as the scripts happened to run. */
+renumberTables();

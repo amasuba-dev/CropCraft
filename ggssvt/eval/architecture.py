@@ -615,6 +615,27 @@ def generative() -> Diagram:
 DIAGRAMS = (carve, sam3d, fusion, posefree, ggssvt, backbones, generative)
 
 
+def manifest() -> list[dict]:
+    """Key, title and subtitle for every diagram, for the page to list.
+
+    Generated from the diagram factories rather than repeated as markup, so a
+    methodology cannot appear in the picker and be missing from the figure, or
+    the other way round.
+    """
+    entries = []
+    for factory in DIAGRAMS:
+        diagram = factory()
+        entries.append({
+            "key": diagram.key,
+            "title": diagram.title,
+            "subtitle": diagram.subtitle,
+            "outcome": diagram.outcome,
+            "n_stages": len(diagram.stages),
+            "image": f"./static/architecture/architecture_{diagram.key}.svg",
+        })
+    return entries
+
+
 def write_all(out_dir: Path) -> list[Path]:
     """Render every methodology to its own SVG."""
     out_dir.mkdir(parents=True, exist_ok=True)

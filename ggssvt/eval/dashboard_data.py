@@ -41,6 +41,13 @@ def _batch_of(plant_id: str) -> str | None:
     return None
 
 
+def _architecture() -> list:
+    """The methodology diagrams, listed from the factories that draw them."""
+    from .architecture import manifest
+
+    return manifest()
+
+
 def _references() -> dict:
     """The bibliography, generated rather than kept as markup."""
     from .references import payload
@@ -110,6 +117,10 @@ class DashboardPayload:
     stages: dict | None = None
     filmstrip: dict | None = None
     references: dict | None = None
+    architecture: list | None = None
+    backbone_viz: dict | None = None
+    dino_probe: dict | None = None
+    recon_metrics: dict | None = None
     batch_holdout: dict | None = None
     external: dict | None = None
 
@@ -127,6 +138,10 @@ class DashboardPayload:
                 "stages": self.stages,
                 "filmstrip": self.filmstrip,
                 "references": self.references,
+                "architecture": self.architecture,
+                "backbone_viz": self.backbone_viz,
+                "dino_probe": self.dino_probe,
+                "recon_metrics": self.recon_metrics,
                 "batch_holdout": self.batch_holdout,
                 "external": self.external,
             },
@@ -352,6 +367,10 @@ def build_payload(
         stages=report("stages.json"),
         filmstrip=report("filmstrip.json"),
         references=_references(),
+        architecture=_architecture(),
+        backbone_viz=report("backbone_viz.json"),
+        dino_probe=report("dino_probe.json"),
+        recon_metrics=report("recon_metrics.json"),
         reconstruction=report("reconstruction_clouds.json"),
         batch_holdout=report("batch_holdout.json"),
         external=report("external_lettuce.json"),
