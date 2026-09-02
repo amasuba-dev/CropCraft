@@ -532,7 +532,11 @@ function filmTurn(host, frames){
   img.style.cursor = "grab";
   img.addEventListener("pointerdown", e => {
     drag = true; lx = e.clientX; acc = 0;
-    img.setPointerCapture(e.pointerId); img.style.cursor = "grabbing";
+    // Guarded like the release below. A pointerdown can arrive without a live
+    // pointer behind it, and an uncaught NotFoundError here would abort the
+    // handler and leave the turntable unresponsive rather than merely uncaptured.
+    try { img.setPointerCapture(e.pointerId) } catch(_){}
+    img.style.cursor = "grabbing";
     e.preventDefault(); });
   img.addEventListener("pointermove", e => {
     if (!drag) return;
