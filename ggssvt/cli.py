@@ -379,6 +379,19 @@ def cmd_stages(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_filmstrip(args: argparse.Namespace) -> int:
+    """Render raw frames, masks, depth and volumes for the project page."""
+    from .eval.filmstrip import run
+
+    report = run(limit=args.limit, n_views=args.views, verbose=not args.quiet)
+    print()
+    print("Run `cli dashboard` to rebuild the page around it. The raw frames are")
+    print("the part no number can carry: E001's staging is a fact about the")
+    print("capture, and it is obvious in the frame and invisible in the volume.")
+    print(f"{report['bytes_on_disk'] // 1024} KB of tiles, loaded on demand.")
+    return 0
+
+
 def cmd_surface_mesh(args: argparse.Namespace) -> int:
     """A third operator: volume as occupied surface voxels, after Nombambela."""
     from .eval.surface_mesh import run
@@ -1454,6 +1467,16 @@ def build_parser() -> argparse.ArgumentParser:
                         help="stop after this many specimens")
     stages.add_argument("--quiet", action="store_true")
     stages.set_defaults(func=cmd_stages)
+
+    filmstrip = sub.add_parser(
+        "filmstrip",
+        help="raw frames, masks, depth and volumes per specimen (CPU, ~30 s)")
+    filmstrip.add_argument("--limit", type=int, default=None,
+                           help="stop after this many specimens")
+    filmstrip.add_argument("--views", type=int, default=6,
+                           help="how many of the twelve views to show")
+    filmstrip.add_argument("--quiet", action="store_true")
+    filmstrip.set_defaults(func=cmd_filmstrip)
 
     surface_mesh = sub.add_parser(
         "surface-mesh",

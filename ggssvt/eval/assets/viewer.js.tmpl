@@ -1,6 +1,7 @@
 const D = __PAYLOAD__;
 const S = D.specimens, byId = new Map(S.map(s => [s.id, s]));
 let current = S[0].id, colourMode = "segment";
+let viewerCmap = "viridis", viewerDot = 3;
 // Registry order, so the geometric carve is the default rather than whatever
 // sorts first alphabetically.
 let segmenter = (D.summary.methods_available || D.summary.segmenters)[0];
@@ -417,11 +418,21 @@ function syncPressed(root){
 }
 
 function legend(){
-  const ramp = `linear-gradient(to right, ${VIRIDIS.map(rgb).join(",")})`;
-  document.getElementById("legend").innerHTML = colourMode==="segment"
-    ? `<i style="background:var(--canopy)"></i>above pot rim
-       &nbsp;<i style="background:var(--pot)"></i>pot and below`
-    : `far <i class="ramp" style="background:${ramp}"></i> near`;
+  /* The swatch has to be the palette in use. A viridis bar under a plasma cloud
+     is worse than no legend: it is a legend that is wrong. */
+  const stops = (viewerCmap === "plasma" ? PLASMA
+                : viewerCmap === "greys" ? GREYS : VIRIDIS).map(rgb).join(",");
+  const bar = `linear-gradient(to right, ${stops})`;
+  const el = document.getElementById("legend");
+  if (colourMode === "segment")
+    el.innerHTML = `<i style="background:var(--canopy)"></i>above the pot rim
+       &nbsp;<i style="background:var(--pot)"></i>pot and below`;
+  else if (colourMode === "solid")
+    el.innerHTML = `<i style="background:var(--canopy)"></i>one colour, shaded by depth`;
+  else
+    el.innerHTML = (colourMode === "z" ? "floor" : "far")
+      + ` <i class="ramp" style="background:${bar}"></i> `
+      + (colourMode === "z" ? "top" : "near");
 }
 
 async function buildList(){
@@ -441,7 +452,8 @@ async function buildList(){
 
 async function render(){
   const c = await cloud(current, segmenter);
-  draw(document.getElementById("stage"), c);
+  draw(document.getElementById("stage"), c,
+       {dot: viewerDot, cmap: viewerCmap, rim: potHeight(c)});
   drawSlices(c);
   document.getElementById("cloudinfo").textContent =
     c ? `${c.n.toLocaleString()} voxels shown` : "";
@@ -473,7 +485,96 @@ async function select(id){
     `${best}: ${f(s.predictions[best])} kg predicted`;
   document.querySelectorAll("#list button").forEach(b=>
     b.setAttribute("aria-current", String(b.dataset.id===id)));
-  facts(); await render();
+  facts(); filmstrip(id); await render();
+}
+
+/* ------------------------------------------------------------ filmstrip
+
+   The evidence between a capture and its number. Tiles are files under
+   static/filmstrip rather than base64 in the payload, because fourteen
+   megabytes of frames would make the page unopenable; this way the browser
+   fetches only the specimen someone selected, about four hundred kilobytes, and
+   loading="lazy" defers even that until the row scrolls into view. */
+const FILM_ROWS = [
+  ["rgb", "Capture", "the frame as the camera returned it, uncropped"],
+  ["mask", "Segmentation", "subject mask outlined over a dimmed frame"],
+  ["depth", "Depth", "what the sensor measured, near is bright"],
+];
+
+function filmstrip(id){
+  const host = document.getElementById("filmstrip");
+  if (!host) return;
+  const R = D.filmstrip;
+  const entry = R && R.specimens
+    ? R.specimens.find(s => s.plant_id === id) : null;
+  if (!entry){
+    host.innerHTML = `<p class="is-size-7 has-text-grey">No frames rendered for
+      this specimen. Run <code>cli filmstrip</code>.</p>`;
+    return;
+  }
+
+  const tile = (src, alt) =>
+    `<img src="./static/filmstrip/${src}" alt="${alt}" loading="lazy"
+          style="width:100%;border-radius:3px;display:block">`;
+
+  const rows = FILM_ROWS.map(([key, title, detail]) => `
+    <div class="mb-4">
+      <p class="mb-1"><strong>${title}</strong>
+        <span class="is-size-7 has-text-grey">&nbsp;${detail}</span></p>
+      <div class="columns is-mobile is-variable is-1">
+        ${entry.frames.map(fr => `
+          <div class="column">
+            ${tile(fr[key], `${id} ${title} at ${fr.azimuth_deg} degrees`)}
+            <p class="is-size-7 has-text-grey has-text-centered">${
+              fr.azimuth_deg}&deg;</p>
+          </div>`).join("")}
+      </div>
+    </div>`).join("");
+
+  const volumes = entry.volumes.length ? `
+    <div class="mb-4">
+      <p class="mb-1"><strong>What each operator built</strong>
+        <span class="is-size-7 has-text-grey">&nbsp;depth-cued projection, near
+        is bright. This is the evidence.</span></p>
+      <div class="columns is-mobile is-variable is-1">
+        ${entry.volumes.map(vol => `
+          <div class="column is-one-quarter">
+            ${tile(vol.image, `${id} ${vol.title}`)}
+            <p class="is-size-7 has-text-grey has-text-centered">${vol.title}</p>
+          </div>`).join("")}
+      </div>
+    </div>` : "";
+
+  /* Labelled as an illustration on purpose. render.py declines to shade its
+     projections because a lit surface reads as solid everywhere, which is the
+     one property a carved hull does not have: it hides the hollows and the
+     space no camera ever saw. It earns its place by showing shape faster than
+     anything else here, and it carries no verdict. */
+  const shaded = entry.shaded ? `
+    <div class="columns">
+      <div class="column is-half">
+        ${tile(entry.shaded.image, `${id} shaded mesh`)}
+      </div>
+      <div class="column is-half">
+        <p><strong>The surface, lit</strong></p>
+        <p class="is-size-7 has-text-grey">
+          The marching-cubes mesh of the carve, Lambert shaded instead of
+          depth cued: ${entry.shaded.n_vertices.toLocaleString()} vertices,
+          ${entry.shaded.n_faces.toLocaleString()} faces,
+          ${entry.shaded.area_m2.toFixed(3)} m&sup2; of surface.
+        </p>
+        <p class="is-size-7 has-text-grey">
+          Read this one as an illustration. Every other panel on this page is
+          depth cued rather than lit, and deliberately so: shading makes a
+          surface read as solid everywhere, which is exactly what a carved hull
+          is not. It hides the hollows and the space no camera reached. It is
+          here because it carries shape to a reader faster than a projection
+          does, and it carries no verdict.
+        </p>
+      </div>
+    </div>` : "";
+
+  host.innerHTML = rows + volumes + shaded;
 }
 
 function attach(){
@@ -503,7 +604,14 @@ function attach(){
       x=>x.setAttribute("aria-pressed",String(x===b)));
     syncPressed(e.currentTarget);
     await render(); };
-  addEventListener("resize",()=>cloud(current,segmenter).then(c=>draw(document.getElementById("stage"),c)));
+  const cmapSel = document.getElementById("viewercmap");
+  if (cmapSel) cmapSel.onchange = async e => {
+    viewerCmap = e.target.value; legend(); await render(); };
+  const dotSel = document.getElementById("viewerdot");
+  if (dotSel) dotSel.onchange = async e => {
+    viewerDot = Number(e.target.value); await render(); };
+
+  addEventListener("resize",()=>cloud(current,segmenter).then(c=>draw(document.getElementById("stage"),c,{dot:viewerDot,cmap:viewerCmap,rim:potHeight(c)})));
 }
 
 pipeline(); methodTable(); nextTable(); honesty(); scatter(); methodButtons();

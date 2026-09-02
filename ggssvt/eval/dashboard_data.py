@@ -101,6 +101,7 @@ class DashboardPayload:
     pedestal: dict | None = None
     pot_mass: dict | None = None
     stages: dict | None = None
+    filmstrip: dict | None = None
     batch_holdout: dict | None = None
     external: dict | None = None
 
@@ -116,6 +117,7 @@ class DashboardPayload:
                 "pedestal": self.pedestal,
                 "pot_mass": self.pot_mass,
                 "stages": self.stages,
+                "filmstrip": self.filmstrip,
                 "batch_holdout": self.batch_holdout,
                 "external": self.external,
             },
@@ -339,6 +341,7 @@ def build_payload(
         pedestal=report("pedestal.json"),
         pot_mass=report("pot_mass.json"),
         stages=report("stages.json"),
+        filmstrip=report("filmstrip.json"),
         reconstruction=report("reconstruction_clouds.json"),
         batch_holdout=report("batch_holdout.json"),
         external=report("external_lettuce.json"),

@@ -217,8 +217,33 @@ BODY = """
       <div class="methodgroup">
         <span class="grouplabel">Colour</span>
         <div class="buttons has-addons" id="colour">
-          <button class="button is-small" data-mode="segment" aria-pressed="true">Pot vs canopy</button>
+          <button class="button is-small" data-mode="segment" aria-pressed="true">Pot vs plant</button>
+          <button class="button is-small" data-mode="z" aria-pressed="false">Height</button>
           <button class="button is-small" data-mode="depth" aria-pressed="false">Depth</button>
+          <button class="button is-small" data-mode="solid" aria-pressed="false">Flat</button>
+        </div>
+      </div>
+      <div class="methodgroup">
+        <span class="grouplabel">Palette</span>
+        <div class="select is-small">
+          <select id="viewercmap">
+            <option value="viridis" selected>viridis</option>
+            <option value="plasma">plasma</option>
+            <option value="greys">greys, for print</option>
+          </select>
+        </div>
+      </div>
+      <div class="methodgroup">
+        <span class="grouplabel">Point size</span>
+        <div class="select is-small">
+          <select id="viewerdot">
+            <option value="1">1 px</option>
+            <option value="2">2 px</option>
+            <option value="3" selected>3 px</option>
+            <option value="4">4 px</option>
+            <option value="5">5 px</option>
+            <option value="7">7 px</option>
+          </select>
         </div>
       </div>
       <span class="is-size-7 has-text-grey" id="cloudinfo"></span>
@@ -246,6 +271,16 @@ BODY = """
       </div>
       <div class="specimens" id="list"></div>
     </div>
+
+    <h3 class="title is-5 mt-6" id="strip-heading">How this one was built</h3>
+    <p class="is-size-7 has-text-grey mb-3">
+      The same specimen, from the frames the cameras returned to the surface the
+      mesh describes. A volume and its number cannot show where a reconstruction
+      went wrong; these can. On the specimens raised on an upturned pot the
+      staging is plain in the first row and invisible in every number on this
+      page. Tiles load only for the specimen you select.
+    </p>
+    <div id="filmstrip"></div>
 
     <h3 class="title is-5 mt-6">Horizontal slices</h3>
     <p class="is-size-7 has-text-grey mb-3">
@@ -813,6 +848,13 @@ def build_site(
 
     if teaser is not None and teaser.exists():
         shutil.copyfile(teaser, img_dir / "contact_sheet.png")
+
+    # The filmstrip tiles travel as files rather than as base64 in the payload.
+    # Fourteen megabytes of frames would make the page unopenable; as files the
+    # browser fetches only the specimen someone actually selected, about 400 KB.
+    tiles = WORK_DIR / "reports" / "filmstrip"
+    if tiles.is_dir():
+        shutil.copytree(tiles, out_dir / "static" / "filmstrip", dirs_exist_ok=True)
 
     links = "\n              ".join(
         [
