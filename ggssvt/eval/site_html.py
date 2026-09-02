@@ -325,17 +325,33 @@ BODY = """
   <div class="container is-max-desktop">
     <h2 class="title is-3">One specimen, every stage</h2>
     <p class="content">
-      The pipeline segments, then carves, then fuses, then meshes, and each stage
-      was previously only inspectable on its own. Here they share one camera, one
-      voxel grid and one vertical scale, so a reconstruction that reaches lower is
-      drawn lower and they can be read against each other. Each panel gives the
-      estimate produced by the method that consumes that stage. The last is a
-      different operator entirely, after
-      <a href="#ledger">Nombambela (2025)</a>: volume as the count of occupied
-      surface voxels at 7 mm from his four views, with no carving. It has no
-      fitted regressor here, so it reports its implied bulk density and whether
-      that clears the screen. Pick a specimen and drag any panel to turn all of
-      them. Shift-scroll or the buttons zoom; a plain scroll moves the page.
+      The five panels are not five parallel methods, and the row reads left to
+      right for a reason. <strong>Segmentation is the shared input</strong>: the
+      subject masks and their depth from twelve views, back-projected into the
+      world. Everything to its right consumes that and nothing else.
+      <strong>Silhouette carving and depth fusion are two genuinely different
+      operators</strong> on it, and they differ in what they are willing to
+      assume: carving keeps a voxel unless enough cameras vote it away, so it
+      fills the space between leaves and comes out too large, while fusion only
+      accepts surface the depth sensor actually returned. <strong>The mesh is not
+      a third operator</strong>. It is marching cubes over the carve, so it is the
+      same object drawn as a shell rather than a solid and can never contain
+      anything the carve discarded, which is why its panel reaches the same
+      height. <strong>The surface count, after
+      <a href="#ledger">Nombambela (2025)</a>, is the fifth</strong>: no carving
+      and no distance field, just the occupied voxels the measured surface passes
+      through at 7 mm, from four of the same twelve views. At twelve views it
+      would be the first panel counted differently, which is the clearest
+      statement of what that operator is.
+    </p>
+    <p class="content">
+      They share one camera, one voxel grid and one vertical scale, so a
+      reconstruction that reaches lower is drawn lower. Each panel gives the
+      estimate produced by the method that consumes that stage, except the
+      surface count, which has no fitted regressor here and reports its implied
+      bulk density and whether that clears the screen. Pick a specimen and drag
+      any panel to turn all of them. Shift-scroll or the buttons zoom; a plain
+      scroll moves the page.
     </p>
 
     <div class="field is-horizontal mb-3">
@@ -350,6 +366,47 @@ BODY = """
           <button class="button is-small" data-zoom="1.25">Zoom in</button>
           <button class="button is-small" data-zoom="0.8">Zoom out</button>
           <button class="button is-small" data-zoom="reset">Reset view</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Display only. These change nothing that is measured, and the point of
+         offering them is that the panels are capped at 2500 points: at 2 px a
+         canopy reads as a cloud and at 5 px as a solid, and which one you want
+         depends on whether you are looking for shape or for extent. -->
+    <div class="field is-grouped is-grouped-multiline mb-4" id="stagedisplay">
+      <div class="control">
+        <label class="label is-small" for="stagedot">Point size</label>
+        <div class="select is-small">
+          <select id="stagedot">
+            <option value="1">1 px, finest</option>
+            <option value="2">2 px</option>
+            <option value="3" selected>3 px</option>
+            <option value="4">4 px</option>
+            <option value="5">5 px</option>
+            <option value="7">7 px, solid</option>
+          </select>
+        </div>
+      </div>
+      <div class="control">
+        <label class="label is-small" for="stagemode">Colour by</label>
+        <div class="select is-small">
+          <select id="stagemode">
+            <option value="z" selected>height above the floor</option>
+            <option value="depth">depth from the camera</option>
+            <option value="segment">pot and canopy</option>
+            <option value="solid">one colour</option>
+          </select>
+        </div>
+      </div>
+      <div class="control">
+        <label class="label is-small" for="stagecmap">Palette</label>
+        <div class="select is-small">
+          <select id="stagecmap">
+            <option value="viridis" selected>viridis</option>
+            <option value="plasma">plasma</option>
+            <option value="greys">greys, for print</option>
+          </select>
         </div>
       </div>
     </div>

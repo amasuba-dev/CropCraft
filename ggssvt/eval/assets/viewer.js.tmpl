@@ -23,6 +23,28 @@ function viridis(t){
   return [mix(a[0],b[0],k), mix(a[1],b[1],k), mix(a[2],b[2],k)];
 }
 const rgb = c => `rgb(${c[0]},${c[1]},${c[2]})`;
+
+/* Two more sequential ramps, and the reason for offering them is not
+   decoration. Viridis compresses its light end, so on a tall specimen the few
+   points at the top of a thin stem land in a narrow band of yellow and are hard
+   to separate from each other; plasma spreads that end further. Greys is there
+   for the opposite case, a figure going into print where hue is unavailable. */
+const PLASMA = [[13,8,135],[84,2,163],[139,10,165],[185,50,137],
+                [219,92,104],[244,136,73],[254,188,43],[240,249,33]];
+const GREYS  = [[214,214,216],[24,24,27]];
+
+function lerpRamp(stops, t){
+  t = t < 0 ? 0 : (t > 1 ? 1 : t);
+  const x = t * (stops.length - 1);
+  const i = Math.min(stops.length - 2, Math.floor(x)), k = x - i;
+  const a = stops[i], b = stops[i+1];
+  return [mix(a[0],b[0],k), mix(a[1],b[1],k), mix(a[2],b[2],k)];
+}
+function ramp(t, cmap){
+  if (cmap === "plasma") return lerpRamp(PLASMA, t);
+  if (cmap === "greys")  return lerpRamp(GREYS, t);
+  return viridis(t);
+}
 const f = (v,d=2) => (v===null||v===undefined||Number.isNaN(v)) ? ", " : Number(v).toFixed(d);
 
 async function inflate(b64){
@@ -86,7 +108,8 @@ function potHeight(c){
   return D.summary.pot_height_m;
 }
 
-function draw(canvas, c, {dot=3, mode=colourMode, yawL=yaw, pitchL=pitch, zoomL=zoom}={}){
+function draw(canvas, c, {dot=3, mode=colourMode, cmap="viridis",
+                         yawL=yaw, pitchL=pitch, zoomL=zoom}={}){
   const ctx = canvas.getContext("2d"), dpr = Math.min(devicePixelRatio||1,2);
   const w = canvas.clientWidth, hgt = canvas.clientHeight;
   if (!w || !hgt) return;
@@ -107,6 +130,13 @@ function draw(canvas, c, {dot=3, mode=colourMode, yawL=yaw, pitchL=pitch, zoomL=
   let dmin=Infinity,dmax=-Infinity;
   for(let i=0;i<c.n;i++){const d=P[i*3+2]; if(d<dmin)dmin=d; if(d>dmax)dmax=d;}
   const dspan = Math.max(1e-6,dmax-dmin);
+
+  /* Height above the floor, which is what "colour by height" means. It is not
+     the same as depth from the camera: depth turns as you drag the specimen and
+     height does not, so a stem stays the same colour whichever way you look. */
+  let hmin=Infinity,hmax=-Infinity;
+  if(c.h) for(let i=0;i<c.n;i++){const v=c.h[i]; if(v<hmin)hmin=v; if(v>hmax)hmax=v;}
+  const hspan = Math.max(1e-6,hmax-hmin);
   const cc=hex(css("--canopy")), pc=hex(css("--pot"));
   const pot = potHeight(c);
 
@@ -114,12 +144,12 @@ function draw(canvas, c, {dot=3, mode=colourMode, yawL=yaw, pitchL=pitch, zoomL=
     const sx=w/2+P[i*3]*scale, sv=hgt/2-P[i*3+1]*scale;
     const t=(P[i*3+2]-dmin)/dspan;
     let col;
-    if(mode==="segment"){
-      const base = c.h[i] > pot ? cc : pc;
+    if(mode==="segment" || mode==="solid"){
+      const base = (mode==="solid" || c.h[i] > pot) ? cc : pc;
       const k = 0.55+0.45*t;
       col = `rgb(${Math.round(base[0]*k)},${Math.round(base[1]*k)},${Math.round(base[2]*k)})`;
     } else {
-      col = rgb(viridis(t));
+      col = rgb(ramp(mode==="z" && c.h ? (c.h[i]-hmin)/hspan : t, cmap));
     }
     ctx.fillStyle=col; ctx.fillRect(sx,sv,dot,dot);
   }
@@ -892,7 +922,26 @@ potMassSection();
    segmentation reaches most of a metre higher than the carve does, and that gap
    is the subject of section 7r. Two numbers in a table make it an inference; two
    panels make it obvious. */
-const STAGE = { yaw: 0.62, pitch: 0.18, zoom: 1.4, entry: null, clouds: new Map() };
+const STAGE = {
+  yaw: 0.62, pitch: 0.18, zoom: 1.4, entry: null, clouds: new Map(),
+  // Display only. None of these change a number on the page; they change how
+  // easy it is to see the thing the numbers are about. A 2500-point cap means
+  // point size is doing real work: at 2 px a Mango canopy is a cloud and at 5 px
+  // it is a solid, and which of those you want depends on the question.
+  dot: 3, cmap: "viridis", mode: "z",
+};
+
+/* Where each panel's geometry comes from. This is the part the panels alone
+   cannot show: they are not five parallel methods. One is the shared input,
+   three are alternative operators on it, and one is a re-expression of another
+   panel. */
+const STAGE_LINEAGE = {
+  segmentation: "the shared input",
+  carve: "operator on the segmentation",
+  fusion: "operator on the segmentation",
+  mesh: "re-expression of the carve",
+  surface: "operator on four of the twelve views",
+};
 
 /* Which regression consumes which stage, so each panel can show the estimate
    that stage actually produces rather than a single number repeated four times.
@@ -914,7 +963,7 @@ function stageDraw(){
   for (const st of entry.stages){
     const cv = document.getElementById("stage-" + st.key);
     const c = STAGE.clouds.get(entry.plant_id + "/" + st.key);
-    if (cv && c) draw(cv, c, {dot: 3, mode: "height",
+    if (cv && c) draw(cv, c, {dot: STAGE.dot, mode: STAGE.mode, cmap: STAGE.cmap,
       yawL: STAGE.yaw, pitchL: STAGE.pitch, zoomL: STAGE.zoom});
   }
 }
@@ -940,7 +989,8 @@ async function stageSelect(entry){
       <canvas class="recon" id="stage-${st.key}"
               style="width:100%;aspect-ratio:1;touch-action:none;cursor:grab"></canvas>
       <p class="mt-2"><strong>${st.title}</strong><br>
-        <span class="is-size-7 has-text-grey">${st.detail}</span></p>
+        <span class="is-size-7 has-text-grey">${st.detail}</span><br>
+        <span class="tag is-small is-light">${STAGE_LINEAGE[st.key] || ""}</span></p>
       <p class="is-size-7">${entry.species} &middot; weighed
         ${entry.mass_kg.toFixed(2)} kg<br>
         ${method && estimate != null
@@ -1035,6 +1085,19 @@ async function stagesSection(){
     if (b.dataset.zoom === "reset"){
       STAGE.zoom = 1.4; STAGE.yaw = 0.62; STAGE.pitch = 0.18; stageDraw();
     } else stageZoom(Number(b.dataset.zoom));
+  };
+
+  const display = document.getElementById("stagedisplay");
+  if (display) display.onchange = e => {
+    const t = e.target;
+    if (t.id === "stagedot")  STAGE.dot  = Number(t.value);
+    if (t.id === "stagecmap") STAGE.cmap = t.value;
+    if (t.id === "stagemode") STAGE.mode = t.value;
+    // A ramp is meaningless when the colour is categorical or flat, so the
+    // control says so rather than sitting there doing nothing.
+    const ramped = STAGE.mode === "z" || STAGE.mode === "depth";
+    document.getElementById("stagecmap").disabled = !ramped;
+    stageDraw();
   };
 
   addEventListener("resize", stageDraw);

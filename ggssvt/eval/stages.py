@@ -7,16 +7,36 @@ reaches most of a metre higher than the carve does (§7r). Reading that as two
 numbers in a table takes an act of imagination. Seeing the plant in one panel and
 the stump beside it does not.
 
-All four stages are encoded onto the same voxel grid and in the same byte format
+All five stages are encoded onto the same voxel grid and in the same byte format
 the specimen viewer already decodes, so the page gains a panel rather than a
 renderer, and the four are directly comparable because they share a frame.
 
-**What each stage is.** The segmentation is what the cameras saw: the subject
-masks from all twelve views back-projected into the world. The carve is the
-visual hull built from those masks. The fusion is the truncated signed distance
-field built from the same depth. The mesh is the marching-cubes surface of the
-carve, drawn as its vertices, which reads as a shell where the carve reads as a
-solid.
+**These are not five parallel methods, and the panels have to say so.** Reading
+them left to right as a sequence of equals is the natural mistake and it is
+wrong in two places at once.
+
+The segmentation is the *shared input*: the subject masks from all twelve views
+with their depth, back-projected into the world. Nothing to its right sees the
+raw frames; they all consume this.
+
+Carving and fusion are two genuinely *alternative operators* on that input, and
+they differ in what they will assume about space no camera resolved. Carving
+keeps a voxel unless enough views vote it away, so it fills the gaps between
+leaves and overestimates. Fusion integrates a truncated signed distance field
+from the same depth, so it only accepts surface the sensor returned.
+
+The mesh is *not* a third operator. It is marching cubes over the carve's own
+occupancy, so it is the same object drawn as a shell rather than a solid. It
+can never contain anything the carve discarded, which is why the two panels
+reach the same height on every specimen, and why treating a mesh result as
+independent evidence would be double counting.
+
+The surface count is the fifth, and the sharpest way to state what it is: it
+back-projects the same masks with the same function the segmentation panel uses
+and counts occupied voxels, differing only in view count and grid pitch. At
+twelve views it would be the first panel counted differently. There is no
+carving and no distance field, so it cannot fill a gap it never observed, and
+its volume scales with how many views you give it (§7t).
 
 **Point budgets are deliberate.** The segmentation of one Mango runs past 300,000
 points and the page embeds every specimen, so each stage is capped. The cap costs
@@ -194,7 +214,7 @@ def run(
 
     report = {
         "note": "every stage on one voxel grid and in the specimen viewer's own "
-                "byte format, so the four panels share a frame and the page needs "
+                "byte format, so the panels share a frame and the page needs "
                 "no second renderer",
         "max_points": MAX_POINTS,
         "voxel_size_m": VOXEL_SIZE_M,
