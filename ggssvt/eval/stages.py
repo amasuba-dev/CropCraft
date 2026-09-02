@@ -1,0 +1,185 @@
+"""Every stage of one specimen's reconstruction, in one frame, for the page.
+
+The pipeline runs segmentation, then carving, then fusion, then meshing, and
+until now each stage could only be inspected on its own. That hides the thing
+that matters most about this dataset: on 17 of 36 specimens the segmentation
+reaches most of a metre higher than the carve does (§7r). Reading that as two
+numbers in a table takes an act of imagination. Seeing the plant in one panel and
+the stump beside it does not.
+
+All four stages are encoded onto the same voxel grid and in the same byte format
+the specimen viewer already decodes, so the page gains a panel rather than a
+renderer, and the four are directly comparable because they share a frame.
+
+**What each stage is.** The segmentation is what the cameras saw: the subject
+masks from all twelve views back-projected into the world. The carve is the
+visual hull built from those masks. The fusion is the truncated signed distance
+field built from the same depth. The mesh is the marching-cubes surface of the
+carve, drawn as its vertices, which reads as a shell where the carve reads as a
+solid.
+
+**Point budgets are deliberate.** The segmentation of one Mango runs past 300,000
+points and the page embeds every specimen, so each stage is capped. The cap costs
+detail and not shape, and the alternative is a page too heavy to open.
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+import numpy as np
+
+from ..config import VOXEL_RESOLUTION, VOXEL_SIZE_M, WORK_DIR, voxel_grid_centres
+
+# Points kept per stage before encoding. Four stages for all 36 specimens go into
+# one page that has to open from a file:// URL, and the budget is what decides
+# whether it does. Measured: 5000 points costs 2.0 MB, 2500 costs 1.0 MB and 1500
+# costs 0.65 MB. At 2500 a stem is still a stem and a hull is still a hull, which
+# is the whole job of these panels.
+MAX_POINTS = 2500
+
+STAGE_LABELS = {
+    "segmentation": ("Segmentation", "what the twelve cameras saw"),
+    "carve": ("Silhouette carving", "the visual hull of those masks"),
+    "fusion": ("Depth fusion", "the same depth, integrated"),
+    "mesh": ("Mesh", "marching cubes over the carve, as a surface"),
+}
+
+
+@dataclass
+class Stage:
+    """One stage of one specimen, encoded for the browser."""
+
+    key: str
+    title: str
+    detail: str
+    n_points: int
+    top_m: float
+    volume_l: float
+    cloud: dict
+
+    def as_dict(self) -> dict:
+        return asdict(self)
+
+
+def _voxelise(points: np.ndarray) -> np.ndarray:
+    """Points onto the project's grid, so every stage shares one frame."""
+    from ..data.pheno4d import voxelise
+
+    return voxelise(points, resolution=VOXEL_RESOLUTION, voxel_size_m=VOXEL_SIZE_M)
+
+
+def _stage(key: str, grid: np.ndarray, *, from_points: bool) -> Stage:
+    from .dashboard_data import _quantise
+
+    litres = VOXEL_SIZE_M ** 3 * 1000.0
+    occupied = np.flatnonzero(grid.any(axis=(0, 1)))
+    title, detail = STAGE_LABELS[key]
+    return Stage(
+        key=key,
+        title=title,
+        detail=detail,
+        n_points=int(grid.sum()),
+        top_m=round(float(occupied.max() + 1) * VOXEL_SIZE_M, 3)
+        if occupied.size else 0.0,
+        # A surface is not a volume, so only the solid stages report one.
+        volume_l=0.0 if from_points else round(float(grid.sum()) * litres, 3),
+        cloud=_quantise(grid, downsample=1, max_points=MAX_POINTS),
+    )
+
+
+def stages_for(
+    plant_id: str,
+    *,
+    cache_dir: Path,
+    fused_dir: Path | None = None,
+) -> dict:
+    """Encode every stage the caches can supply for one specimen."""
+    from ..data.preprocess import load_cached
+    from ..geometry.mesh import mesh_from_occupancy
+    from .pedestal import masked_points
+
+    cached = load_cached(plant_id, cache_dir)
+    stages: list[Stage] = []
+
+    points = masked_points(cached)
+    if points.shape[0]:
+        stages.append(_stage("segmentation", _voxelise(points), from_points=True))
+
+    stages.append(_stage("carve", cached.occupancy, from_points=False))
+
+    if fused_dir is not None and (fused_dir / "quality.json").exists():
+        try:
+            fused = load_cached(plant_id, fused_dir)
+        except (FileNotFoundError, KeyError):
+            fused = None
+        if fused is not None:
+            stages.append(_stage("fusion", fused.occupancy, from_points=False))
+
+    mesh = mesh_from_occupancy(cached.occupancy, voxel_size_m=VOXEL_SIZE_M)
+    if mesh.n_vertices:
+        stages.append(_stage("mesh", _voxelise(mesh.vertices), from_points=True))
+
+    heights = voxel_grid_centres()[..., 2]
+    litres = VOXEL_SIZE_M ** 3 * 1000.0
+    return {
+        "plant_id": plant_id,
+        "species": cached.species,
+        "mass_kg": round(float(cached.target_kg), 3),
+        "rim_m": round(float(cached.pot_height_m), 3),
+        "rim_measured": abs(cached.pot_height_m - 0.28) > 1e-6,
+        "above_rim_l": round(
+            float((cached.occupancy & (heights > cached.pot_height_m)).sum()) * litres,
+            3),
+        "segmented_top_m": round(float(points[:, 2].max()), 3) if points.shape[0] else 0.0,
+        "stages": [s.as_dict() for s in stages],
+    }
+
+
+def run(
+    *,
+    cache_dir: Path | None = None,
+    fused_dir: Path | None = None,
+    out: Path = WORK_DIR / "reports" / "stages.json",
+    limit: int | None = None,
+    verbose: bool = True,
+) -> dict:
+    """Encode every usable specimen's stages for the project page."""
+    from ..data.preprocess import usable_plant_ids
+
+    cache_dir = cache_dir or WORK_DIR / "cache"
+    fused_dir = fused_dir or WORK_DIR / "cache_tsdf"
+
+    plant_ids = sorted(usable_plant_ids(cache_dir))
+    if limit:
+        plant_ids = plant_ids[:limit]
+
+    specimens = []
+    for plant_id in plant_ids:
+        entry = stages_for(plant_id, cache_dir=cache_dir, fused_dir=fused_dir)
+        specimens.append(entry)
+        if verbose:
+            names = "  ".join(
+                f"{s['key'][:4]} {s['top_m']:.2f} m" for s in entry["stages"])
+            print(f"  {plant_id:6s} {names}", flush=True)
+
+    report = {
+        "note": "every stage on one voxel grid and in the specimen viewer's own "
+                "byte format, so the four panels share a frame and the page needs "
+                "no second renderer",
+        "max_points": MAX_POINTS,
+        "voxel_size_m": VOXEL_SIZE_M,
+        "n_specimens": len(specimens),
+        "specimens": specimens,
+    }
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(report, separators=(",", ":")), encoding="utf-8")
+    if verbose:
+        print(f"\n  wrote {out} ({out.stat().st_size // 1024} KB, "
+              f"{len(specimens)} specimens)")
+    return report
+
+
+__all__ = ["MAX_POINTS", "STAGE_LABELS", "Stage", "run", "stages_for"]

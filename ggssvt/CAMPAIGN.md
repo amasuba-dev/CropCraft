@@ -592,3 +592,31 @@ turn. And these clouds are *not* downsampled, unlike the specimen viewer's: a
 carved Eucalyptus is tens of thousands of voxels and halves fine, but a maize
 plant at 12 mm is 342 voxels, and halving again leaves 114, which reads as
 scattered dust rather than a plant.
+
+---
+
+## The per-stage panel
+
+```bash
+python -m ggssvt.cli stages
+python -m ggssvt.cli dashboard
+```
+
+Four panels for a chosen specimen, sharing one camera and one voxel grid:
+segmentation, silhouette carving, depth fusion, and the marching-cubes mesh. A
+dropdown picks the specimen, dragging any panel turns all four, and the wheel
+zooms.
+
+The first two panels are the reason it exists. On E001 the segmentation panel
+shows a plant reaching 1.260 m and the carve panel beside it stops at 0.456 m.
+The same fact stated as two numbers in section 7r takes an act of imagination;
+side by side it needs no explaining. The box below the panels turns red and
+quotes the gap when it exceeds 15 cm, and green when the carve kept what the
+cameras saw, so a reader who picks E017 rather than E001 sees the difference
+immediately.
+
+**One number to watch when changing anything here.** `MAX_POINTS` in
+`eval/stages.py` is 2500 per stage. Four stages times 36 specimens is embedded in
+a page that has to open from a `file://` URL, and that budget is what decides
+whether it does: measured at 5000 points the payload is 2.0 MB, at 2500 it is
+1.0 MB, at 1500 it is 0.65 MB. The page is currently 3.8 MB in total.

@@ -876,3 +876,125 @@ function potMassSection(){
 }
 
 potMassSection();
+
+/* ------------------------------------------------------- per-stage panels
+
+   Four stages of one specimen on one camera and one grid. The point of putting
+   them side by side is the first two: on most of these captures the
+   segmentation reaches most of a metre higher than the carve does, and that gap
+   is the subject of section 7r. Two numbers in a table make it an inference; two
+   panels make it obvious. */
+const STAGE = { yaw: 0.62, pitch: 0.18, zoom: 1.15, entry: null, clouds: new Map() };
+
+function stageDraw(){
+  const entry = STAGE.entry;
+  if (!entry) return;
+  for (const st of entry.stages){
+    const cv = document.getElementById("stage-" + st.key);
+    const c = STAGE.clouds.get(entry.plant_id + "/" + st.key);
+    if (cv && c) draw(cv, c, {dot: 3, mode: "height",
+      yawL: STAGE.yaw, pitchL: STAGE.pitch, zoomL: STAGE.zoom});
+  }
+}
+
+function stageZoom(f){
+  STAGE.zoom = Math.max(0.4, Math.min(4.0, STAGE.zoom * f));
+  stageDraw();
+}
+
+async function stageSelect(entry){
+  STAGE.entry = entry;
+
+  const host = document.getElementById("stagepanels");
+  host.innerHTML = entry.stages.map(st => `
+    <div class="column is-half">
+      <canvas class="recon" id="stage-${st.key}"
+              style="width:100%;aspect-ratio:1;touch-action:none;cursor:grab"></canvas>
+      <p class="mt-2"><strong>${st.title}</strong><br>
+        <span class="is-size-7 has-text-grey">${st.detail}</span></p>
+      <p class="is-size-7">reaches ${st.top_m.toFixed(3)} m${
+        st.volume_l ? ` &middot; ${st.volume_l.toFixed(2)} L` : ""}</p>
+    </div>`).join("");
+
+  for (const st of entry.stages){
+    const key = entry.plant_id + "/" + st.key;
+    if (!STAGE.clouds.has(key))
+      STAGE.clouds.set(key, await decodeCloud(st.cloud, key));
+  }
+
+  /* One camera across every panel, rebound each time because the canvases are
+     replaced when the specimen changes. */
+  for (const st of entry.stages){
+    const cv = document.getElementById("stage-" + st.key);
+    if (!cv) continue;
+    let drag = false, lx = 0, ly = 0;
+    cv.addEventListener("pointerdown", e => {
+      drag = true; lx = e.clientX; ly = e.clientY;
+      cv.setPointerCapture(e.pointerId); cv.style.cursor = "grabbing"; });
+    cv.addEventListener("pointermove", e => {
+      if (!drag) return;
+      STAGE.yaw += (e.clientX - lx) * 0.01;
+      STAGE.pitch = Math.max(-1.4, Math.min(1.4, STAGE.pitch + (e.clientY - ly) * 0.01));
+      lx = e.clientX; ly = e.clientY; stageDraw(); });
+    const stop = e => { drag = false; cv.style.cursor = "grab";
+      try { cv.releasePointerCapture(e.pointerId) } catch(_){} };
+    cv.addEventListener("pointerup", stop);
+    cv.addEventListener("pointercancel", stop);
+    cv.addEventListener("wheel", e => {
+      e.preventDefault(); stageZoom(e.deltaY > 0 ? 0.92 : 1.08); }, {passive: false});
+  }
+
+  const note = document.getElementById("stagenote");
+  if (note) note.innerHTML =
+    `${entry.plant_id}, ${entry.species}, ${entry.mass_kg.toFixed(2)} kg. Rim at
+     ${entry.rim_m.toFixed(3)} m${entry.rim_measured
+       ? "" : ", which is the configured fallback because no step was found"}.
+     Reported volume above that rim, ${entry.above_rim_l.toFixed(2)} L.`;
+
+  const seg = entry.stages.find(s => s.key === "segmentation");
+  const carve = entry.stages.find(s => s.key === "carve");
+  const fusion = entry.stages.find(s => s.key === "fusion");
+  const box = document.getElementById("stagegap");
+  const body = document.getElementById("stagegapbody");
+  if (seg && carve && body){
+    const lost = seg.top_m - carve.top_m;
+    box.className = lost > 0.15 ? "message is-danger mt-3" : "message is-success mt-3";
+    body.innerHTML = lost > 0.15
+      ? `The segmentation reaches <strong>${seg.top_m.toFixed(3)} m</strong> and the
+         carve stops at <strong>${carve.top_m.toFixed(3)} m</strong>, so
+         <strong>${lost.toFixed(3)} m</strong> of plant the cameras photographed is
+         absent from the reconstruction. A stem thinner than a voxel is voted away
+         by the cameras that look past it.` +
+        (fusion ? ` Depth fusion, on the same masks and the same depth, reaches
+         <strong>${fusion.top_m.toFixed(3)} m</strong>.` : "")
+      : `The carve reaches ${carve.top_m.toFixed(3)} m against the segmentation's
+         ${seg.top_m.toFixed(3)} m, so this specimen keeps what the cameras saw.`;
+  }
+  stageDraw();
+}
+
+async function stagesSection(){
+  const R = D.stages, section = document.getElementById("stages");
+  if (!R || !R.specimens || !R.specimens.length){ if (section) section.remove(); return; }
+
+  const pick = document.getElementById("stagepick");
+  pick.innerHTML = R.specimens.map(s =>
+    `<option value="${s.plant_id}">${s.plant_id}, ${s.species}, ${
+      s.mass_kg.toFixed(2)} kg</option>`).join("");
+  pick.onchange = () =>
+    stageSelect(R.specimens.find(s => s.plant_id === pick.value));
+
+  const zoom = document.getElementById("stagezoom");
+  if (zoom) zoom.onclick = e => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.zoom === "reset"){
+      STAGE.zoom = 1.15; STAGE.yaw = 0.62; STAGE.pitch = 0.18; stageDraw();
+    } else stageZoom(Number(b.dataset.zoom));
+  };
+
+  addEventListener("resize", stageDraw);
+  await stageSelect(R.specimens[0]);
+}
+
+stagesSection();

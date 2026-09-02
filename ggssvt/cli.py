@@ -367,6 +367,18 @@ def cmd_pot_mass(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_stages(args: argparse.Namespace) -> int:
+    """Encode every stage of every specimen for the project page's stage panel."""
+    from .eval.stages import run
+
+    run(limit=args.limit, verbose=not args.quiet)
+    print()
+    print("Run `cli dashboard` to rebuild the page around it. The first two")
+    print("panels are the point: where the segmentation reaches higher than the")
+    print("carve, the plant was photographed and the carve discarded it.")
+    return 0
+
+
 def cmd_viewpoint(args: argparse.Namespace) -> int:
     """H2: agreement with a view the reconstruction never saw. No GPU."""
     from .eval.viewpoint import run
@@ -1423,6 +1435,13 @@ def build_parser() -> argparse.ArgumentParser:
         "pot-mass", help="check pot masses against the reconstruction (CPU, ~1 min)")
     pot_mass.add_argument("--quiet", action="store_true")
     pot_mass.set_defaults(func=cmd_pot_mass)
+
+    stages = sub.add_parser(
+        "stages", help="per-stage clouds for the project page (CPU, ~3 min)")
+    stages.add_argument("--limit", type=int, default=None,
+                        help="stop after this many specimens")
+    stages.add_argument("--quiet", action="store_true")
+    stages.set_defaults(func=cmd_stages)
 
     viewpoint = sub.add_parser(
         "viewpoint", help="H2: held-out-view consistency (CPU, ~25 min)"

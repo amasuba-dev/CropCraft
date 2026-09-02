@@ -81,6 +81,7 @@ class DashboardPayload:
     resolution: dict | None = None
     pedestal: dict | None = None
     pot_mass: dict | None = None
+    stages: dict | None = None
     batch_holdout: dict | None = None
     external: dict | None = None
 
@@ -95,6 +96,7 @@ class DashboardPayload:
                 "resolution": self.resolution,
                 "pedestal": self.pedestal,
                 "pot_mass": self.pot_mass,
+                "stages": self.stages,
                 "batch_holdout": self.batch_holdout,
                 "external": self.external,
             },
@@ -317,6 +319,7 @@ def build_payload(
         resolution=report("resolution.json"),
         pedestal=report("pedestal.json"),
         pot_mass=report("pot_mass.json"),
+        stages=report("stages.json"),
         reconstruction=report("reconstruction_clouds.json"),
         batch_holdout=report("batch_holdout.json"),
         external=report("external_lettuce.json"),

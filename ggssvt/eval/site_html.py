@@ -321,6 +321,46 @@ BODY = """
 </section>
 
 
+<section class="section" id="stages">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3">One specimen, every stage</h2>
+    <p class="content">
+      The pipeline segments, then carves, then fuses, then meshes, and each stage
+      was previously only inspectable on its own. Here they share one camera and
+      one voxel grid, so they can be read against each other. Pick a specimen,
+      drag any panel to turn all of them, and scroll to zoom.
+    </p>
+
+    <div class="field is-horizontal mb-3">
+      <div class="field-label is-normal" style="flex-grow:0;margin-right:.75rem">
+        <label class="label" for="stagepick">Specimen</label>
+      </div>
+      <div class="field-body">
+        <div class="select is-small">
+          <select id="stagepick"></select>
+        </div>
+        <div class="buttons are-small ml-3" id="stagezoom">
+          <button class="button is-small" data-zoom="1.25">Zoom in</button>
+          <button class="button is-small" data-zoom="0.8">Zoom out</button>
+          <button class="button is-small" data-zoom="reset">Reset view</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="columns is-multiline" id="stagepanels"></div>
+
+    <p class="is-size-7 has-text-grey" id="stagenote"></p>
+
+    <article class="message is-info mt-3" id="stagegap">
+      <div class="message-header"><p>Read the first two panels against each other</p></div>
+      <div class="message-body">
+        <p id="stagegapbody"></p>
+      </div>
+    </article>
+  </div>
+</section>
+
+
 <section class="section" id="pedestal">
   <div class="container is-max-desktop">
     <h2 class="title is-3">Plant the carve threw away</h2>
