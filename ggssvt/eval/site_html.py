@@ -328,10 +328,14 @@ BODY = """
       The pipeline segments, then carves, then fuses, then meshes, and each stage
       was previously only inspectable on its own. Here they share one camera, one
       voxel grid and one vertical scale, so a reconstruction that reaches lower is
-      drawn lower and the four can be read against each other. Each panel gives
-      the estimate produced by the method that consumes that stage. Pick a
-      specimen and drag any panel to turn all of them. Shift-scroll or the buttons
-      zoom; a plain scroll moves the page.
+      drawn lower and they can be read against each other. Each panel gives the
+      estimate produced by the method that consumes that stage. The last is a
+      different operator entirely, after
+      <a href="#ledger">Nombambela (2025)</a>: volume as the count of occupied
+      surface voxels at 7 mm from his four views, with no carving. It has no
+      fitted regressor here, so it reports its implied bulk density and whether
+      that clears the screen. Pick a specimen and drag any panel to turn all of
+      them. Shift-scroll or the buttons zoom; a plain scroll moves the page.
     </p>
 
     <div class="field is-horizontal mb-3">

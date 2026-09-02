@@ -903,6 +903,9 @@ const STAGE_METHOD = {
   carve: "geometric features",
   fusion: "fused geometry",
   mesh: "mesh geometry",
+  // The surface-voxel arm has no fitted regressor in this project, so its panel
+  // reports the implied density and the screen's verdict instead of an estimate.
+  surface: null,
 };
 
 function stageDraw(){
@@ -933,20 +936,26 @@ async function stageSelect(entry){
     const estimate = predictions[method];
     const error = estimate != null ? estimate - entry.mass_kg : null;
     return `
-    <div class="column is-one-quarter">
+    <div class="column is-one-fifth">
       <canvas class="recon" id="stage-${st.key}"
               style="width:100%;aspect-ratio:1;touch-action:none;cursor:grab"></canvas>
       <p class="mt-2"><strong>${st.title}</strong><br>
         <span class="is-size-7 has-text-grey">${st.detail}</span></p>
       <p class="is-size-7">${entry.species} &middot; weighed
         ${entry.mass_kg.toFixed(2)} kg<br>
-        ${estimate != null
+        ${method && estimate != null
           ? `<strong>estimated ${estimate.toFixed(2)} kg</strong>
              <span class="has-text-grey">(${error >= 0 ? "+" : ""}${
                error.toFixed(2)} kg, ${method})</span>`
-          : '<span class="has-text-grey">no estimate from this stage</span>'}<br>
+          : st.density
+            ? `<strong>${st.density.toFixed(0)} kg/m&sup3;</strong>
+               <span class="tag is-small ${
+                 st.density >= 200 && st.density <= 1000 ? "is-success" : "is-light"}">${
+                 st.density >= 200 && st.density <= 1000 ? "plausible" : "outside the band"
+               }</span>`
+            : '<span class="has-text-grey">no estimate from this stage</span>'}<br>
         <span class="has-text-grey">reaches ${st.top_m.toFixed(3)} m${
-          st.volume_l ? ` &middot; ${st.volume_l.toFixed(2)} L` : ""}</span></p>
+          st.volume_l ? ` &middot; ${st.volume_l.toFixed(2)} L above the rim` : ""}</span></p>
     </div>`;
   }).join("");
 

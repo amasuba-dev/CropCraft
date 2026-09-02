@@ -615,6 +615,15 @@ quotes the gap when it exceeds 15 cm, and green when the carve kept what the
 cameras saw, so a reader who picks E017 rather than E001 sees the difference
 immediately.
 
+The fifth panel is a different operator, not a stage of ours: volume as the
+count of occupied surface voxels at 7 mm from four views, after Nombambela
+(2025). It has no fitted regressor in this project, so instead of an estimate it
+reports its implied bulk density and whether that clears the screen. Two things
+about it belong in any caption that uses it: his ground truth is plant and pot
+weighed together where ours is plant alone, and the volume this operator reports
+scales with the view count, at a median of 2.00 times between our twelve views
+and his four.
+
 **One number to watch when changing anything here.** `MAX_POINTS` in
 `eval/stages.py` is 2500 per stage. Four stages times 36 specimens is embedded in
 a page that has to open from a `file://` URL, and that budget is what decides

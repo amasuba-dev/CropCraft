@@ -45,6 +45,7 @@ STAGE_LABELS = {
     "carve": ("Silhouette carving", "the visual hull of those masks"),
     "fusion": ("Depth fusion", "the same depth, integrated"),
     "mesh": ("Mesh", "marching cubes over the carve, as a surface"),
+    "surface": ("Surface voxels", "after Nombambela (2025), his four views"),
 }
 
 
@@ -58,6 +59,9 @@ class Stage:
     n_points: int
     top_m: float
     volume_l: float
+    # Only the surface-voxel arm reports one, because it is the only operator
+    # here whose output is a volume without a fitted regressor behind it.
+    density: float
     cloud: dict
 
     def as_dict(self) -> dict:
@@ -71,12 +75,17 @@ def _voxelise(points: np.ndarray) -> np.ndarray:
     return voxelise(points, resolution=VOXEL_RESOLUTION, voxel_size_m=VOXEL_SIZE_M)
 
 
-def _stage(key: str, grid: np.ndarray, *, from_points: bool) -> Stage:
+def _stage(key: str, grid: np.ndarray, *, from_points: bool,
+           rim_m: float = 0.0) -> Stage:
     from .dashboard_data import _quantise
 
     litres = VOXEL_SIZE_M ** 3 * 1000.0
     occupied = np.flatnonzero(grid.any(axis=(0, 1)))
     title, detail = STAGE_LABELS[key]
+
+    # Above the rim, matching the figure the rest of the project reports. The
+    # whole-grid count includes the pot and contradicts the note under the panel.
+    above = grid & (voxel_grid_centres()[..., 2] > rim_m)
     return Stage(
         key=key,
         title=title,
@@ -85,7 +94,8 @@ def _stage(key: str, grid: np.ndarray, *, from_points: bool) -> Stage:
         top_m=round(float(occupied.max() + 1) * VOXEL_SIZE_M, 3)
         if occupied.size else 0.0,
         # A surface is not a volume, so only the solid stages report one.
-        volume_l=0.0 if from_points else round(float(grid.sum()) * litres, 3),
+        volume_l=0.0 if from_points else round(float(above.sum()) * litres, 3),
+        density=0.0,
         cloud=_quantise(grid, downsample=1, max_points=MAX_POINTS),
     )
 
@@ -108,7 +118,8 @@ def stages_for(
     if points.shape[0]:
         stages.append(_stage("segmentation", _voxelise(points), from_points=True))
 
-    stages.append(_stage("carve", cached.occupancy, from_points=False))
+    stages.append(_stage("carve", cached.occupancy, from_points=False,
+                             rim_m=cached.pot_height_m))
 
     if fused_dir is not None and (fused_dir / "quality.json").exists():
         try:
@@ -116,11 +127,27 @@ def stages_for(
         except (FileNotFoundError, KeyError):
             fused = None
         if fused is not None:
-            stages.append(_stage("fusion", fused.occupancy, from_points=False))
+            stages.append(_stage("fusion", fused.occupancy, from_points=False,
+                                 rim_m=cached.pot_height_m))
 
     mesh = mesh_from_occupancy(cached.occupancy, voxel_size_m=VOXEL_SIZE_M)
     if mesh.n_vertices:
         stages.append(_stage("mesh", _voxelise(mesh.vertices), from_points=True))
+
+    # The surface-voxel operator at his own four views. The panel draws the
+    # points on the shared 12 mm display grid so it can be compared with the
+    # others; the volume beneath it is his, counted on his own 7 mm grid.
+    from .surface_mesh import HIS_AZIMUTHS, masked_points_from, surface_volume
+    from .surface_mesh import _view_subset as his_views
+
+    four = masked_points_from(cached, his_views(cached, HIS_AZIMUTHS))
+    if four.shape[0]:
+        stage = _stage("surface", _voxelise(four), from_points=True)
+        _, volume_m3 = surface_volume(four, above_m=cached.pot_height_m)
+        stage.volume_l = round(volume_m3 * 1000.0, 3)
+        mass = float(cached.target_kg)
+        stage.density = round(mass / volume_m3, 1) if volume_m3 > 0 else -1.0
+        stages.append(stage)
 
     heights = voxel_grid_centres()[..., 2]
     litres = VOXEL_SIZE_M ** 3 * 1000.0
