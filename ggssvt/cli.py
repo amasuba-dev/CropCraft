@@ -829,12 +829,13 @@ def cmd_dino_segment(args: argparse.Namespace) -> int:
 
     from .eval.dino_segment import run, summarise
 
-    print("Lifting DINOv2 patch features onto carved points, DITR-style.")
+    print(f"Lifting {args.backbone} patch features onto carved points, DITR-style.")
     print("Unsupervised: this dataset has no per-point labels, so the")
     print("supervised head is replaced by clustering.\n")
 
     results = run(
-        args.plants, cache_dir=args.cache_dir, variant=args.variant, out=args.out
+        args.plants, cache_dir=args.cache_dir, variant=args.variant,
+        backbone_kind=args.backbone, out=args.out
     )
     print()
     print(_json.dumps(summarise(results), indent=2))
@@ -1678,11 +1679,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     dino_seg = sub.add_parser(
         "dino-segment",
-        help="lift DINOv2 features onto the points and cluster (DITR-style)",
+        help="lift DINO features onto the points and cluster (DITR-style)",
     )
     _add_common(dino_seg)
     dino_seg.add_argument("--plants", nargs="*")
     dino_seg.add_argument("--variant", default="base", choices=["small", "base", "large"])
+    dino_seg.add_argument(
+        "--backbone", default="dinov2", choices=["dinov2", "dinov3"],
+        help="which frozen features to lift; dinov3 needs granted access")
     dino_seg.add_argument(
         "--out", type=Path, default=WORK_DIR / "reports" / "dino_segment.json"
     )

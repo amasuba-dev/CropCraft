@@ -135,6 +135,7 @@ def run(
     *,
     cache_dir: Path = WORK_DIR / "cache",
     variant: str = "base",
+    backbone_kind: str = "dinov2",
     out: Path = WORK_DIR / "reports" / "dino_segment.json",
     verbose: bool = True,
 ) -> list[SegmentationResult]:
@@ -143,7 +144,10 @@ def run(
     from ..models.backbones import build_backbone
 
     plant_ids = plant_ids or usable_plant_ids(cache_dir)
-    backbone = build_backbone("dinov2", variant=variant)
+    # Which backbone lifts the features is the open question this module was
+    # written to answer and could not, because DINOv3 was gated when it was
+    # written. It no longer is.
+    backbone = build_backbone(backbone_kind, variant=variant)
 
     results = []
     for index, plant_id in enumerate(plant_ids, start=1):

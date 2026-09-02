@@ -172,40 +172,38 @@ def stages_for(
     heights = voxel_grid_centres()[..., 2]
     litres = VOXEL_SIZE_M ** 3 * 1000.0
 
-    # Where "pot" stops and "plant" starts, for the panels that colour the two
-    # apart. It is not always the rim the cache carries: on the specimens raised
-    # on an inverted pot the detector found no step and fell back to the 0.28 m
-    # constant, which lies inside the staging, so colouring there paints 16 cm of
-    # plastic as plant.
+    # Where the display splits "pot" from "plant". Where the detector found a
+    # rim, that rim. Where it did not, the 0.28 m fallback is useless here: it
+    # lies inside the staging and paints 16 cm of plastic as plant.
     #
-    # The carve's own vertical profile says where the rim is, and it is a
-    # cleaner reading than the constant it replaces. On E001 the occupied
-    # cross-section falls smoothly from 645 voxels at the floor to 258 at
-    # 0.300 m, steps down to 158 by 0.324 m, then holds flat near 143 to
-    # 0.420 m before collapsing to nothing by 0.444 m. That is two stacked
-    # objects with a junction between them: the tapering inverted pot to about
-    # 0.31 m, then the plant's own straight-sided pot above it. The flat section
-    # is the pot, and the split belongs at its top.
+    # What the profile actually shows on E001, and what it does not. The
+    # occupied cross-section tapers from 645 voxels at the floor to 258 by
+    # 0.300 m, steps down to about 143 by 0.324 m, then holds flat between 138
+    # and 147 until it ends at 0.444 m. The plateau is real and says there is a
+    # distinct upper structure of constant width sitting on a tapering base.
     #
-    # So 0.44 m is the *pot rim*, not the top of the stand, and the carve on
-    # these captures keeps the entire rigid assembly and none of the plant. A
-    # profile rule reading the top of the broad section reproduces the detector
-    # to within one voxel on eight of the ten Eucalyptus where the detector did
-    # work, and returns 0.432 to 0.444 m on the nine where it did not.
+    # It does *not* establish where the pot ends and the plant begins, and this
+    # module must not imply that it does. `geometry/pot.py` declines to place a
+    # rim on these specimens deliberately: its test is a step, and the step here
+    # has an above/below median ratio of 0.50 to 0.55 where a rim collapse is
+    # 0.35 or less. Its docstring also records that an earlier fraction-of-the-
+    # maximum rule, which is exactly the kind of rule that would read a rim off
+    # this plateau, returned 0.432, 0.336 and 0.432 m for E001, E003 and E008:
+    # three different answers to a question the geometry does not answer.
     #
-    # M008 and M009 are the exception and are treated as assumptions rather than
-    # measurements. Their canopies are wider than their pots, so the profile rule
-    # collapses to the first slab and measures nothing; they take the same
-    # constant on the grounds that they were staged on the same rig, which is
-    # weaker evidence than the Eucalyptus have.
+    # So the constant below is used for what it can support. It is the top of
+    # the rigid structure the carve kept, which is the correct place to divide
+    # the colouring, because everything above it on these captures is plant that
+    # the carve discarded. It is not offered as a pot rim, and no volume is
+    # measured from it.
     from .recarve import STAND_TOP_M
 
     rim_measured = abs(cached.pot_height_m - 0.28) > 1e-6
     split_m = float(cached.pot_height_m) if rim_measured else STAND_TOP_M
     split_source = (
         "the detected pot rim" if rim_measured
-        else "the rim of the pot standing on the stand, read off the carve's "
-             "own vertical profile because no step was detected")
+        else "the top of the rigid structure the carve kept, because no rim "
+             "step was found; not a measured pot rim")
 
     return {
         "plant_id": plant_id,
