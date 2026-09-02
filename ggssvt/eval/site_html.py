@@ -394,7 +394,7 @@ BODY = """
           <select id="stagemode">
             <option value="z" selected>height above the floor</option>
             <option value="depth">depth from the camera</option>
-            <option value="segment">pot and canopy</option>
+            <option value="segment">pot and plant</option>
             <option value="solid">one colour</option>
           </select>
         </div>

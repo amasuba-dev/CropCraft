@@ -20,7 +20,7 @@ from pathlib import Path
 
 import numpy as np
 
-from ..config import POT_HEIGHT_M, WORK_DIR, voxel_grid_centres
+from ..config import POT_HEIGHT_M, VOXEL_SIZE_M, WORK_DIR, voxel_grid_centres
 
 
 def _batch_of(plant_id: str) -> str | None:
@@ -41,8 +41,24 @@ def _batch_of(plant_id: str) -> str | None:
     return None
 
 
-def _quantise(occupancy: np.ndarray, downsample: int = 2, max_points: int = 18000) -> dict:
-    """Occupied voxels as base64 zlib-compressed uint8 triples."""
+def _quantise(occupancy: np.ndarray, downsample: int = 2, max_points: int = 18000,
+              voxel_size_m: float = VOXEL_SIZE_M) -> dict:
+    """Occupied voxels as base64 zlib-compressed uint8 triples.
+
+    The payload carries its own metres-per-byte. It used to be inferred in the
+    browser as ``resolution * 0.024 / 255``, which happens to land within half a
+    percent when the caller downsamples by two, and is exactly twice the truth
+    when it does not. The stage panels do not downsample, so every height they
+    reported was doubled and the pot-and-plant split fell above the whole plant,
+    painting stem, leaves and pot alike as canopy.
+
+    Both halves of the old guess were unsound and only cancelled by luck: the
+    byte step is an *integer* division of 255 by the resolution, so the top of
+    the byte range is never reached, and the 0.024 pitch is the downsampled
+    grid's rather than this one's. Deriving a physical scale from a display
+    resolution was the mistake. The encoder knows the answer exactly, so it
+    states it and the browser stops guessing.
+    """
     resolution = occupancy.shape[0]
     if downsample > 1:
         trimmed = resolution - (resolution % downsample)
@@ -59,9 +75,12 @@ def _quantise(occupancy: np.ndarray, downsample: int = 2, max_points: int = 1800
         keep = np.random.default_rng(0).choice(index.shape[0], max_points, replace=False)
         index = index[np.sort(keep)]
 
-    scaled = np.clip(index * (255 // max(1, resolution - 1)), 0, 255).astype(np.uint8)
+    step = 255 // max(1, resolution - 1)
+    scaled = np.clip(index * step, 0, 255).astype(np.uint8)
     return {
         "resolution": int(resolution),
+        # Height of one byte, after any downsampling and the integer byte step.
+        "metres_per_byte": voxel_size_m * downsample / step,
         "data": base64.b64encode(zlib.compress(scaled.tobytes(), 9)).decode("ascii"),
     }
 

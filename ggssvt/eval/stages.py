@@ -171,16 +171,35 @@ def stages_for(
 
     heights = voxel_grid_centres()[..., 2]
     litres = VOXEL_SIZE_M ** 3 * 1000.0
+
+    # Where "pot" stops and "plant" starts, for the panels that colour the two
+    # apart. It is not always the rim the cache carries. On the specimens raised
+    # on an inverted pot the rim detector found no step and fell back to the
+    # 0.28 m constant, which sits *inside* the stand, so colouring at that height
+    # paints 16 cm of plastic as canopy. The stand's own top is the honest split
+    # there, and it is not a guess: the carve on those captures is the stand and
+    # nothing else, and its top clusters at 0.444 to 0.492 m across the nine
+    # Eucalyptus staged this way, with E002's detector independently finding
+    # 0.444 on the same rig.
+    from .recarve import STAND_TOP_M
+
+    rim_measured = abs(cached.pot_height_m - 0.28) > 1e-6
+    split_m = float(cached.pot_height_m) if rim_measured else STAND_TOP_M
+    split_source = ("the detected pot rim" if rim_measured
+                    else "the top of the inverted-pot stand, because no rim was found")
+
     return {
         "plant_id": plant_id,
         "species": cached.species,
         "mass_kg": round(float(cached.target_kg), 3),
         "rim_m": round(float(cached.pot_height_m), 3),
-        "rim_measured": abs(cached.pot_height_m - 0.28) > 1e-6,
+        "rim_measured": rim_measured,
         "above_rim_l": round(
             float((cached.occupancy & (heights > cached.pot_height_m)).sum()) * litres,
             3),
         "segmented_top_m": round(float(points[:, 2].max()), 3) if points.shape[0] else 0.0,
+        "split_m": round(split_m, 3),
+        "split_source": split_source,
         "stages": [s.as_dict() for s in stages],
     }
 
