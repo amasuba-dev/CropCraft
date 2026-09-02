@@ -843,6 +843,18 @@ def cmd_dino_segment(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_backbone_viz(args: argparse.Namespace) -> int:
+    """Render what DINOv2 and DINOv3 each see, side by side."""
+    from .eval.backbone_viz import run
+
+    run(plant_ids=tuple(args.plants), view=args.view, verbose=not args.quiet)
+    print()
+    print("Patch features projected onto their own principal components, fitted")
+    print("on the subject rather than the whole frame. Read the boundaries the")
+    print("features draw, not the colours they take: the hues are arbitrary.")
+    return 0
+
+
 def cmd_architecture(args: argparse.Namespace) -> int:
     """Render one architecture diagram per methodology."""
     from .eval.architecture import write_all
@@ -1691,6 +1703,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--out", type=Path, default=WORK_DIR / "reports" / "dino_segment.json"
     )
     dino_seg.set_defaults(func=cmd_dino_segment)
+
+    backbone_viz = sub.add_parser(
+        "backbone-viz",
+        help="what DINOv2 and DINOv3 each see, as feature maps and clusterings")
+    backbone_viz.add_argument(
+        "--plants", nargs="*", default=["E001", "E002", "E018", "V004"])
+    backbone_viz.add_argument("--view", type=int, default=0)
+    backbone_viz.add_argument("--quiet", action="store_true")
+    backbone_viz.set_defaults(func=cmd_backbone_viz)
 
     architecture = sub.add_parser(
         "architecture", help="architecture diagram per methodology, as SVG"

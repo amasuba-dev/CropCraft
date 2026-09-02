@@ -492,7 +492,127 @@ def ggssvt() -> Diagram:
     )
 
 
-DIAGRAMS = (carve, sam3d, fusion, posefree, ggssvt)
+def backbones() -> Diagram:
+    """The frozen-feature arm, which is the one that is finished."""
+    return Diagram(
+        "backbones",
+        "Method F. Frozen self-supervised features",
+        "No training. Patch tokens from a frozen backbone, pooled and ridged "
+        "against mass, which is what makes the comparison cheap enough to run "
+        "properly.",
+        [
+            _acquisition(),
+            _registration(),
+            _segmentation(),
+            Stage(
+                "Patch tokens per view",
+                "Every view through a frozen DINOv2 or DINOv3 encoder. Nothing "
+                "is finetuned, so the comparison is of the representations "
+                "themselves rather than of how well each one trains.",
+                "models/backbones.py",
+                tone=4,
+                note="(V, gh, gw, D) tokens",
+            ),
+            Stage(
+                "Pool, reduce, ridge",
+                "Tokens pooled across views, projected to a handful of "
+                "principal components, and regressed on mass with leave-one-out "
+                "cross-validation. The no-DINO control uses the seven geometric "
+                "descriptors alone.",
+                "eval/dino_probe.py",
+                tone=6,
+                note="mass, kg",
+                verdict="DINOv2 0.392 kg, DINOv3 0.394 kg, control 0.458 kg",
+            ),
+            Stage(
+                "Lift onto points, cluster",
+                "The same tokens back-projected onto the carved points and "
+                "clustered in two, which asks whether the features separate "
+                "plant from pot where colour does not.",
+                "geometry/dino_lift.py, eval/dino_segment.py",
+                tone=7,
+                note="a label per point",
+                verdict="ties where the rim is confident, DINOv3 ahead where it is not",
+            ),
+        ],
+        outcome=(
+            "Finished, and the answer is a null. Paired against each other the "
+            "two backbones differ by 0.0018 kg with a 95 percent interval of "
+            "-0.025 to +0.030, on predictions correlating at 0.977. The "
+            "resolution ledger puts the smallest detectable effect at n=36 at "
+            "0.138 kg, so no amount of finetuning could settle a difference this "
+            "size on this dataset. The one place they part company is the "
+            "eleven captures where the rim detector refuses: DINOv3 is better on "
+            "all eleven, and still fails to separate plant from pot there."
+        ),
+    )
+
+
+def generative() -> Diagram:
+    """The proposed baseline. Scoped, deliberately not implemented."""
+    return Diagram(
+        "generative",
+        "Method G. Single-image generative reconstruction (proposed)",
+        "SAM 3D Objects as a control, not as an instrument: what would a "
+        "model that never saw the back of the plant report?",
+        [
+            Stage(
+                "One view, one mask",
+                "A single frame and its subject mask, which is all this model "
+                "takes. Eleven of the twelve views are discarded on purpose: "
+                "the point is to measure what one view is worth.",
+                "eval/generative.py (proposed)",
+                tone=2,
+                note="one RGB frame",
+            ),
+            Stage(
+                "Structured latent generation",
+                "facebook/sam-3d-objects. A sparse structure generator and a "
+                "latent generator, about 12.5 GB of checkpoints, producing a "
+                "mesh or a splat. The geometry it returns for the unseen half "
+                "of the plant is *invented*, which is the whole reason this arm "
+                "exists and the whole reason it must stay a control.",
+                "12.5 GB, gated, needs Meta's own package",
+                tone=5,
+                note="a generated mesh",
+                verdict="does not fit 4 GiB without offloading",
+            ),
+            Stage(
+                "Scale and measure",
+                "The generated mesh has no metric scale, so it is fitted to the "
+                "measured silhouette before any volume is read. Without this the "
+                "comparison is of shape only and the volumes are arbitrary.",
+                "eval/generative.py (proposed)",
+                tone=6,
+                note="volume, litres",
+            ),
+            Stage(
+                "Score against the same screen",
+                "The implied bulk density screen and the leave-one-batch-out "
+                "regression, unchanged, so the number lands in the same ledger "
+                "as every other operator.",
+                "eval/resolution.py",
+                tone=8,
+                note="admitted or rejected",
+                verdict="never enters a reported volume",
+            ),
+        ],
+        outcome=(
+            "The hypothesis is stated before the run, because it is the kind of "
+            "result that is easy to rationalise afterwards. If a single-image "
+            "generative model predicts mass as well as the twelve-view carve, "
+            "that is evidence for the batch confound: it would mean the task is "
+            "being solved from apparent size rather than from measured geometry, "
+            "and that the rig is not earning its twelve views. If it does worse, "
+            "the multi-view capture is justified on its own terms. Either way "
+            "the volume it produces is generated rather than measured, so it "
+            "never feeds a reported figure and never enters the density screen "
+            "as evidence about a specimen."
+        ),
+    )
+
+
+DIAGRAMS = (carve, sam3d, fusion, posefree, ggssvt, backbones, generative)
 
 
 def write_all(out_dir: Path) -> list[Path]:
