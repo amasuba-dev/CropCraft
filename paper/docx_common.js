@@ -52,14 +52,33 @@ const h2 = (text) => new Paragraph({
   children: [new TextRun({ text, size: 23, bold: true, color: ACCENT, font: "Calibri" })],
 });
 
-const caption = (label, text) => new Paragraph({
+/* Captions number themselves.
+
+   They used to carry a hardcoded label, which is fine until a section is added
+   in the middle: inserting the distance-metric table and the backbone table
+   produced two Table 2s and two Table 6s, because every later caption still
+   claimed the number it was written with. Passing "Table" or "Figure" and
+   letting the counter assign the rest means a caption cannot disagree with its
+   position. An explicit label ending in a digit is still honoured, so a document
+   that wants to fix a number can. */
+const CAPTION_N = { Table: 0, Figure: 0 };
+
+const nextLabel = (label) => {
+  const kind = String(label).trim().split(/\s+/)[0];
+  if (!(kind in CAPTION_N)) return label;
+  if (/\d/.test(label)) return label;          // caller fixed it deliberately
+  CAPTION_N[kind] += 1;
+  return `${kind} ${CAPTION_N[kind]}`;
+};
+
+const caption = (rawLabel, text) => ((label) => new Paragraph({
   spacing: { before: 60, after: 200 },
   alignment: AlignmentType.LEFT,
   children: [
     new TextRun({ text: label + ". ", size: 18, bold: true, color: INK, font: "Calibri" }),
     new TextRun({ text, size: 18, color: MUTED, font: "Calibri" }),
   ],
-});
+}))(nextLabel(rawLabel));
 
 function figure(file, widthPx, label, text) {
   const buf = fs.readFileSync(file);

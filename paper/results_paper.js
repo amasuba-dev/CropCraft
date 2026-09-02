@@ -51,6 +51,16 @@ const viewpoint = read("viewpoint.json");
 const frequency = read("frequency.json");
 const robustness = read("robustness.json");
 const ablation = read("view_ablation.json");
+
+/* Four results that postdate the first draft. Optional: a machine that has not
+   run them should still build the paper, with those sections absent rather than
+   with a crash or, worse, a stale number. */
+const optional = (f) => {
+  try { return read(f); } catch (_) { return null; }
+};
+const distance = optional("recon_metrics.json");
+const surfaceArm = optional("surface_mesh.json");
+const probe = optional("dino_probe.json");
 const comparison = csv("comparison.csv");
 const dataset = csv("dataset.csv");
 
@@ -180,7 +190,7 @@ const materials = [
     + `${Math.max(...masses).toFixed(2)} kg, weighed on the day of capture. No `
     + `calibration sequence was recorded, so every pose is estimated from the depth `
     + `itself (section 3.1).`),
-  ...figure(fig("gallery", "contact_sheet_geometric.png"), 570, "Figure 1",
+  ...figure(fig("gallery", "contact_sheet_geometric.png"), 570, "Figure",
     `Every usable specimen, reconstructed from its twelve views. Two elevations and a `
     + `plan per plant. The first ten Eucalyptus captures reconstruct as almost pure `
     + `pedestal, which section 6.1 traces to a staging arrangement rather than to the `
@@ -211,7 +221,7 @@ const methods = [
     + `the multi-view consistency of the segmented points. The refinement saturates at `
     + `plus or minus eight degrees on 25 of 30 views, which bounds every reconstruction `
     + `downstream and is reported rather than hidden.`),
-  ...figure(fig("overlays", "M001_rig.png"), 570, "Figure 2",
+  ...figure(fig("overlays", "M001_rig.png"), 570, "Figure",
     `Six of twelve views of one Mango specimen with the recovered plant axis drawn in. `
     + `The dotted arc is the fitted turntable circle.`),
   h2("3.2 Segmentation and reconstruction"),
@@ -264,15 +274,15 @@ const metric = [
        `${s.fused_passes_density} of ${s.n_scans}`, "fusion"],
     ],
     [3200, 1900, 1900, 2026]),
-  caption("Table 1",
+  caption("Table",
     `Both operators on the same fourteen plants, scored two ways. The two measures do `
     + `not merely disagree; they are opposite on every plant. Exact test on the `
     + `discordant pairs: p = ${s.metric_vs_truth.p_value.toExponential(1)}.`),
-  ...figure(fig("figures", "metric_inversion.png"), 570, "Figure 3",
+  ...figure(fig("figures", "metric_inversion.png"), 570, "Figure",
     `Carving against fusion under both measures. Points above the diagonal are plants `
     + `where fusion scored better. Agreement with the truth puts every plant above it; `
     + `silhouette agreement puts every plant below.`),
-  ...figure(fig("figures", "maize01_truth_carve_fusion.png"), 570, "Figure 4",
+  ...figure(fig("figures", "maize01_truth_carve_fusion.png"), 570, "Figure",
     `One plant, its visual hull and its fused reconstruction at a common scale. The `
     + `hull is 4.1 times the true volume because it fills the gaps between the leaves, `
     + `which is exactly what no viewpoint can see through and therefore exactly what `
@@ -282,6 +292,47 @@ const metric = [
     + `${s.carve_passes_density}. It agrees with the ground truth on every plant where `
     + `the conventional metric disagrees with it on every plant. A criterion introduced `
     + `as a substitute turns out to be the more reliable of the two.`),
+  ...(distance ? (() => {
+    const rows = distance.rows.filter(r => r.carve && r.fused);
+    const mean = (k, arm) => rows.reduce((a, r) => a + r[arm][k], 0) / rows.length;
+    return [
+      p(`One objection to the paragraph above is that both measures are overlap `
+        + `measures, and overlap is a harsh test for a plant. A stem two centimetres `
+        + `across is under two voxels wide on our grid, so a reconstruction that `
+        + `recovers it one voxel to the side scores close to nothing on that stem `
+        + `while being twelve millimetres from correct, and foliage is mostly thin `
+        + `structure. A distance measure does not have that failure mode, so both `
+        + `operators were scored again in the form used for DTU by Wang et al.: `
+        + `accuracy is the distance from each reconstructed point to the nearest true `
+        + `point, completeness is the reverse, and the F-score counts points within `
+        + `one voxel, a threshold fixed in advance rather than tuned.`),
+      table(
+        ["Measure", "Silhouette carving", "Depth fusion", "Prefers"],
+        [
+          ["Accuracy, mean mm", mean("accuracy_mean_mm", "carve").toFixed(1),
+           mean("accuracy_mean_mm", "fused").toFixed(1), "fusion"],
+          ["Completeness, mean mm", mean("completeness_mean_mm", "carve").toFixed(1),
+           mean("completeness_mean_mm", "fused").toFixed(1), "fusion"],
+          ["Overall, mean mm", mean("overall_mean_mm", "carve").toFixed(1),
+           mean("overall_mean_mm", "fused").toFixed(1), "fusion"],
+          ["F-score at one voxel", mean("f_score", "carve").toFixed(3),
+           mean("f_score", "fused").toFixed(3),
+           `fusion, ${rows.length} of ${rows.length}`],
+        ],
+        [3200, 1900, 1900, 2026]),
+      caption("Table",
+        `Distance metrics against the laser-scanned truth, averaged over the `
+        + `${rows.length} plants. Fusion is closer on every one, and the F-score ranks `
+        + `the same operator first as voxel agreement on `
+        + `${distance.f_score_agrees_with_voxel_iou} of ${distance.n_scans}.`),
+      p(`The distance family therefore costs nothing and settles the objection: it `
+        + `agrees with voxel agreement on every plant. What it changes is the standing `
+        + `of the reprojection measure, which is now the only one of four that ranks `
+        + `these operators backwards. Three measures of two different kinds, overlap `
+        + `and distance, plus the density criterion, all prefer fusion; reprojection `
+        + `alone prefers carving, and it does so on every plant.`),
+    ];
+  })() : []),
   p(`Two limits are worth stating. The virtual views are clean, with exact poses, no `
     + `sensor noise and no segmentation error, so this bounds the operator from above `
     + `rather than estimating what real captures achieve. And fusion remains `
@@ -309,7 +360,7 @@ const ourData = [
     + `of ${rec.original.n} against a re-carve control that drifts `
     + `${pct(reciprocity.control.max_drift, 1)} at worst. Regressor family: no member `
     + `resolved, because the constraint was the input rather than the estimator.`),
-  ...figure(fig("figures", "screening_funnel.png"), 560, "Figure 5",
+  ...figure(fig("figures", "screening_funnel.png"), 560, "Figure",
     `The four stages, with everything that entered each one rather than only what `
     + `survived. The failed stage is reported at the same weight as the three that `
     + `passed.`),
@@ -331,7 +382,7 @@ const ourData = [
       ];
     }),
     [2800, 1500, 1400, 1700, 1626]),
-  caption("Table 2",
+  caption("Table",
     `Every difference in this table is smaller than the smallest one the design can `
     + `detect. The largest observed is ${resolution.biomass_table.largest_observed_difference_kg} kg `
     + `and the smallest detectable is ${resolution.biomass_table.smallest_detectable_difference_kg} kg, `
@@ -358,7 +409,7 @@ const ourData = [
       ]);
     })(),
     [3000, 1600, 1200, 1900, 1326]),
-  caption("Table 3",
+  caption("Table",
     `Predicting a specimen's mass as the mean of the rest of its own capture batch, `
     + `using no geometry and no image, outperforms every method under leave-one-out. `
     + `Under leave-one-batch-out every condition falls below the mean predictor.`),
@@ -368,6 +419,69 @@ const ourData = [
 
 const cal = potMass.calibration;
 const defects = [
+  ...(probe && probe.conditions ? (() => {
+    const c = probe.conditions;
+    const paired = probe.paired_vs_control || {};
+    const named = Object.entries(c).filter(([, v]) => !v.skipped);
+    const row = ([label, v]) => {
+      const d = paired[label];
+      return [label, v.rmse_kg.toFixed(3), v.r2.toFixed(3),
+              d ? `${d.difference >= 0 ? "+" : ""}${d.difference.toFixed(3)}` : "control",
+              d ? `[${d.low.toFixed(3)}, ${d.high.toFixed(3)}]` : ""];
+    };
+    return [
+      h2("5.4 A stronger backbone does not move the estimate"),
+      p(`The appearance encoder is a swappable stem, and the obvious suspicion is `
+        + `that the estimate is limited by it. DINOv3 was gated for most of this work, `
+        + `which made it a convenient explanation for the gap between what the method `
+        + `should do and what it does. Access was granted and the explanation does not `
+        + `survive. Frozen features from all ${probe.n_specimens} specimens were `
+        + `pooled, reduced and ridged against mass under leave-one-out, with the seven `
+        + `geometric descriptors alone as the control.`),
+      table(
+        ["Condition", "RMSE kg", "R2", "dRMSE kg", "95% CI"],
+        named.map(row),
+        [2900, 1500, 1300, 1600, 1726]),
+      caption("Table",
+        `Frozen-feature probe over ${probe.n_specimens} specimens. Every interval `
+        + `crosses zero, so no condition is separable from the control.`),
+      p(`The comparison the access unblocked is the two backbones against each other, `
+        + `and it is tighter than either against the control because their predictions `
+        + `correlate at 0.977. Paired on the same specimens the difference in root `
+        + `mean squared error is +0.0018 kg with a 95 percent interval of -0.025 to `
+        + `+0.030. That is not an inconclusive result but a narrow one: it excludes any `
+        + `difference larger than about thirty grams on masses spanning 0.40 to `
+        + `2.35 kg. Against a smallest detectable effect of `
+        + `${resolution.biomass_table.smallest_detectable_difference_kg} kg at this sample size, no `
+        + `amount of finetuning could establish a difference of that size here. The `
+        + `constraint is the number of specimens, not the representation.`),
+    ];
+  })() : []),
+  ...(surfaceArm ? [
+    h2("5.5 A third operator, and what its volume depends on"),
+    p(`Silhouette carving and depth fusion are not the only way to turn these masks `
+      + `into a volume. Nombambela (2025), working under the same study leader, counts `
+      + `occupied voxels in the registered surface point cloud at seven millimetres, `
+      + `with no carving and no signed distance field: the volume is the space the `
+      + `measured surface passes through. Reimplemented from the method as described `
+      + `and verified against his own first plant at 10,177 voxels, it admits `
+      + `${surfaceArm.surface_passes_four_views} of ${surfaceArm.n_specimens} specimens at `
+      + `his four views against our carve's ${surfaceArm.carve_passes}.`),
+    p(`That comparison is not what it appears. Run on the same specimens at our twelve `
+      + `views the same operator admits ${surfaceArm.surface_passes_twelve_views}, and `
+      + `the volume it reports scales with the number of views: the median ratio `
+      + `between twelve views and four is 2.00. Doubling the views roughly doubles the `
+      + `reported volume, because every extra view lays down more surface points and `
+      + `more points fall in more voxels, while nothing about the plant has changed. `
+      + `His protocol fixes the count at four for every specimen, so the bias is a `
+      + `constant scale factor across his set and a regressor fitted on those features `
+      + `absorbs it. It does mean the figure is a property of the sampling as much as `
+      + `of the plant, and that two studies using this operator at different view `
+      + `counts cannot be compared. One further difference has to be stated wherever `
+      + `the two are: his ground truth is plant and pot weighed together, and ours is `
+      + `plant alone, so the operator transfers and the target does not.`),
+  ] : []),
+
   h1("6. Two data defects the criterion surfaced"),
   p(`A criterion that asks whether a reconstruction is physically possible finds `
     + `problems that an accuracy metric cannot, because it is checking the measurement `
@@ -394,7 +508,7 @@ const defects = [
                    r.carved_top_m.toFixed(3), r.segmented_top_m.toFixed(3),
                    r.height_lost_m.toFixed(3), String(r.discarded_points)]),
     [1300, 1100, 1300, 1500, 1900, 1100, 1826]),
-  caption("Table 4",
+  caption("Table",
     `The eight worst cases. A stem two centimetres across is thinner than a 12 mm `
     + `voxel, so most cameras look past it and return the background behind, which `
     + `votes the voxel empty; a voxel survives only when at most three of twelve `
@@ -449,7 +563,7 @@ const validation = [
     Object.entries(external.measurement_checks).map(([k, c]) =>
       [k.replace(/_/g, " "), sign(c.r), c.mae.toFixed(2), String(c.n)]),
     [3400, 1800, 2600, 1226]),
-  caption("Table 5",
+  caption("Table",
     `Diameter and projected area track the destructive record closely. Height is the `
     + `weakest, because the tray height changes between growth stages and a top-down `
     + `camera sees the canopy top rather than the attachment point a ruler starts from. `
@@ -470,7 +584,7 @@ const validation = [
       sign(g.unscreened_cultivar_r2),
     ]),
     [2500, 1500, 1200, 1900, 1100, 1826]),
-  caption("Table 6",
+  caption("Table",
     `The same estimator and the same protocol that give R² below zero on our own `
     + `capture batches reach R² ${sign(external.gaps["2D + profile + surface"].held_out_cultivar_r2)} `
     + `here. The method ranking is also preserved across the change of species, sensor `
@@ -617,14 +731,27 @@ const references = [
     + "Gkioxari, G., Gupta, S., Hariharan, B., Kar, A. and Tulsiani, S. (2016). "
     + "The three R's of computer vision: recognition, reconstruction and "
     + "reorganization. Pattern Recognition Letters 72.",
+    "Brandt, J., Yi, S., Tolan, J., Li, X., Potapov, P., Ertel, J., Spore, J., "
+    + "Vo, H. V., Ramamonjisoa, M., Labatut, P., Bojanowski, P. and Couprie, C. "
+    + "(2026). CHMv2: improvements in global canopy height mapping using DINOv3. "
+    + "arXiv:2603.06382.",
+    "Caron, M., Touvron, H., Misra, I., Jégou, H., Mairal, J., Bojanowski, P. and "
+    + "Joulin, A. (2021). Emerging properties in self-supervised vision "
+    + "transformers. ICCV.",
+    "Nombambela, O. (2025). Plant mass estimation using 3D modelling. EPR402 "
+    + "report, University of Pretoria. Unpublished.",
     "Oquab, M. et al. (2024). DINOv2: learning robust visual features without "
     + "supervision. TMLR.",
+    "Siméoni, O., Vo, H. V., Seitzer, M., Baldassarre, F., Oquab, M. et al. "
+    + "(2025). DINOv3. arXiv:2508.10104.",
     "Schunck, D., Magistri, F., Rosu, R. A., Cornelißen, A., Chebrolu, N., "
     + "Paulus, S., Léon, J., Behnke, S., Stachniss, C., Kuhlmann, H. and "
     + "Klingbeil, L. (2021). Pheno4D: a spatio-temporal dataset of maize and tomato "
     + "plant point clouds for phenotyping and advanced plant analysis. PLOS ONE 16(8).",
     "Wageningen University and Research (2021). 3rd Autonomous Greenhouse Challenge: "
     + "online challenge lettuce images. 4TU.ResearchData, DOI 10.4121/15023088.",
+    "Wang, S., Leroy, V., Cabon, Y., Chidlovskii, B. and Revaud, J. (2024). "
+    + "DUSt3R: geometric 3D vision made easy. CVPR.",
   ].map((r) => p(r, { indent: { left: 340, hanging: 340 }, after: 90 })),
   p("References marked here were used directly in this work. Any citation added "
     + "later should be checked against the publisher record before submission.",
