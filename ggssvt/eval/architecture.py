@@ -616,7 +616,7 @@ def hierarchical() -> Diagram:
     """Method H. Swin, proposed. Not another backbone swap."""
     return Diagram(
         "hierarchical",
-        "Method H. Hierarchical stem with reconstruction (proposed)",
+        "Method H. Hierarchical stem with reconstruction",
         "A Swin pyramid in place of the plain ViT stem, proposed for token "
         "resolution rather than for representation strength.",
         [
@@ -628,7 +628,7 @@ def hierarchical() -> Diagram:
                 "A shifted-window transformer returns a pyramid at strides 4, 8, "
                 "16 and 32 rather than one grid at 16. On a 416 by 512 frame that "
                 "is 13,312 tokens at the finest level against DINOv3's 832.",
-                "models/backbones.py (proposed SwinBackbone)",
+                "ggssvt/models/backbones.py, SwinBackbone",
                 tone=4,
                 note="tokens at four scales",
             ),
@@ -661,6 +661,19 @@ def hierarchical() -> Diagram:
                 note="occupancy, then mass",
             ),
             Stage(
+                "Fused onto the ViT's own grid",
+                "The pyramid is projected level by level and resampled onto "
+                "26 by 32, which is DINOv3's grid exactly on these frames, so "
+                "token count is held constant and the comparison isolates the "
+                "stem. The finer levels are area pooled rather than sampled: a "
+                "stem narrower than a coarse cell then contributes a fraction "
+                "of its value instead of falling between sample points.",
+                "SwinBackbone._fuse",
+                tone=6,
+                note="832 tokens, as before",
+                verdict="27.5M frozen, 0.75M trainable laterals",
+            ),
+            Stage(
                 "Scored on thin structure, not on mass",
                 "The primary measure is the section 7r quantity: how much of the "
                 "plant the segmentation found survives into the reconstruction. "
@@ -689,7 +702,13 @@ def hierarchical() -> Diagram:
             "this design detects is 0.138 kg, and the frozen-backbone comparison "
             "already showed that swapping representations moves the estimate by "
             "far less. Scoring it on recovered thin structure instead is what "
-            "makes it answerable at 36 specimens."
+            "makes it answerable at 36 specimens. "
+            "Built and measured, not proposed: it loads, it trains end to end on "
+            "CUDA, and on a 4 GiB card it peaks at 2.41 GiB at batch 8 with 32 "
+            "tokens a view, which is less than either DINO backbone at the same "
+            "setting because Swin tiny is 27.5M parameters against DINOv2 base's "
+            "86M. One pretraining epoch runs in 4.8 seconds where DINOv3 takes "
+            "6.2. It is condition h4_swin in the full campaign plan."
         ),
     )
 

@@ -656,8 +656,13 @@ The ten conditions, from `campaign.py`:
 ```
 baseline_cnn  baseline_fused  h2_no_geometry  h1_dinov2
 h3_bands_8_freq7  h3_bands_6_freq6  h3_bands_16_freq10
-sam3d_cnn  sam3d_dinov2  h1_dinov3
+sam3d_cnn  sam3d_dinov2  h1_dinov3  h4_swin
 ```
+
+`h4_swin` is the newest and needs no access grant: Swin weights are open. It is
+the one condition whose hypothesis is not about representation strength, so it
+is the one worth watching. See
+[What h4_swin is asking](#what-h4_swin-is-asking) below.
 
 `h1_dinov3` is now runnable: access was granted on 2026-09-02 to account
 `aamsb`. **Use `env -u HF_TOKEN`** on that machine if it also carries an
@@ -727,6 +732,42 @@ DINOv3 uses marginally *less* than DINOv2 at every setting. On a 15.57 GiB Titan
 batch 8 at 32 tokens leaves about 13 GiB spare for one job, which is why three
 concurrent shards is comfortable and ten is not.
 
+### What h4_swin is asking
+
+Not "is Swin a better encoder". That question is already answered in the
+negative for this dataset by the frozen-backbone probe, and a third backbone
+would return a third null.
+
+The question is whether a **16-pixel patch can represent a 6-pixel stem**. In
+the upper half of these frames the median horizontal run of subject mask is 5 to
+7 pixels, and a quarter of runs are 2 to 3. A ViT patch embedding averages such
+a stem with roughly 240 pixels of background in the first layer of the network,
+where nothing downstream can recover it. Swin's first stage works at stride 4,
+so the same stem occupies about a third of a token and survives to be merged
+hierarchically after it has been represented.
+
+The pyramid is fused back onto 26 by 32, which is DINOv3's grid exactly on these
+frames, so the token count is identical and the comparison isolates the stem
+rather than confounding it with sequence length. The finer levels are area
+pooled rather than sampled, which is the mechanism: a stem narrower than a
+coarse cell contributes a fraction of its value instead of falling between
+sample points.
+
+**Score it on recovered structure, not on mass.** The endpoint is the section 7r
+quantity, how much of what the segmentation found survives into the
+reconstruction, in metres and in points. Biomass error cannot decide this: the
+smallest difference this design detects is 0.138 kg and no backbone change has
+moved the estimate by a tenth of that. Reporting Swin's RMSE as the headline
+would produce another null and hide whatever it did to the geometry.
+
+**It cannot help the carve.** Silhouette carving is a geometric voting rule with
+no learned component. Section 7r's losses stand whatever stem is used; this is a
+hypothesis about what a trained occupancy decoder can represent.
+
+Measured on the 4 GiB card: 2.41 GiB peak at batch 8 with 32 tokens a view,
+below both DINO backbones, and one pretraining epoch in 4.8 seconds against
+DINOv3's 6.2.
+
 ### What a week buys, and what it does not
 
 The campaign at default epochs is roughly 112 hours of finetuning per condition
@@ -743,6 +784,9 @@ before you start:
   asks whether a trained model inherits the 0.209 kg the classical features
   gained when the reconstruction operator changed, and that effect is larger than
   the detection floor.
+- **`h4_swin` pays only if you score it correctly.** On biomass error it will
+  join the nulls. On recovered thin structure it is the one condition in the plan
+  that could move a number this project actually cares about.
 
 `posefree` and the neural field are different: both are unrun and neither has a
 prior result to compare against, so anything they produce is new.

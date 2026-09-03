@@ -167,6 +167,12 @@ def _full_runs() -> list[Run]:
             question="H1: DINOv3, if access has been granted",
             backbone="dinov3",
         ),
+        Run(
+            name="h4_swin",
+            question="H4: does a hierarchical stem recover thin structure a "
+                     "16-pixel patch cannot represent?",
+            backbone="swin",
+        ),
     ]
     return runs
 

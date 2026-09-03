@@ -288,10 +288,192 @@ class Dinov3Backbone(_DinoBackbone):
     repos = DINOV3_REPOS
 
 
+SWIN_REPOS = {
+    "tiny": "microsoft/swin-tiny-patch4-window7-224",
+    "small": "microsoft/swin-small-patch4-window7-224",
+    "base": "microsoft/swin-base-patch4-window7-224",
+}
+
+
+class SwinBackbone(Backbone):
+    """Shifted-window transformer, its pyramid fused onto one grid.
+
+    **Why this exists, given that the backbone comparison is a null.** DINOv2 and
+    DINOv3 differ by 0.0018 kg with a 95 percent interval of -0.025 to +0.030, so
+    representation *strength* is not what limits this project. Token *resolution*
+    might be, and that is a different claim with a measurement behind it: in the
+    upper half of these frames, where the stem and canopy are, the median
+    horizontal run of subject mask is 5 to 7 pixels and a quarter of runs are 2
+    to 3. A ViT patch is 16 pixels wide. A stem therefore never fills one, and
+    the patch embedding averages it with about 240 pixels of background in the
+    first layer of the network, where it cannot be recovered afterwards.
+
+    Swin's first stage works at stride 4. The same stem occupies roughly a third
+    of such a token rather than a fortieth of a patch, so it survives as a
+    distinct signal through the early layers and is merged hierarchically after
+    it has been represented rather than before.
+
+    **The output grid deliberately matches the ViT.** On a 416 by 512 frame
+    Swin's third stage is 26 by 32, which is exactly DINOv3's patch grid, so
+    every stage downstream sees the same token count and the comparison isolates
+    the stem instead of confounding it with sequence length. The pyramid enters
+    through lateral projections resampled onto that grid, with the finer levels
+    *area pooled* rather than sampled: a thin stem then contributes a fraction of
+    a coarse token's value instead of falling between sample points, which is the
+    whole mechanism this backbone is here to test.
+
+    **What it cannot do.** It has no effect on silhouette carving, which is a
+    geometric voting rule with no learned component, so the losses in section 7r
+    stand whatever stem is used. It is a hypothesis about what a *trained*
+    occupancy decoder can represent, and it has to be scored on recovered thin
+    structure rather than on biomass error, which at this sample size cannot
+    resolve a difference below 0.138 kg.
+    """
+
+    name = "swin"
+    repos = SWIN_REPOS
+
+    def __init__(
+        self,
+        embed_dim: int = MODEL.embed_dim,
+        *,
+        variant: str = "tiny",
+        freeze: bool = True,
+        out_stride: int = 16,
+        depth_stem: bool = True,
+    ):
+        super().__init__()
+        if variant not in SWIN_REPOS:
+            raise BackboneError(
+                f"unknown swin variant {variant!r}; expected one of "
+                f"{sorted(SWIN_REPOS)}"
+            )
+        if out_stride not in (4, 8, 16, 32):
+            raise BackboneError(
+                f"out_stride must be one of the pyramid's own strides, "
+                f"4, 8, 16 or 32; got {out_stride}"
+            )
+
+        self.repo = SWIN_REPOS[variant]
+        self.variant = variant
+        self.frozen = freeze
+        self.patch_size = out_stride          # what grid_size() divides by
+
+        self.backbone, channels = self._load(self.repo)
+        if freeze:
+            for parameter in self.backbone.parameters():
+                parameter.requires_grad_(False)
+            self.backbone.eval()
+
+        # One lateral per pyramid level. These are trainable even when the trunk
+        # is frozen, exactly as the DINO stems' output projection is.
+        self.lateral = nn.ModuleList(
+            [nn.Conv2d(c, embed_dim, kernel_size=1) for c in channels]
+        )
+        self.norm = nn.GroupNorm(1, embed_dim)
+        self.depth_stem = (
+            nn.Conv2d(2, embed_dim, kernel_size=out_stride, stride=out_stride)
+            if depth_stem
+            else None
+        )
+
+        self.register_buffer(
+            "mean", torch.tensor(IMAGENET_MEAN).view(1, 3, 1, 1), persistent=False
+        )
+        self.register_buffer(
+            "std", torch.tensor(IMAGENET_STD).view(1, 3, 1, 1), persistent=False
+        )
+
+    @staticmethod
+    def _load(repo: str):
+        try:
+            from transformers import SwinModel
+        except ImportError as exc:
+            raise BackboneError(
+                "the Swin backbone needs `transformers`; install it with "
+                "`pip install transformers`"
+            ) from exc
+        try:
+            model = SwinModel.from_pretrained(repo)
+        except Exception as exc:
+            raise BackboneError(f"could not load {repo}: {exc}") from exc
+
+        embed = model.config.embed_dim
+        n_stages = len(model.config.depths)
+        channels = [embed * 2 ** i for i in range(n_stages)]
+        return model, channels
+
+    def train(self, mode: bool = True):
+        super().train(mode)
+        if self.frozen:
+            self.backbone.eval()
+        return self
+
+    def _pyramid(self, rgb: torch.Tensor) -> list[torch.Tensor]:
+        normalised = (rgb - self.mean) / self.std
+        context = torch.no_grad() if self.frozen else torch.enable_grad()
+        with context:
+            outputs = self.backbone(
+                pixel_values=normalised, output_hidden_states=True)
+        stages = list(outputs.reshaped_hidden_states)[: len(self.lateral)]
+        if len(stages) < len(self.lateral):
+            raise BackboneError(
+                f"{self.repo} returned {len(stages)} pyramid levels; expected "
+                f"{len(self.lateral)}"
+            )
+        return stages
+
+    def _fuse(self, stages: list[torch.Tensor], grid_h: int, grid_w: int):
+        fused = None
+        for level, lateral in zip(stages, self.lateral):
+            height, width = level.shape[-2:]
+            if (height, width) == (grid_h, grid_w):
+                resampled = level
+            elif height > grid_h:
+                # Area pooling, not sampling. A stem two tokens wide would fall
+                # between sample points and vanish; averaged, it lands in the
+                # coarse token as a fraction of its value.
+                resampled = F.adaptive_avg_pool2d(level, (grid_h, grid_w))
+            else:
+                resampled = F.interpolate(
+                    level, size=(grid_h, grid_w), mode="bilinear",
+                    align_corners=False)
+            projected = lateral(resampled)
+            fused = projected if fused is None else fused + projected
+        return self.norm(fused)
+
+    def grid_size(self, height: int, width: int) -> tuple[int, int]:
+        return height // self.patch_size, width // self.patch_size
+
+    def patch_tokens(self, rgb: torch.Tensor) -> tuple[torch.Tensor, int, int]:
+        """Fused pyramid as a token sequence, matching the DINO stems' contract."""
+        grid_h, grid_w = self.grid_size(*rgb.shape[-2:])
+        fused = self._fuse(self._pyramid(rgb), grid_h, grid_w)
+        tokens = fused.flatten(2).transpose(1, 2)
+        return tokens, grid_h, grid_w
+
+    def forward(
+        self, rgb: torch.Tensor, depth: torch.Tensor, valid: torch.Tensor
+    ) -> torch.Tensor:
+        grid_h, grid_w = self.grid_size(*rgb.shape[-2:])
+        tokens = self._fuse(self._pyramid(rgb), grid_h, grid_w)
+
+        if self.depth_stem is not None:
+            geometry = torch.cat([depth, valid], dim=1)
+            geometry = F.interpolate(
+                geometry,
+                size=(grid_h * self.patch_size, grid_w * self.patch_size),
+                mode="nearest",
+            )
+            tokens = tokens + self.depth_stem(geometry)
+        return tokens
+
+
 BACKBONES = {
     "cnn": CnnBackbone,
     "dinov2": Dinov2Backbone,
     "dinov3": Dinov3Backbone,
+    "swin": SwinBackbone,
 }
 
 
@@ -366,9 +548,25 @@ def backbone_is_available(kind: str, variant: str = "small") -> tuple[bool, str]
     """
     if kind == "cnn":
         return True, ""
-    repos = DINOV2_REPOS if kind == "dinov2" else DINOV3_REPOS
+
+    # Looked up rather than inferred. This was `DINOV2_REPOS if kind ==
+    # "dinov2" else DINOV3_REPOS`, which silently routes every other backbone to
+    # DINOv3's repositories. Adding Swin exposed it: a Swin tiny reported
+    # "unknown variant", and a Swin base was checked against a DINOv3 access
+    # grant it has nothing to do with, so it would have been reported gated on
+    # an account without DINOv3 and available on one with it. Neither answer had
+    # anything to do with Swin.
+    catalogues = {
+        "dinov2": DINOV2_REPOS,
+        "dinov3": DINOV3_REPOS,
+        "swin": SWIN_REPOS,
+    }
+    repos = catalogues.get(kind)
+    if repos is None:
+        return False, f"unknown backbone {kind!r}"
     if variant not in repos:
-        return False, f"unknown variant {variant!r}"
+        return False, (f"unknown {kind} variant {variant!r}; expected one of "
+                       f"{sorted(repos)}")
 
     accessible, reason = repo_access(repos[variant])
     if accessible:
@@ -380,6 +578,8 @@ def backbone_is_available(kind: str, variant: str = "small") -> tuple[bool, str]
 
 __all__ = [
     "BACKBONES",
+    "SWIN_REPOS",
+    "SwinBackbone",
     "DINOV3_ACCESS_HELP",
     "Backbone",
     "BackboneError",

@@ -1711,9 +1711,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_common(dino_seg)
     dino_seg.add_argument("--plants", nargs="*")
-    dino_seg.add_argument("--variant", default="base", choices=["small", "base", "large"])
+    dino_seg.add_argument("--variant", default="base", choices=["tiny", "small", "base", "large"])
     dino_seg.add_argument(
-        "--backbone", default="dinov2", choices=["dinov2", "dinov3"],
+        "--backbone", default="dinov2", choices=["dinov2", "dinov3", "swin"],
         help="which frozen features to lift; dinov3 needs granted access")
     dino_seg.add_argument(
         "--out", type=Path, default=WORK_DIR / "reports" / "dino_segment.json"
@@ -1816,11 +1816,11 @@ def build_parser() -> argparse.ArgumentParser:
     probe.add_argument(
         "--backbones",
         nargs="+",
-        default=["dinov2", "dinov3"],
-        choices=["dinov2", "dinov3"],
+        default=["dinov2", "dinov3", "swin"],
+        choices=["dinov2", "dinov3", "swin"],
         help="DINO backbones to probe; the no-DINO control always runs",
     )
-    probe.add_argument("--variant", default="base", choices=["small", "base", "large"])
+    probe.add_argument("--variant", default="base", choices=["tiny", "small", "base", "large"])
     probe.add_argument("--components", type=int, default=8, help="PCA components")
     probe.add_argument("--alpha", type=float, default=1.0, help="ridge strength")
     probe.add_argument(
@@ -1836,11 +1836,11 @@ def build_parser() -> argparse.ArgumentParser:
     experiment.add_argument(
         "--backbones",
         nargs="+",
-        default=["cnn", "dinov2", "dinov3"],
-        choices=["cnn", "dinov2", "dinov3"],
+        default=["cnn", "dinov2", "dinov3", "swin"],
+        choices=["cnn", "dinov2", "dinov3", "swin"],
     )
     experiment.add_argument(
-        "--variant", default="base", choices=["small", "base", "large"]
+        "--variant", default="base", choices=["tiny", "small", "base", "large"]
     )
     experiment.add_argument("--epochs", type=int, default=TRAIN.pretrain_epochs)
     experiment.add_argument("--device", default=TRAIN.device)
@@ -1858,11 +1858,11 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["geometric", "sam3d"],
     )
     factorial.add_argument(
-        "--backbones", nargs="+", default=["cnn", "dinov2", "dinov3"],
-        choices=["cnn", "dinov2", "dinov3"],
+        "--backbones", nargs="+", default=["cnn", "dinov2", "dinov3", "swin"],
+        choices=["cnn", "dinov2", "dinov3", "swin"],
     )
     factorial.add_argument(
-        "--variant", default="base", choices=["small", "base", "large"]
+        "--variant", default="base", choices=["tiny", "small", "base", "large"]
     )
     factorial.add_argument("--components", type=int, default=8)
     factorial.add_argument("--alpha", type=float, default=1.0)
