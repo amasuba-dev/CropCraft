@@ -357,6 +357,7 @@ def loocv(
     geometry_grounded: bool = True,
     strict: bool = False,
     pretrained_state: dict | None = None,
+    resume_dir: Path | None = None,
     device: torch.device | None = None,
     verbose: bool = True,
 ) -> list[FoldResult]:
@@ -368,14 +369,31 @@ def loocv(
             folds, and gives the inductive rather than transductive number.
         pretrained_state: a stage-1 checkpoint to start every fold from. Ignored
             when ``strict``.
+        resume_dir: directory where completed fold results are stored. Existing
+            fold files are loaded and skipped, allowing a campaign to resume
+            after a process or power interruption.
 
     Returns:
         One :class:`FoldResult` per specimen.
     """
     device = device or resolve_device(train_config.device)
     results: list[FoldResult] = []
+    if resume_dir is not None:
+        resume_dir.mkdir(parents=True, exist_ok=True)
 
     for fold, held_out in enumerate(plant_ids, start=1):
+        fold_path = resume_dir / f"fold_{fold:03d}_{held_out}.json" if resume_dir else None
+        if fold_path is not None and fold_path.exists():
+            try:
+                stored = FoldResult(**json.loads(fold_path.read_text(encoding="utf-8")))
+            except (OSError, TypeError, ValueError, json.JSONDecodeError):
+                stored = None
+            if stored is not None and stored.held_out == held_out:
+                results.append(stored)
+                if verbose:
+                    print(f"[fold {fold}/{len(plant_ids)}] {held_out}: already done, skipping")
+                continue
+
         train_ids = [pid for pid in plant_ids if pid != held_out]
 
         if verbose:
@@ -436,6 +454,12 @@ def loocv(
             )[0],
         )
         results.append(result)
+        if fold_path is not None:
+            temporary = fold_path.with_suffix(".tmp")
+            temporary.write_text(
+                json.dumps(asdict(result), indent=2), encoding="utf-8"
+            )
+            temporary.replace(fold_path)
 
         if verbose:
             print(

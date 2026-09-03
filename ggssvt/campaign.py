@@ -334,29 +334,34 @@ def execute(
                 f"{len(plant_ids)} specimens, cache={run.cache}"
             )
 
-        train_stage(
-            model,
-            SpecimenDataset(plant_ids, cache_dir=cache_dir, mode="occupancy"),
-            stage="pretrain",
-            epochs=run.pretrain_epochs,
-            config=train_config,
-            device=device,
-            log_every=max(1, run.pretrain_epochs // 4),
-            verbose=verbose,
-        )
-
         checkpoint = out_dir / f"{run.name}.pt"
-        # The seed goes in the checkpoint because a result you cannot reproduce
-        # is a result you cannot defend, and the seed is the only part of that
-        # which is not already in the run config.
-        torch.save(
-            {
-                "state_dict": model.state_dict(),
-                "run": run.as_dict(),
-                "seed": train_config.seed,
-            },
-            checkpoint,
-        )
+        if checkpoint.exists():
+            saved = torch.load(checkpoint, map_location="cpu", weights_only=False)
+            model.load_state_dict(saved["state_dict"], strict=False)
+            if verbose:
+                print(f"  loaded pretraining checkpoint {checkpoint}")
+        else:
+            train_stage(
+                model,
+                SpecimenDataset(plant_ids, cache_dir=cache_dir, mode="occupancy"),
+                stage="pretrain",
+                epochs=run.pretrain_epochs,
+                config=train_config,
+                device=device,
+                log_every=max(1, run.pretrain_epochs // 4),
+                verbose=verbose,
+            )
+            # The seed goes in the checkpoint because a result you cannot reproduce
+            # is a result you cannot defend, and the seed is the only part of that
+            # which is not already in the run config.
+            torch.save(
+                {
+                    "state_dict": model.state_dict(),
+                    "run": run.as_dict(),
+                    "seed": train_config.seed,
+                },
+                checkpoint,
+            )
 
         _report_memory("after pretrain", device, verbose)
 
@@ -388,6 +393,7 @@ def execute(
             tokens_per_view=run.tokens_per_view,
             geometry_grounded=run.geometry_grounded,
             pretrained_state=pretrained_state,
+            resume_dir=out_dir / f"{run.name}_folds",
             device=device,
             verbose=False,
         )
