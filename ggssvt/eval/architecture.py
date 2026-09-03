@@ -612,7 +612,90 @@ def generative() -> Diagram:
     )
 
 
-DIAGRAMS = (carve, sam3d, fusion, posefree, ggssvt, backbones, generative)
+def hierarchical() -> Diagram:
+    """Method H. Swin, proposed. Not another backbone swap."""
+    return Diagram(
+        "hierarchical",
+        "Method H. Hierarchical stem with reconstruction (proposed)",
+        "A Swin pyramid in place of the plain ViT stem, proposed for token "
+        "resolution rather than for representation strength.",
+        [
+            _acquisition(),
+            _registration(),
+            _segmentation(),
+            Stage(
+                "Hierarchical view encoder",
+                "A shifted-window transformer returns a pyramid at strides 4, 8, "
+                "16 and 32 rather than one grid at 16. On a 416 by 512 frame that "
+                "is 13,312 tokens at the finest level against DINOv3's 832.",
+                "models/backbones.py (proposed SwinBackbone)",
+                tone=4,
+                note="tokens at four scales",
+            ),
+            Stage(
+                "Scale-aware 3D anchoring",
+                "Each level's tokens are anchored to the world points its "
+                "receptive field back-projects to, as the existing encoder does "
+                "for one level. Coarse tokens carry canopy context; fine tokens "
+                "carry the structure a single patch cannot hold.",
+                "models/embedding.py",
+                tone=5,
+                note="anchored multi-scale tokens",
+            ),
+            Stage(
+                "Cross-view fusion, unchanged",
+                "The distance-biased attention across views is indifferent to "
+                "how many scales feed it, so this stage is reused rather than "
+                "rewritten.",
+                "ggssvt/models/attention.py",
+                tone=6,
+                note="fused tokens",
+            ),
+            Stage(
+                "Occupancy decoder and biomass head",
+                "Unchanged from Method E, so the comparison isolates the stem. "
+                "The decoder can attend across scales, which is the point: a "
+                "query near a stem has fine tokens to attend to.",
+                "models/decoder.py, head.py",
+                tone=7,
+                note="occupancy, then mass",
+            ),
+            Stage(
+                "Scored on thin structure, not on mass",
+                "The primary measure is the section 7r quantity: how much of the "
+                "plant the segmentation found survives into the reconstruction. "
+                "Biomass error is reported second and cannot decide this.",
+                "eval/pedestal.py",
+                tone=8,
+                note="height and points recovered",
+                verdict="the only endpoint this sample can resolve",
+            ),
+        ],
+        outcome=(
+            "The reason to try Swin here is measured rather than assumed. In the "
+            "upper half of the frame, where the stem and canopy are, the median "
+            "horizontal run of subject mask is 5 to 7 pixels across E001, E005, "
+            "E018 and M008, with a quarter of runs at 2 to 3 pixels. A DINOv3 "
+            "patch is 16 pixels, so a stem never fills one and every token "
+            "containing it is dominated by background; a Swin stride-4 token is 4 "
+            "pixels, so the same stem spans about one and a half of them. This is "
+            "not a claim that Swin is a better model. It is the observation that "
+            "its finest stage is the only token grid among these whose cell is "
+            "smaller than the structure this project keeps losing. "
+            "Two limits are worth stating before anyone runs it. It cannot help "
+            "the carve, which is a geometric voting rule with no learned stem in "
+            "it, so section 7r's losses stand whatever the backbone. And biomass "
+            "root mean squared error cannot settle it: the smallest difference "
+            "this design detects is 0.138 kg, and the frozen-backbone comparison "
+            "already showed that swapping representations moves the estimate by "
+            "far less. Scoring it on recovered thin structure instead is what "
+            "makes it answerable at 36 specimens."
+        ),
+    )
+
+
+DIAGRAMS = (carve, sam3d, fusion, posefree, ggssvt, backbones, generative,
+            hierarchical)
 
 
 def manifest() -> list[dict]:
