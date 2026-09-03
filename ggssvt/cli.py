@@ -871,6 +871,21 @@ def cmd_backbone_viz(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_decisions(args: argparse.Namespace) -> int:
+    """The four forks, drawn from the reports that measured them."""
+    from .eval.decisions import forks, run
+
+    rows, outcome = forks()
+    for index, fork in enumerate(rows, start=1):
+        print(f"  {index}. {fork.question}")
+        print(f"     {fork.cost}")
+    print()
+    print(f"  Where the defaults end today: leave-one-batch-out RMSE "
+          f"{outcome['lobo_rmse']:.3f} kg at R2 {outcome['lobo_r2']:.2f}.")
+    run(verbose=True)
+    return 0
+
+
 def cmd_architecture(args: argparse.Namespace) -> int:
     """Render one architecture diagram per methodology."""
     from .eval.architecture import write_all
@@ -1735,6 +1750,11 @@ def build_parser() -> argparse.ArgumentParser:
     backbone_viz.add_argument("--limit", type=int, default=None)
     backbone_viz.add_argument("--quiet", action="store_true")
     backbone_viz.set_defaults(func=cmd_backbone_viz)
+
+    decisions = sub.add_parser(
+        "decisions",
+        help="the four forks and their measured costs, as one SVG")
+    decisions.set_defaults(func=cmd_decisions)
 
     architecture = sub.add_parser(
         "architecture", help="architecture diagram per methodology, as SVG"

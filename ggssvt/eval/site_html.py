@@ -217,6 +217,18 @@ BODY = """
     <div class="tablewrap"><img id="archimg" alt="methodology diagram"
          style="width:100%;max-width:900px;display:block"></div>
     <p class="is-size-7 mt-3" id="archoutcome"></p>
+
+    <h3 class="title is-5 mt-6">Four forks, and which side the defaults are on</h3>
+    <p class="is-size-7 has-text-grey mb-3">
+      The diagrams above are methods. These are four choices that are already
+      made, that no diagram shows, and that each carry a measured cost in this
+      project&rsquo;s own reports. Three of the four are simply the defaults. The
+      first two need no training and change what a training run would produce.
+    </p>
+    <div class="tablewrap">
+      <img src="./static/architecture/decisions.svg" alt="the four forks"
+           style="width:100%;max-width:980px;display:block">
+    </div>
   </div>
 </section>
 
