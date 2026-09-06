@@ -22,7 +22,7 @@ notify() {
   body="$2"
 
   # Email notify (if configured)
-  if [ -x "$PYTHON" ] && [ -f "$NOTIFY_PY" ] && [ -f "$HOME/.config/ggssvt/notify.conf" ]; then
+  if [ "${GGSSVT_DISABLE_EMAIL:-0}" != "1" ] && [ -x "$PYTHON" ] && [ -f "$NOTIFY_PY" ] && [ -f "$HOME/.config/ggssvt/notify.conf" ]; then
     tmpf=$(mktemp)
     printf "%s\n" "$body" > "$tmpf"
     "$PYTHON" "$NOTIFY_PY" --subject "$subject" --body-file "$tmpf" || echo "Warning: notify email script failed" >> "$LOG"
@@ -52,7 +52,7 @@ notify() {
 # cleaned up by the main script's EXIT trap.
 start_progress_pinger() {
   # Only run if at least one notifier is configured
-  if [ ! -f "$HOME/.config/ggssvt/notify.conf" ] && [ ! -f "$HOME/.config/ggssvt/webhook.conf" ]; then
+  if [ ! -f "$HOME/.config/ggssvt/webhook.conf" ] && [ "${GGSSVT_DISABLE_EMAIL:-0}" = "1" ]; then
     echo "No notification config found; progress pinger disabled" >> "$LOG"
     return 0
   fi
