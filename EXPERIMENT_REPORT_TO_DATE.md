@@ -58,6 +58,40 @@ TSDF fusion is therefore a material improvement over the original carved
 geometry. It is the best result that uses all 38 specimens in the current
 metrics report.
 
+### 4D. What the reconstruction approach achieved
+
+The reconstruction-based biomass approach followed four stages:
+
+1. register the RGB-D views in a common coordinate system;
+2. segment the plant and produce either a silhouette-carved or TSDF-fused
+   occupancy volume;
+3. summarize the reconstruction with volume, height, projected area,
+   compactness, and related geometric descriptors; and
+4. fit a biomass regressor under specimen-level leave-one-out cross-validation.
+
+This approach produced useful but incomplete biomass prediction. Volume-only
+allometry failed to beat the mean predictor (RMSE 0.619 kg, R² -0.207),
+because reconstruction volume was not consistently proportional to plant
+mass. Geometric features improved over the mean (RMSE 0.469 kg, R² 0.309),
+and TSDF-fused geometry performed better still (RMSE 0.430 kg, R² 0.416).
+Thus, 3D structure contained biomass signal, but reconstruction quality was a
+larger limitation than regression capacity. The later frozen DINOv2 plus
+fused-geometry ridge model improved the current result to approximately
+RMSE 0.361 kg and R² 0.581, on the probe's 37 specimens.
+
+#### M008 reconstruction example
+
+M008 illustrates why raw reconstructed volume cannot be interpreted directly
+as biomass. Its target fresh mass was 0.56 kg. The carved reconstruction
+occupied approximately 6.42 L, implying only about 87 kg/m³, whereas the
+TSDF-fused reconstruction occupied approximately 0.65 L, implying about
+860 kg/m³. The carved result therefore retained substantial excess or
+background geometry and made the plant appear unrealistically large and
+sparse. Fusion produced a substantially more plausible volume, although it
+remains a measured reconstruction rather than a guarantee of true plant
+volume. M008 is retained as a reconstruction-quality diagnostic, not removed
+from the primary analysis.
+
 ## 4. Frozen-feature experiments
 
 Results from `work_dirs/ggssvt/reports/dino_probe.json`:
