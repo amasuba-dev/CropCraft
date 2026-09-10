@@ -92,6 +92,76 @@ remains a measured reconstruction rather than a guarantee of true plant
 volume. M008 is retained as a reconstruction-quality diagnostic, not removed
 from the primary analysis.
 
+### Reproducing the reconstruction and prediction for another sample
+
+From the repository root, activate the `ggssvt` environment and place the
+sample's RGB-D capture in the expected dataset layout. The commands below
+rebuild the cached preprocessing, generate the TSDF reconstruction, and
+produce the classical baseline outputs:
+
+```bash
+conda activate ggssvt
+python -m ggssvt.cli preprocess \
+  --cache-dir work_dirs/ggssvt/cache
+python -m ggssvt.cli fuse \
+  --cache-dir work_dirs/ggssvt/cache \
+  --write-cache work_dirs/ggssvt/cache_tsdf \
+  --out work_dirs/ggssvt/reports/fusion.json
+python -m ggssvt.cli baselines \
+  > work_dirs/ggssvt/reports/baselines.txt
+```
+
+To process only selected specimens, add `--plants M008` (or replace it with
+one or more plant identifiers) to both `preprocess` and `fuse`. The
+preprocessing command writes the registered RGB-D cache; `fuse` writes the
+TSDF occupancy and descriptors; `baselines` evaluates the available
+geometry-based regressors using leave-one-out cross-validation over the
+available labelled set.
+
+To recreate the visual evidence for a sample, render its RGB frames, masks,
+depth panels, carved volume, fused volume, measured points, and shaded
+illustration:
+
+```bash
+python -m ggssvt.cli filmstrip --limit 1
+python -m ggssvt.cli show \
+  --plants M008 \
+  --layers rgb segmentation depth occupancy points \
+  --size 400
+```
+
+The filmstrip command processes specimens in dataset order and writes one
+folder per specimen; use the generated report and static assets under
+`work_dirs/ggssvt/reports/filmstrip/` to find the requested identifier. The
+shaded render is only an illustration. The occupancy and measured-point panels
+are the evidence used to diagnose reconstruction quality.
+
+To reproduce the primary DINOv2-plus-geometry biomass result across the
+labelled set, run:
+
+```bash
+python -m ggssvt.cli dino-probe \
+  --cache-dir work_dirs/ggssvt/cache \
+  --backbones dinov2 \
+  --variant base \
+  --components 8 \
+  --alphas 0.1 1.0 10.0 \
+  --out work_dirs/ggssvt/reports/dino_probe.json
+python -m ggssvt.eval.ab_ssvit \
+  --cache-dir work_dirs/ggssvt/cache \
+  --variant base \
+  --alpha 1.0 \
+  --out work_dirs/ab_ssvit/ab_ssvit.json
+```
+
+This estimator is not fitted separately to one new unlabelled plant. It
+requires labelled specimens to fit the ridge biomass head, while the held-out
+specimen is transformed using training-fold PCA and scaling. For a genuinely
+new sample, first add its capture and independently measured mass to the
+dataset, rebuild the caches, and rerun the full evaluation. Do not report a
+single-sample prediction as validated accuracy unless that sample was held out
+from fitting.
+
 ## 4. Frozen-feature experiments
 
 Results from `work_dirs/ggssvt/reports/dino_probe.json`:
@@ -234,3 +304,19 @@ rim detection, and target-label correctness.
 - Reconstruction diagnostics: `work_dirs/ggssvt/reports/reconstruction_quality.json`
 - Robustness diagnostics: `work_dirs/ggssvt/reports/robustness.json`
 - Per-run trained predictions: `work_dirs/ggssvt/campaign/baseline_fused.json`
+
+New campaign runs save epoch histories to
+`work_dirs/ggssvt/campaign/<run>_pretrain_history.json` and
+`work_dirs/ggssvt/campaign/<run>_histories/fold_*.json`. Render a loss plot for
+a fold with:
+
+```bash
+python -m ggssvt.eval.training_plots \
+  work_dirs/ggssvt/campaign/baseline_fused_histories/fold_001_E001.json \
+  --out work_dirs/ggssvt/reports/figures/baseline_fused_fold_001_loss.png
+```
+
+Previously completed runs contain final metrics and checkpoints but not
+epoch-by-epoch histories, so their exact loss curves cannot be reconstructed
+from the existing artifacts. Rerunning a smoke or campaign condition creates
+the histories without changing the evaluation protocol.

@@ -341,7 +341,7 @@ def execute(
             if verbose:
                 print(f"  loaded pretraining checkpoint {checkpoint}")
         else:
-            train_stage(
+            pretrain_run = train_stage(
                 model,
                 SpecimenDataset(plant_ids, cache_dir=cache_dir, mode="occupancy"),
                 stage="pretrain",
@@ -351,6 +351,10 @@ def execute(
                 log_every=max(1, run.pretrain_epochs // 4),
                 verbose=verbose,
             )
+            history_path = out_dir / f"{run.name}_pretrain_history.json"
+            temporary = history_path.with_suffix(".tmp")
+            temporary.write_text(pretrain_run.to_json(), encoding="utf-8")
+            temporary.replace(history_path)
             # The seed goes in the checkpoint because a result you cannot reproduce
             # is a result you cannot defend, and the seed is the only part of that
             # which is not already in the run config.
@@ -394,6 +398,7 @@ def execute(
             geometry_grounded=run.geometry_grounded,
             pretrained_state=pretrained_state,
             resume_dir=out_dir / f"{run.name}_folds",
+            history_dir=out_dir / f"{run.name}_histories",
             device=device,
             verbose=False,
         )
