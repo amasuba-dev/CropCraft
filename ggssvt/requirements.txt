@@ -12,8 +12,8 @@
 #       --index-url https://download.pytorch.org/whl/cu121
 #   pip install -r ggssvt/requirements.txt
 #
-# cu121 wheels cover the RTX 4060 (Ada, sm_89). cu118 also works but is slower
-# on Ada; do not use a CPU-only wheel or every GPU command silently falls back.
+# cu121 wheels cover the RTX 4070/4080 (Ada, sm_89). cu118 also works but is
+# slower on Ada; do not use a CPU-only wheel or every GPU command silently falls back.
 
 # --- core: the geometry half needs only these two -------------------------
 numpy>=1.24,<3
