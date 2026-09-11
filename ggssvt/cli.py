@@ -1367,6 +1367,8 @@ def cmd_posefree(args: argparse.Namespace) -> int:
         image_size=args.image_size,
         cache_dir=args.cache_dir,
         out_path=args.out,
+        export_dir=args.export_dir,
+        max_export_points=args.max_export_points,
     )
     print()
     print(report.to_table())
@@ -1961,6 +1963,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     posefree.add_argument(
         "--out", type=Path, default=WORK_DIR / "reports" / "posefree.json"
+    )
+    posefree.add_argument(
+        "--export-dir",
+        type=Path,
+        default=None,
+        help="write normalized point clouds as method/plant_id.ply",
+    )
+    posefree.add_argument(
+        "--max-export-points",
+        type=int,
+        default=100000,
+        help="deterministic cap for exported point clouds",
     )
     posefree.set_defaults(func=cmd_posefree)
 

@@ -161,6 +161,21 @@ def _upsample(image: np.ndarray, size: int = PANEL_PX) -> np.ndarray:
     return np.repeat(np.repeat(image, factor, axis=0), factor, axis=1)
 
 
+def _mask_overlay(cached, view: int, subject: np.ndarray,
+                  *, size: int = PANEL_PX) -> np.ndarray:
+    """Show the DINO foreground proposal over the original RGB view."""
+    rgb = _upsample(_rgb_tile(cached, view), size).astype(np.float32)
+    h, w = rgb.shape[:2]
+    ys = (np.arange(h) * subject.shape[0] // h)
+    xs = (np.arange(w) * subject.shape[1] // w)
+    mask = subject[ys[:, None], xs[None, :]]
+    colour = np.array([244.0, 180.0, 24.0], dtype=np.float32)
+    rgb[mask] = 0.55 * rgb[mask] + 0.45 * colour
+    edge = mask ^ np.pad(mask, ((0, 1), (0, 1)), mode="edge")[:-1, :-1]
+    rgb[edge] = np.array([255.0, 40.0, 40.0], dtype=np.float32)
+    return np.clip(rgb, 0, 255).astype(np.uint8)
+
+
 def _cluster_render(cached, backbone, *, size: int = PANEL_PX) -> tuple[np.ndarray, dict]:
     """The lifted two-way clustering, drawn on the points it labelled."""
     from ..geometry.dino_lift import cluster, lift, order_by_height
@@ -267,9 +282,12 @@ def compare(
                 reference = basis
             name = f"{kind}_features_{view:02d}.jpg"
             _save(_upsample(image, PANEL_PX), here / name)
+            mask_name = f"{kind}_mask_{view:02d}.jpg"
+            _save(_mask_overlay(cached, view, subject), here / mask_name)
             per_view.append({
                 "view": int(view),
                 "features": rel(name),
+                "mask": rel(mask_name),
                 **mask_agreement(subject, cached, view),
             })
 

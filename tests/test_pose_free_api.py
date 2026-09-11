@@ -20,7 +20,9 @@ prediction.
 from __future__ import annotations
 
 import inspect
+from pathlib import Path
 
+import numpy as np
 import pytest
 
 
@@ -77,6 +79,23 @@ class TestDust3r:
             schedule="cosine",
             lr=0.01,
         )
+
+    def test_posefree_ply_export_writes_finite_points(self, tmp_path: Path):
+        from ggssvt.eval.pose_free_experiment import export_posefree_ply
+        from ggssvt.geometry.pose_free import PoseFreeResult
+
+        result = PoseFreeResult(
+            method="dust3r",
+            position_ids=["cam0"],
+            rotations=np.eye(3)[None],
+            centres=np.zeros((1, 3)),
+            points=np.array([[0.0, 1.0, 2.0], [np.nan, 0.0, 0.0]]),
+        )
+        path = export_posefree_ply(result, tmp_path / "dust3r" / "M001.ply")
+
+        text = path.read_text(encoding="utf-8")
+        assert "element vertex 1" in text
+        assert "0.000000 1.000000 2.000000" in text
 
 
 class TestMast3r:

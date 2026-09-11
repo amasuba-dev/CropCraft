@@ -171,6 +171,15 @@ python -m ggssvt.cli posefree --methods fast3r --device cuda
 python -m ggssvt.cli posefree --methods dust3r mast3r --device cuda
 ```
 
+To retain inspectable point clouds for MeshLab or CloudCompare, add an export
+directory. The exporter writes finite, deterministically capped PLY files under
+`method/plant_id.ply`:
+
+```bash
+python -m ggssvt.cli posefree --methods dust3r --plants M001 \
+  --device cuda --export-dir work_dirs/ggssvt/posefree/ply
+```
+
 ### Scale, which decides whether the numbers mean anything
 
 DUSt3R and Fast3R return geometry up to an **unknown global scale**. A volume

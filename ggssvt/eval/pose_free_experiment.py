@@ -125,6 +125,8 @@ def run_specimen(
     rig,
     *,
     align_scale: bool = True,
+    export_dir: Path | None = None,
+    max_export_points: int = 100000,
 ) -> SpecimenOutcome:
     """Reconstruct one specimen and compare its poses against the rig."""
     from ..geometry.pose_free_backends import sanity_check_result
@@ -139,6 +141,12 @@ def run_specimen(
 
     outcome.warnings = sanity_check_result(result)
     outcome.n_points = int(result.points.shape[0])
+    if export_dir is not None and result.points.size:
+        export_posefree_ply(
+            result,
+            export_dir / result.method / f"{specimen.plant_id}.ply",
+            max_points=max_export_points,
+        )
 
     # Scale first: a comparison of poses is scale-invariant, but the biomass
     # numbers that follow are not, and a metric method should be checked rather
@@ -164,6 +172,34 @@ def run_specimen(
         outcome.error = f"pose comparison failed: {exc}"
 
     return outcome
+
+
+def export_posefree_ply(
+    result: PoseFreeResult,
+    path: Path,
+    *,
+    max_points: int = 100000,
+) -> Path:
+    """Write a deterministic, inspectable PLY from a normalized result."""
+    points = np.asarray(result.points, dtype=np.float64).reshape(-1, 3)
+    valid = np.isfinite(points).all(axis=1)
+    points = points[valid]
+    if points.shape[0] > max_points:
+        selected = np.linspace(0, points.shape[0] - 1, max_points, dtype=np.int64)
+        points = points[selected]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "ply",
+        "format ascii 1.0",
+        f"element vertex {points.shape[0]}",
+        "property float x",
+        "property float y",
+        "property float z",
+        "end_header",
+    ]
+    lines.extend(f"{x:.6f} {y:.6f} {z:.6f}" for x, y, z in points)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
 
 
 def _predicted_depth(result: PoseFreeResult, index: int, shape: tuple[int, int]):
@@ -197,6 +233,8 @@ def run_experiment(
     image_size: int = 512,
     cache_dir: Path = WORK_DIR / "cache",
     out_path: Path | None = None,
+    export_dir: Path | None = None,
+    max_export_points: int = 100000,
     verbose: bool = True,
 ) -> PoseFreeReport:
     """Run every available pose-free method over the specimens."""
@@ -225,7 +263,13 @@ def run_experiment(
         for index, plant_id in enumerate(plant_ids, start=1):
             specimen = load_specimen(plant_id)
             rig = estimate_rig(specimen)
-            outcome = run_specimen(backend, specimen, rig)
+            outcome = run_specimen(
+                backend,
+                specimen,
+                rig,
+                export_dir=export_dir,
+                max_export_points=max_export_points,
+            )
             outcomes.append(outcome)
 
             if verbose:
@@ -252,4 +296,5 @@ __all__ = [
     "SpecimenOutcome",
     "run_experiment",
     "run_specimen",
+    "export_posefree_ply",
 ]

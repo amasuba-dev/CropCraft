@@ -224,12 +224,13 @@ class Fast3rBackend(PoseFreeBackend):
 
         paths, position_ids = self._image_paths(specimen)
         images = load_images(paths, size=self.image_size, verbose=False)
+        device = torch.device(self.device)
 
         # Positional: the views come first and the model second, and `dtype` is
         # required rather than defaulted. `profiling=False` returns the dict
         # alone; with profiling it returns a (dict, info) tuple instead.
         output = inference(
-            images, self._model, self.device, dtype=torch.float32, verbose=False
+            images, self._model, device, dtype=torch.float32, verbose=False
         )
 
         # Fast3R does not put a pose in each prediction the way the earlier
