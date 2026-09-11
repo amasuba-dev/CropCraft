@@ -358,6 +358,7 @@ def loocv(
     strict: bool = False,
     pretrained_state: dict | None = None,
     resume_dir: Path | None = None,
+    history_dir: Path | None = None,
     device: torch.device | None = None,
     verbose: bool = True,
 ) -> list[FoldResult]:
@@ -372,6 +373,7 @@ def loocv(
         resume_dir: directory where completed fold results are stored. Existing
             fold files are loaded and skipped, allowing a campaign to resume
             after a process or power interruption.
+        history_dir: optional directory for per-fold epoch-loss histories.
 
     Returns:
         One :class:`FoldResult` per specimen.
@@ -380,6 +382,8 @@ def loocv(
     results: list[FoldResult] = []
     if resume_dir is not None:
         resume_dir.mkdir(parents=True, exist_ok=True)
+    if history_dir is not None:
+        history_dir.mkdir(parents=True, exist_ok=True)
 
     for fold, held_out in enumerate(plant_ids, start=1):
         fold_path = resume_dir / f"fold_{fold:03d}_{held_out}.json" if resume_dir else None
@@ -409,7 +413,7 @@ def loocv(
             pretrain_set = SpecimenDataset(
                 train_ids, cache_dir=cache_dir, mode="occupancy"
             )
-            train_stage(
+            pretrain_run = train_stage(
                 model,
                 pretrain_set,
                 stage="pretrain",
@@ -421,9 +425,12 @@ def loocv(
             )
         elif pretrained_state is not None:
             model.load_state_dict(pretrained_state, strict=False)
+            pretrain_run = None
+        else:
+            pretrain_run = None
 
         finetune_set = SpecimenDataset(train_ids, cache_dir=cache_dir, mode="biomass")
-        train_stage(
+        finetune_run = train_stage(
             model,
             finetune_set,
             stage="finetune",
@@ -433,6 +440,16 @@ def loocv(
             verbose=verbose,
             log_every=0,
         )
+        if history_dir is not None:
+            history = {
+                "held_out": held_out,
+                "pretrain": None if pretrain_run is None else json.loads(pretrain_run.to_json()),
+                "finetune": json.loads(finetune_run.to_json()),
+            }
+            path = history_dir / f"fold_{fold:03d}_{held_out}.json"
+            temporary = path.with_suffix(".tmp")
+            temporary.write_text(json.dumps(history, indent=2), encoding="utf-8")
+            temporary.replace(path)
 
         held_out_set = SpecimenDataset([held_out], cache_dir=cache_dir, mode="biomass")
         prediction = predict(model, held_out_set, device=device, config=train_config)[held_out]
