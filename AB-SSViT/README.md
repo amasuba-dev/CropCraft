@@ -187,3 +187,25 @@ The runner defaults to `cuda`, uses one inference worker, and stores outputs in
 The source implementation is shared with `ggssvt`; this folder contains the
 experiment contract and reproducible entry point rather than a second copy of
 the geometry/model code.
+
+## Thesis alignment and pilot result
+
+The thesis-aligned candidate architecture, research-question mapping, required
+ablations, and full-machine plan are documented in
+[CANDIDATE_WAY_FORWARD.md](CANDIDATE_WAY_FORWARD.md). The bounded pilot report,
+including the failed fresh-backbone extraction diagnosis and the successful
+cached fold evaluation, is in
+[PILOT_REPORT_20260913.md](PILOT_REPORT_20260913.md).
+
+The current pilot's primary fresh frozen DINOv2-plus-fused-geometry condition
+achieved RMSE **0.336 kg** and R2 **0.645** on 38 specimens under plant-level
+LOOCV. This is provisional evidence: paired DINOv2-only, campaign-held-out,
+and multi-view attention experiments remain required.
+
+DINOv3 is also supported as an explicit evaluator backbone. The fresh
+38-specimen comparison currently gives DINOv3-plus-geometry RMSE **0.361 kg**
+and R2 **0.588**, below the fresh DINOv2 result (0.336 kg, R2 0.645).
+
+The consolidated GG-SSVT, pose-free PLY, pot-exclusion, reconstruction,
+segmentation, and hypothesis-litmus results are in
+[GGSSVT_POSEFREE_VALIDATION_20260914.md](GGSSVT_POSEFREE_VALIDATION_20260914.md).

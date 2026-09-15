@@ -30,13 +30,13 @@ cp "$ROOT/work_dirs/ggssvt/reports/fusion.json" "$WORK/fusion.json"
   --backbones dinov2 \
   --variant base \
   --components 8 \
-  --alphas 0.1 1.0 10.0 \
+  --alpha 1.0 \
   --out "$WORK/dino_probe.json"
 
 "$PYTHON" -m ggssvt.eval.ab_ssvit \
   --cache-dir "$CACHE" \
   --variant base \
-  --alpha 1.0 \
+  --alphas 0.1 1.0 10.0 \
   --out "$WORK/ab_ssvit.json"
 
 printf '\nAB-SSViT complete. Results are in %s\n' "$WORK"
