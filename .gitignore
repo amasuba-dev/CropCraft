@@ -193,7 +193,5 @@ cython_debug/
 
 # Pheno4D (Bonn), ~12 GB of laser point clouds. Downloaded, not vendored.
 /dataset_pheno4d/
+# D455 capture output is intentionally tracked with its collection metadata.
 
-# RealSense D455 capture output; keep the collector and its documentation tracked.
-/dataset_d455/plants/
-/dataset_d455/ground_truth.csv

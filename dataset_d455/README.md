@@ -75,10 +75,9 @@ get distance in metres. Depth images are aligned to color coordinates.
 
 `dataset_d455/ground_truth.csv` contains one row per completed plant with all
 sheet fields, pot-only mass, the derived plant-only mass, and camera serial.
-The image data and generated CSV are ignored by Git to keep large capture
-outputs out of source control. A cancelled or failed sweep may leave a
-partial plant folder; it is not added to the CSV, and the script will not
-overwrite it.
+The image data and generated CSV are tracked in this repository. A cancelled
+or failed sweep may leave a partial plant folder; it is not added to the CSV,
+and the script will not overwrite it.
 
 ## Notes for later processing
 
