@@ -187,3 +187,20 @@ The runner defaults to `cuda`, uses one inference worker, and stores outputs in
 The source implementation is shared with `ggssvt`; this folder contains the
 experiment contract and reproducible entry point rather than a second copy of
 the geometry/model code.
+
+## Current stopping point and visual evidence
+
+The AB-SSViT pilot stopped after frozen DINOv2/DINOv3 feature probes and
+plant-level LOOCV. DINOv2 plus fused geometry is the current candidate (RMSE
+0.336 kg, R2 0.645, n=38); this is promising but still provisional because
+paired same-fold ablations, multi-seed uncertainty, and campaign-held-out
+validation are not complete. DINOv2 is a feature extractor, not a 3D decoder,
+so it does not itself emit a reconstruction.
+
+Pot-excluded RGB-D reconstruction videos for E011, M001, and V001 are in
+`work_dirs/ab_ssvit/videos/pot-excluded-20261012/index.html`. Per-view subject
+and depth masks are intersected with each specimen's confidently detected pot
+rim **before** RGB-D points are fused. The video shows kept plant pixels in
+green, rim-filtered pot/soil pixels in red, and the rotating fused canopy.
+These are deterministic AB-SSViT input-pipeline visualizations, not outputs
+predicted by DINOv2. Each video has a colored PLY and JSON processing record.
