@@ -7,6 +7,7 @@
 # "No module named ...data", which looks like a broken install rather than a
 # missing commit. Keep the slash.
 /data/
+/dataset_kinect_stationary/
 preds/
 wandb/
 work_dirs/

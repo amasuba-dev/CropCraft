@@ -58,3 +58,71 @@ plain checkerboard.
 - **Segmentation** (plant vs. pot vs. background) is not handled here at
   all; that's a separate step, upstream or downstream depending on whether
   you mask before or after reconstruction.
+
+## Stationary Kinect v2 with a rotating plant
+
+The collector for the alternative stationary-camera setup is
+[`collect_specimen_stationary_kinect.py`](collect_specimen_stationary_kinect.py).
+It uses one Kinect v2 fixed on a tripod while the plant and pot rotate together
+on a turntable. Its output is kept in the ignored
+`dataset_kinect_stationary/` folder, separate from the existing dual-camera
+dataset and its manually repositioned single-camera fallback.
+
+Install the Kinect v2/libfreenect2 stack as described in
+[`install_libfreenect2.sh`](install_libfreenect2.sh), then run a background
+reference sweep before placing the plant:
+
+```bash
+python rig_calibration/collect_specimen_stationary_kinect.py \
+  --serial YOUR_KINECT_SERIAL \
+  --step-deg 15 \
+  --checkerboard-inner-corners 9 6 \
+  --checkerboard-square-mm 25 \
+  --background-only \
+  --setup-id greenhouse_setup_01
+```
+
+Attach a known-size checkerboard rigidly to the turntable, outside the pot
+footprint, with all corners visible throughout the full rotation. Add a
+distinctive blue marker beside one specific outer corner; this resolves the
+checkerboard's 180-degree orientation ambiguity. Use the board's **inner
+corner count** and measured square size. Keep the camera, tripod, lights,
+background, checkerboard and turntable in the same positions for the empty
+reference and every plant sweep. The reference captures the empty scene and
+rotating board at matching angles.
+
+Capture each plant using the same turntable setup:
+
+```bash
+python rig_calibration/collect_specimen_stationary_kinect.py \
+  --serial YOUR_KINECT_SERIAL \
+  --step-deg 15 \
+  --checkerboard-inner-corners 9 6 \
+  --checkerboard-square-mm 25 \
+  --background-sweep-id greenhouse_setup_01
+```
+
+The default is 24 views at 15-degree intervals. At each stop, enter the
+measured angle shown by the turntable scale, wait for foliage to settle, and
+capture. The manifest records target and measured angles, the per-frame
+checkerboard pose, reprojection error, and a transform mapping each registered
+depth frame into the first successfully detected board frame. Review all
+checkerboard detections and errors before using the transforms. A missed blue
+orientation marker or an implausible pose jump is rejected and saved as
+unavailable rather than silently interpolated.
+
+Outputs contain `images/`, `depth/`, `capture_manifest.json`, and (for plant
+sweeps) `metadata.json`. RGB and depth are saved at the registered
+512x424 Kinect v2 resolution; depth values are millimetres. Optional mass
+fields can be entered after the scan. Capture data are intentionally
+git-ignored.
+
+This is the recommended acquisition geometry for a repeatable single-camera
+sweep: it avoids moving the camera between views. It does **not** remove Kinect
+v2 limitations: its lower resolution can miss very thin branches, sunlight
+and reflective surfaces can degrade infrared depth, and plant motion during
+rotation can cause misalignment. The checkerboard-derived transforms depend
+on the board being rigidly attached to the turntable and detected accurately.
+The new capture format is separate from the current GG-SSVT dual-Kinect
+loader; transform/mask validation and an adapter are still required before
+these captures can be compared as calibrated reconstructions.
