@@ -1,0 +1,198 @@
+{
+  "plant_id": "E21",
+  "capture_date": "2026-10-23",
+  "camera": {
+    "model": "Intel RealSense D455",
+    "serial_number": "141322252627",
+    "firmware_version": "5.17.3.10",
+    "depth_scale_m_per_unit": 0.0010000000474974513,
+    "depth_encoding": "aligned Z16; raw values multiplied by depth_scale_m_per_unit give metres",
+    "color_intrinsics": {
+      "width": 1280,
+      "height": 720,
+      "fx": 636.4385375976562,
+      "fy": 635.8126831054688,
+      "ppx": 633.03759765625,
+      "ppy": 365.44024658203125,
+      "model": "distortion.inverse_brown_conrady",
+      "coeffs": [
+        -0.05806224048137665,
+        0.06885302811861038,
+        -0.00020626126206479967,
+        0.000603642372880131,
+        -0.02210240624845028
+      ]
+    },
+    "depth_intrinsics": {
+      "width": 1280,
+      "height": 720,
+      "fx": 645.7561645507812,
+      "fy": 645.7561645507812,
+      "ppx": 640.4252319335938,
+      "ppy": 359.410400390625,
+      "model": "distortion.brown_conrady",
+      "coeffs": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "color_resolution": [
+      1280,
+      720
+    ],
+    "depth_resolution": [
+      1280,
+      720
+    ],
+    "fps": 30
+  },
+  "frames": [
+    {
+      "angle_deg": 0,
+      "rgb": "rgb/000.png",
+      "depth": "depth/000.png",
+      "captured_at_utc": "2026-10-23T15:38:00.622511+00:00"
+    },
+    {
+      "angle_deg": 15,
+      "rgb": "rgb/015.png",
+      "depth": "depth/015.png",
+      "captured_at_utc": "2026-10-23T15:38:20.204094+00:00"
+    },
+    {
+      "angle_deg": 30,
+      "rgb": "rgb/030.png",
+      "depth": "depth/030.png",
+      "captured_at_utc": "2026-10-23T15:38:29.379313+00:00"
+    },
+    {
+      "angle_deg": 45,
+      "rgb": "rgb/045.png",
+      "depth": "depth/045.png",
+      "captured_at_utc": "2026-10-23T15:38:37.916441+00:00"
+    },
+    {
+      "angle_deg": 60,
+      "rgb": "rgb/060.png",
+      "depth": "depth/060.png",
+      "captured_at_utc": "2026-10-23T15:38:44.798955+00:00"
+    },
+    {
+      "angle_deg": 75,
+      "rgb": "rgb/075.png",
+      "depth": "depth/075.png",
+      "captured_at_utc": "2026-10-23T15:38:52.625994+00:00"
+    },
+    {
+      "angle_deg": 90,
+      "rgb": "rgb/090.png",
+      "depth": "depth/090.png",
+      "captured_at_utc": "2026-10-23T15:39:03.092565+00:00"
+    },
+    {
+      "angle_deg": 105,
+      "rgb": "rgb/105.png",
+      "depth": "depth/105.png",
+      "captured_at_utc": "2026-10-23T15:39:28.772248+00:00"
+    },
+    {
+      "angle_deg": 120,
+      "rgb": "rgb/120.png",
+      "depth": "depth/120.png",
+      "captured_at_utc": "2026-10-23T15:39:44.835587+00:00"
+    },
+    {
+      "angle_deg": 135,
+      "rgb": "rgb/135.png",
+      "depth": "depth/135.png",
+      "captured_at_utc": "2026-10-23T15:39:56.761445+00:00"
+    },
+    {
+      "angle_deg": 150,
+      "rgb": "rgb/150.png",
+      "depth": "depth/150.png",
+      "captured_at_utc": "2026-10-23T15:40:08.194147+00:00"
+    },
+    {
+      "angle_deg": 165,
+      "rgb": "rgb/165.png",
+      "depth": "depth/165.png",
+      "captured_at_utc": "2026-10-23T15:40:20.011787+00:00"
+    },
+    {
+      "angle_deg": 180,
+      "rgb": "rgb/180.png",
+      "depth": "depth/180.png",
+      "captured_at_utc": "2026-10-23T15:40:35.580456+00:00"
+    },
+    {
+      "angle_deg": 195,
+      "rgb": "rgb/195.png",
+      "depth": "depth/195.png",
+      "captured_at_utc": "2026-10-23T15:40:44.670530+00:00"
+    },
+    {
+      "angle_deg": 210,
+      "rgb": "rgb/210.png",
+      "depth": "depth/210.png",
+      "captured_at_utc": "2026-10-23T15:40:54.265373+00:00"
+    },
+    {
+      "angle_deg": 225,
+      "rgb": "rgb/225.png",
+      "depth": "depth/225.png",
+      "captured_at_utc": "2026-10-23T15:41:03.497614+00:00"
+    },
+    {
+      "angle_deg": 240,
+      "rgb": "rgb/240.png",
+      "depth": "depth/240.png",
+      "captured_at_utc": "2026-10-23T15:41:10.770364+00:00"
+    },
+    {
+      "angle_deg": 255,
+      "rgb": "rgb/255.png",
+      "depth": "depth/255.png",
+      "captured_at_utc": "2026-10-23T15:41:17.831026+00:00"
+    },
+    {
+      "angle_deg": 270,
+      "rgb": "rgb/270.png",
+      "depth": "depth/270.png",
+      "captured_at_utc": "2026-10-23T15:41:26.107217+00:00"
+    },
+    {
+      "angle_deg": 285,
+      "rgb": "rgb/285.png",
+      "depth": "depth/285.png",
+      "captured_at_utc": "2026-10-23T15:41:40.318312+00:00"
+    },
+    {
+      "angle_deg": 300,
+      "rgb": "rgb/300.png",
+      "depth": "depth/300.png",
+      "captured_at_utc": "2026-10-23T15:41:55.552827+00:00"
+    },
+    {
+      "angle_deg": 315,
+      "rgb": "rgb/315.png",
+      "depth": "depth/315.png",
+      "captured_at_utc": "2026-10-23T15:42:11.145610+00:00"
+    },
+    {
+      "angle_deg": 330,
+      "rgb": "rgb/330.png",
+      "depth": "depth/330.png",
+      "captured_at_utc": "2026-10-23T15:42:27.790835+00:00"
+    },
+    {
+      "angle_deg": 345,
+      "rgb": "rgb/345.png",
+      "depth": "depth/345.png",
+      "captured_at_utc": "2026-10-23T15:42:43.567856+00:00"
+    }
+  ]
+}
