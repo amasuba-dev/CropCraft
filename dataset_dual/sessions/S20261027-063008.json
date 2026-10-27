@@ -1,0 +1,113 @@
+{
+  "operator": null,
+  "location": null,
+  "lighting": null,
+  "backdrop": null,
+  "d455_distance_mm": null,
+  "d455_height_mm": null,
+  "d455_orientation": "portrait",
+  "kinect_distance_mm": null,
+  "kinect_height_mm": null,
+  "kinect_orientation": "landscape",
+  "session_id": "S20261027-063008",
+  "started_at": "2026-10-27T06:30:08",
+  "kinect_pause": true,
+  "d455_fps": 15,
+  "interference": {
+    "d455_alone": {
+      "valid_pct": 43.05,
+      "noise_mm": 3.43
+    },
+    "d455_with_kinect": {
+      "valid_pct": 29.28,
+      "noise_mm": 3.684
+    },
+    "kinect_alone": {
+      "valid_pct": 87.45,
+      "noise_mm": 1.806
+    },
+    "kinect_with_d455_projector": {
+      "valid_pct": 87.4,
+      "noise_mm": 1.746
+    },
+    "d455_harmed": true,
+    "kinect_harmed": false
+  },
+  "d455": {
+    "model": "Intel RealSense D455",
+    "serial_number": "141322252627",
+    "firmware_version": "5.17.3.10",
+    "depth_scale_m_per_unit": 0.0010000000474974513,
+    "depth_encoding": "aligned Z16; raw values multiplied by depth_scale_m_per_unit give metres",
+    "color_intrinsics": {
+      "width": 1280,
+      "height": 720,
+      "fx": 637.4765625,
+      "fy": 636.8496704101562,
+      "ppx": 633.03759765625,
+      "ppy": 365.44024658203125,
+      "model": "distortion.inverse_brown_conrady",
+      "coeffs": [
+        -0.05806224048137665,
+        0.06885302811861038,
+        -0.00020626126206479967,
+        0.000603642372880131,
+        -0.02210240624845028
+      ]
+    },
+    "depth_intrinsics": {
+      "width": 1280,
+      "height": 720,
+      "fx": 645.7561645507812,
+      "fy": 645.7561645507812,
+      "ppx": 640.4252319335938,
+      "ppy": 359.410400390625,
+      "model": "distortion.brown_conrady",
+      "coeffs": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "color_resolution": [
+      1280,
+      720
+    ],
+    "depth_resolution": [
+      1280,
+      720
+    ],
+    "fps": 15,
+    "visual_preset": "high_accuracy"
+  },
+  "kinect": {
+    "model": "Microsoft Kinect V2 (libfreenect2)",
+    "serial_number": "003071363947",
+    "ir_intrinsics": {
+      "fx": 363.8572082519531,
+      "fy": 363.8572082519531,
+      "cx": 258.0325927734375,
+      "cy": 208.16400146484375,
+      "k1": 0.09449087828397751,
+      "k2": -0.26886558532714844,
+      "k3": 0.08833683282136917,
+      "p1": 0.0,
+      "p2": 0.0,
+      "width": 512,
+      "height": 424
+    },
+    "color_intrinsics": {
+      "fx": 1081.3720703125,
+      "fy": 1081.3720703125,
+      "cx": 959.5,
+      "cy": 539.5,
+      "width": 1920,
+      "height": 1080
+    },
+    "depth_encoding": "uint16 millimetres; 0 = no return",
+    "rgb_note": "rgb/ is colour registered to the 512x424 depth, gamma 2.6 as in dataset/; color_full/ is the raw 1920x1080 frame",
+    "depth_full_note": "depth_full/ is depth registered to color_full/ (libfreenect2 bigdepth)"
+  }
+}

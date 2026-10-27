@@ -208,3 +208,89 @@ def test_abandoning_a_plant_writes_no_csv_row(tmp_path):
     ask = scripted(answers)
     assert cd.run(args, ask) == 0
     assert not (tmp_path / "ground_truth.csv").exists()
+
+
+def test_kinect_watchdog_kills_a_hung_call_and_spares_a_quick_one():
+    import subprocess
+    import sys
+    from pathlib import Path
+    repo = Path(cd.__file__).resolve().parents[1]
+    script = ("import time\n"
+              "from dataset_dual import capture_dual as cd\n"
+              "with cd.kinect_watchdog(5):\n    pass\n"
+              "with cd.kinect_watchdog(1):\n    time.sleep(30)\n"
+              "print('not reached')\n")
+    done = subprocess.run([sys.executable, "-c", script], cwd=repo, capture_output=True,
+                          text=True, timeout=20)
+    assert done.returncode == 1
+    assert "Timeout" in done.stderr and "not reached" not in done.stdout
+
+
+class FakeListener:
+    def __init__(self, ready_after: int | None):
+        self.polls, self.ready_after, self.released = 0, ready_after, []
+
+    def hasNewFrame(self):
+        self.polls += 1
+        return self.ready_after is not None and self.polls > self.ready_after
+
+    def waitForNewFrame(self):
+        self.polls = 0
+        return object()
+
+    def release(self, frames):
+        self.released.append(frames)
+
+
+def test_wait_kinect_frames_returns_the_last_and_releases_the_rest():
+    listener = FakeListener(ready_after=2)
+    last = cd.wait_kinect_frames(listener, 3, "in a test", timeout_s=1)
+    assert len(listener.released) == 2 and last not in listener.released
+
+
+def test_wait_kinect_frames_fails_cleanly_when_nothing_arrives():
+    with pytest.raises(cd.KinectNotStreaming, match="Unplug the Kinect"):
+        cd.wait_kinect_frames(FakeListener(ready_after=None), 1, "in a test", timeout_s=0.05)
+
+
+def test_a_dead_kinect_ends_the_run_with_both_cameras_closed(tmp_path, monkeypatch):
+    closed = []
+
+    def dead(self):
+        raise cd.KinectNotStreaming("no Kinect frame for 10 s in a test")
+    monkeypatch.setattr(cd.SimKinect, "open", dead)
+    monkeypatch.setattr(cd.SimKinect, "close", lambda self: closed.append("kinect"))
+    monkeypatch.setattr(cd.SimD455, "close", lambda self: closed.append("d455"))
+    args = SimpleNamespace(simulate=True, sim_plant_height=1.0, d455_serial=None, kinect_serial=None,
+                           d455_fps=15, kinect_pause=True, skip_interference_test=True, check_only=False,
+                           preview=False, output_dir=tmp_path / "plants",
+                           ground_truth_csv=tmp_path / "ground_truth.csv")
+    assert cd.run(args, scripted(SESSION)) == 2
+    assert closed == ["kinect", "d455"]  # a half-opened Kinect is stopped and closed too
+
+
+def test_a_d455_that_will_not_start_is_reset_once_and_retried(monkeypatch):
+    calls = []
+    cam = cd.D455(None, 15)
+
+    def open_once():
+        calls.append("open")
+        cam.cam = SimpleNamespace(pipeline=object())  # found the camera, then failed to stream
+        if calls.count("open") == 1:
+            raise RuntimeError("xioctl(VIDIOC_S_FMT) failed")
+    monkeypatch.setattr(cam, "_open_once", open_once)
+    monkeypatch.setattr(cam, "_reset", lambda: calls.append("reset"))
+    cam.open()
+    assert calls == ["open", "reset", "open"]
+
+
+def test_a_missing_d455_is_not_retried(monkeypatch):
+    cam = cd.D455(None, 15)
+
+    def open_once():
+        cam.cam = SimpleNamespace(pipeline=None)
+        raise RuntimeError("No Intel RealSense D455 was detected.")
+    monkeypatch.setattr(cam, "_open_once", open_once)
+    monkeypatch.setattr(cam, "_reset", lambda: pytest.fail("should not reset"))
+    with pytest.raises(RuntimeError, match="No Intel RealSense"):
+        cam.open()

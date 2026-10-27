@@ -34,7 +34,7 @@ USBFS_MEMORY_MIN_MB = 64   # two Kinect v2 depth transfer pools need ~16MB each
 try:
     from pylibfreenect2 import (
         Freenect2, SyncMultiFrameListener, FrameType,
-        Registration, Frame, OpenGLPacketPipeline,
+        Registration, Frame, OpenGLPacketPipeline, CpuPacketPipeline,
     )
     KINECT_AVAILABLE = True
 except ImportError:
@@ -185,7 +185,7 @@ class KinectDevice:
         self.listener = None
         self.registration = None
 
-    def open(self, warmup_frames: int = 30):
+    def open(self, warmup_frames: int = 30, cpu_pipeline: bool = False):
         if not KINECT_AVAILABLE:
             raise RuntimeError(
                 "pylibfreenect2 not installed. See rig_calibration/install_libfreenect2.sh, "
@@ -200,7 +200,10 @@ class KinectDevice:
                 f"devices {serials}. Update CAM_A_SERIAL/CAM_B_SERIAL in this script."
             )
 
-        pipeline = OpenGLPacketPipeline()
+        # The OpenGL depth decoder loses its GL context after device.stop()/start()
+        # ("GLX: Failed to make context current") and never delivers another frame,
+        # so callers that pause the stream must use the CPU decoder.
+        pipeline = CpuPacketPipeline() if cpu_pipeline else OpenGLPacketPipeline()
         self.device = self.fn.openDevice(self.serial.encode(), pipeline=pipeline)
         self.listener = SyncMultiFrameListener(FrameType.Color | FrameType.Depth)
         self.device.setColorFrameListener(self.listener)

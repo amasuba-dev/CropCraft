@@ -47,7 +47,9 @@ Layout, one folder per plant:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import csv
+import faulthandler
 import json
 import math
 import re
@@ -80,6 +82,10 @@ ANGLES_DEG = tuple(range(0, 360, 15))
 D455_SETTLE_FRAMES = 6        # frames dropped after the projector is switched
 KINECT_FLUSH_FRAMES = 2       # Kinect frames dropped so the one kept is fresh
 KINECT_WARMUP_MINUTES = 15.0  # time-of-flight depth drifts while the sensor warms
+KINECT_OPEN_TIMEOUT_S = 45    # libfreenect2 can hang forever opening a wedged Kinect
+KINECT_CALL_TIMEOUT_S = 30    # ... or starting/stopping one that stopped responding
+KINECT_FRAME_TIMEOUT_S = 10   # no Kinect frame for this long = not streaming
+D455_RESET_WAIT_S = 30        # time for the D455 to come back after a hardware reset
 INTERFERENCE_FRAMES = 15
 ORIENTATIONS = ("landscape", "portrait")
 EDGES = ("top", "bottom", "left", "right")
@@ -354,6 +360,20 @@ class D455:
         return capture_d455
 
     def open(self) -> None:
+        try:
+            self._open_once()
+        except RuntimeError as exc:
+            # A D455 left streaming by a killed run fails here ("Failed to set UVC
+            # probe control", "xioctl(VIDIOC_S_FMT) failed"). Unlike the Kinect it can
+            # be reset from software. Missing or ambiguous cameras are not retried.
+            if getattr(getattr(self, "cam", None), "pipeline", None) is None:
+                raise
+            print(f"  The D455 would not start ({exc}).\n  Resetting it and trying once more ...")
+            self._reset()
+            self._open_once()
+
+    def _open_once(self) -> None:
+        self.close()
         base = self._base()
         base.FPS = self.fps
         self.cam = base.D455Camera(requested_serial=self.serial)
@@ -389,16 +409,84 @@ class D455:
     def depth_m(self, depth_raw: np.ndarray) -> np.ndarray:
         return depth_raw.astype(np.float32) * float(self.cam.depth_scale_m)
 
+    def _reset(self) -> None:
+        rs = self.cam._rs
+        serial = self.cam.camera_info.get("serial_number") or self.serial
+        devices = [d for d in rs.context().query_devices() if "D455" in d.get_info(rs.camera_info.name)
+                   and (not serial or d.get_info(rs.camera_info.serial_number) == serial)]
+        if not devices:
+            raise RuntimeError("the D455 disappeared; unplug and replug it")
+        serial = devices[0].get_info(rs.camera_info.serial_number)
+        devices[0].hardware_reset()
+        time.sleep(3)  # it drops off USB before coming back
+        deadline = time.monotonic() + D455_RESET_WAIT_S
+        while time.monotonic() < deadline:
+            if any(d.get_info(rs.camera_info.serial_number) == serial for d in rs.context().query_devices()):
+                time.sleep(2)
+                return
+            time.sleep(1)
+        raise RuntimeError(f"the D455 did not come back within {D455_RESET_WAIT_S} s of a reset; replug it")
+
     def close(self) -> None:
         if getattr(self, "cam", None):
-            self.cam.close()
+            try:
+                self.cam.close()
+            except Exception:  # noqa: BLE001
+                pass
+
+
+@contextlib.contextmanager
+def kinect_watchdog(seconds: float):
+    """Exit the process if a libfreenect2 call does not return within `seconds`.
+
+    A wedged Kinect can block inside libfreenect2's native code (openDevice, start,
+    stop, close) with no timeout, holding the GIL, so neither a Python thread nor a
+    signal handler can interrupt it. faulthandler's timer runs on its own C thread:
+    it prints where Python was stuck and calls _exit(1). This is the last resort;
+    frame waits use wait_kinect_frames, which fails cleanly instead.
+    """
+    faulthandler.dump_traceback_later(seconds, exit=True, file=sys.stderr)
+    try:
+        yield
+    finally:
+        faulthandler.cancel_dump_traceback_later()
+
+
+REPLUG_KINECT = ("Unplug the Kinect's USB cable (or power brick) for 5 s, plug it back in, "
+                 "wait 10 s and rerun. Check the adapter box LED is lit.")
+
+
+class KinectNotStreaming(RuntimeError):
+    """The Kinect is open but no frames arrive. Only a power cycle brings it back."""
+
+
+def wait_kinect_frames(listener, count: int, what: str,
+                       timeout_s: float = KINECT_FRAME_TIMEOUT_S) -> Any:
+    """Wait for `count` frame sets, releasing all but the last, which is returned.
+
+    pylibfreenect2's waitForNewFrame(milliseconds=...) ignores the timeout and
+    blocks forever on a Kinect that stopped streaming, so poll hasNewFrame instead.
+    """
+    frames = None
+    for _ in range(count):
+        if frames is not None:
+            listener.release(frames)
+            frames = None
+        deadline = time.monotonic() + timeout_s
+        while not listener.hasNewFrame():
+            if time.monotonic() > deadline:
+                raise KinectNotStreaming(f"no Kinect frame for {timeout_s:.0f} s {what}. {REPLUG_KINECT}")
+            time.sleep(0.005)
+        frames = listener.waitForNewFrame()
+    return frames
 
 
 class Kinect:
     """One Kinect V2 held open for the whole session, with full-resolution colour kept."""
 
-    def __init__(self, serial: str | None) -> None:
+    def __init__(self, serial: str | None, cpu_pipeline: bool = False) -> None:
         self.serial = serial
+        self.cpu_pipeline = cpu_pipeline  # needed by --kinect-pause, see KinectDevice.open
         self.opened_at: float | None = None
 
     def open(self) -> None:
@@ -421,8 +509,12 @@ class Kinect:
             preferred = [s for s in serials if s in (cs.CAM_A_SERIAL, cs.CAM_B_SERIAL)]
             self.serial = (preferred or serials)[0]
             print(f"  Kinect serial {self.serial} (found {', '.join(serials)})")
+        print("  Opening the Kinect ...")
         self.device = cs.KinectDevice("kinect", self.serial)
-        self.device.open(warmup_frames=30)
+        with kinect_watchdog(KINECT_OPEN_TIMEOUT_S):
+            self.device.open(warmup_frames=0, cpu_pipeline=self.cpu_pipeline)
+        self.device.listener.release(
+            wait_kinect_frames(self.device.listener, 30, "after opening the Kinect"))
         self.opened_at = time.time()
         ir, colour = self.device.device.getIrCameraParams(), self.device.device.getColorCameraParams()
         pick = lambda obj, names: {n: float(getattr(obj, n)) for n in names if hasattr(obj, n)}  # noqa: E731
@@ -433,6 +525,7 @@ class Kinect:
                                   width=512, height=424),
             "color_intrinsics": dict(pick(colour, ("fx", "fy", "cx", "cy")), width=1920, height=1080),
             "depth_encoding": "uint16 millimetres; 0 = no return",
+            "depth_decoder": "libfreenect2 " + ("CPU" if self.cpu_pipeline else "OpenGL"),
             "rgb_note": "rgb/ is colour registered to the 512x424 depth, gamma "
                         f"{cs.RGB_GAMMA} as in dataset/; color_full/ is the raw 1920x1080 frame",
             "depth_full_note": "depth_full/ is depth registered to color_full/ (libfreenect2 bigdepth)",
@@ -446,22 +539,18 @@ class Kinect:
         return 0.0 if self.opened_at is None else (time.time() - self.opened_at) / 60
 
     def pause(self) -> None:
-        self.device.device.stop()
+        with kinect_watchdog(KINECT_CALL_TIMEOUT_S):
+            self.device.device.stop()
 
     def resume(self) -> None:
-        self.device.device.start()
-        for _ in range(5):
-            frames = self.device.listener.waitForNewFrame(milliseconds=10000)
-            self.device.listener.release(frames)
+        with kinect_watchdog(KINECT_CALL_TIMEOUT_S):
+            self.device.device.start()
+        self.device.listener.release(
+            wait_kinect_frames(self.device.listener, 5, "after restarting the Kinect (--kinect-pause)"))
 
     def grab(self) -> dict[str, np.ndarray]:
         lf, cs, dev = self.lf, self.cs, self.device
-        for _ in range(KINECT_FLUSH_FRAMES):
-            stale = dev.listener.waitForNewFrame(milliseconds=10000)
-            dev.listener.release(stale)
-        frames = dev.listener.waitForNewFrame(milliseconds=10000)
-        if frames is None:
-            raise RuntimeError("the Kinect stopped sending frames; unplug and replug its USB cable")
+        frames = wait_kinect_frames(dev.listener, KINECT_FLUSH_FRAMES + 1, "while capturing")
         try:
             colour = frames[lf.FrameType.Color]
             depth = frames[lf.FrameType.Depth]
@@ -489,7 +578,8 @@ class Kinect:
 
     def close(self) -> None:
         if getattr(self, "device", None):
-            self.device.close()
+            with kinect_watchdog(KINECT_CALL_TIMEOUT_S):
+                self.device.close()
 
 
 # Simulated cameras, so the whole flow can be rehearsed (and tested) without hardware.
@@ -878,7 +968,7 @@ def run(args, ask: Ask = input) -> int:
         make_kinect = lambda: SimKinect(args.sim_plant_height)  # noqa: E731
     else:
         d455 = D455(args.d455_serial, args.d455_fps)
-        make_kinect = lambda: Kinect(args.kinect_serial)  # noqa: E731
+        make_kinect = lambda: Kinect(args.kinect_serial, cpu_pipeline=args.kinect_pause)  # noqa: E731
     kinect = None
     try:
         print("\nOpening the D455 ...")
@@ -915,6 +1005,10 @@ def run(args, ask: Ask = input) -> int:
     except (KeyboardInterrupt, EOFError):
         print("\nStopped.")
         return 130
+    except KinectNotStreaming as exc:
+        print(f"\nKinect failure: {exc}\nA plant in progress keeps the views saved so far; "
+              "no CSV row was written for it. Both cameras are being closed.")
+        return 2
     finally:
         for cam in (kinect, d455):
             try:
